@@ -2,95 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
+    /* Dark sporty theme - NFL Draft Board aesthetic */
+    --background: 222 47% 8%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 222 47% 11%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Electric cyan primary */
+    --primary: 190 95% 50%;
+    --primary-foreground: 222 47% 8%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    /* Deep navy secondary */
+    --secondary: 222 47% 15%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 222 30% 18%;
+    --muted-foreground: 215 20% 55%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Gold accent */
+    --accent: 45 100% 55%;
+    --accent-foreground: 222 47% 8%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 222 30% 20%;
+    --input: 222 30% 20%;
+    --ring: 190 95% 50%;
+
+    --radius: 0.75rem;
+
+    /* Custom colors for positions */
+    --qb: 280 70% 55%;
+    --rb: 145 70% 45%;
+    --wr: 190 95% 50%;
+    --te: 35 100% 50%;
+    --k: 320 70% 55%;
+    --def: 0 70% 55%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(190 95% 50%), hsl(220 90% 55%));
+    --gradient-gold: linear-gradient(135deg, hsl(45 100% 55%), hsl(35 100% 45%));
+    --gradient-dark: linear-gradient(180deg, hsl(222 47% 11%), hsl(222 47% 6%));
+    --gradient-card: linear-gradient(145deg, hsl(222 47% 13%), hsl(222 47% 9%));
+
+    /* Shadows */
+    --shadow-glow: 0 0 30px hsl(190 95% 50% / 0.3);
+    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.4);
+    --shadow-elevated: 0 8px 40px hsl(0 0% 0% / 0.5);
+
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 190 95% 50%;
+    --sidebar-primary-foreground: 222 47% 8%;
+    --sidebar-accent: 222 47% 15%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 30% 20%;
+    --sidebar-ring: 190 95% 50%;
+  }
+
+  /* Light mode - keep same dark theme for sports app */
+  .light {
+    --background: 222 47% 8%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 190 95% 50%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 222 47% 15%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 222 30% 18%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 45 100% 55%;
+    --accent-foreground: 222 47% 8%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 30% 20%;
+    --input: 222 30% 20%;
+    --ring: 190 95% 50%;
   }
 }
 
@@ -100,6 +99,126 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.02em;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-xl;
+    box-shadow: var(--shadow-card);
+  }
+
+  .glow-border {
+    @apply relative;
+    box-shadow: var(--shadow-glow);
+  }
+
+  .position-badge {
+    @apply px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider;
+  }
+
+  .position-qb {
+    background: hsl(var(--qb) / 0.2);
+    color: hsl(var(--qb));
+    border: 1px solid hsl(var(--qb) / 0.5);
+  }
+
+  .position-rb {
+    background: hsl(var(--rb) / 0.2);
+    color: hsl(var(--rb));
+    border: 1px solid hsl(var(--rb) / 0.5);
+  }
+
+  .position-wr {
+    background: hsl(var(--wr) / 0.2);
+    color: hsl(var(--wr));
+    border: 1px solid hsl(var(--wr) / 0.5);
+  }
+
+  .position-te {
+    background: hsl(var(--te) / 0.2);
+    color: hsl(var(--te));
+    border: 1px solid hsl(var(--te) / 0.5);
+  }
+
+  .position-k {
+    background: hsl(var(--k) / 0.2);
+    color: hsl(var(--k));
+    border: 1px solid hsl(var(--k) / 0.5);
+  }
+
+  .position-def {
+    background: hsl(var(--def) / 0.2);
+    color: hsl(var(--def));
+    border: 1px solid hsl(var(--def) / 0.5);
+  }
+
+  .dragging {
+    @apply opacity-50 scale-105;
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .drag-over {
+    @apply border-primary border-2;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-primary);
+  }
+
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-gold);
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 20px hsl(190 95% 50% / 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px hsl(190 95% 50% / 0.5);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 }
