@@ -1,4 +1,3 @@
-import { GripVertical } from 'lucide-react';
 import { PositionBadge } from './PositionBadge';
 import { cn } from '@/lib/utils';
 import type { RankedPlayer } from '@/types/database';
@@ -13,19 +12,13 @@ interface PlayerCardProps {
 export const PlayerCard = ({ player, rank, isDragging, dragHandleProps }: PlayerCardProps) => {
   return (
     <div
+      {...dragHandleProps}
       className={cn(
-        'glass-card p-3 flex items-center gap-3 transition-all duration-200',
+        'glass-card p-3 flex items-center gap-3 transition-all duration-200 cursor-grab active:cursor-grabbing',
         isDragging && 'dragging border-primary'
       )}
     >
-      <div
-        {...dragHandleProps}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <GripVertical className="w-5 h-5" />
-      </div>
-      
-      <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center font-display text-lg text-primary-foreground">
+      <div className="w-7 h-7 rounded-md bg-gradient-primary flex items-center justify-center font-display text-sm text-primary-foreground">
         {rank}
       </div>
       
