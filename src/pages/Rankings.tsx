@@ -255,6 +255,12 @@ const Rankings = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuCheckboxItem
+                checked={positionFilter.length === 0}
+                onCheckedChange={() => setPositionFilter([])}
+              >
+                All
+              </DropdownMenuCheckboxItem>
               {positions.map((pos) => (
                 <DropdownMenuCheckboxItem
                   key={pos}

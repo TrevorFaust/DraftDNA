@@ -270,52 +270,38 @@ const History = () => {
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto">
-            {/* Team roster sections */}
+            {/* User's team only */}
             {selectedDraft && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                {Array.from({ length: selectedDraft.num_teams }, (_, i) => i + 1).map(
-                  (teamNum) => {
-                    const teamPicks = selectedDraft.picks.filter(
-                      (p) => p.team_number === teamNum
-                    );
-                    const isUserTeam = teamNum === selectedDraft.user_pick_position;
-
-                    return (
-                      <div
-                        key={teamNum}
-                        className={cn(
-                          'rounded-lg p-3',
-                          isUserTeam
-                            ? 'bg-accent/10 border border-accent/30'
-                            : 'bg-secondary/30'
-                        )}
-                      >
-                        <h4 className="font-display text-sm mb-2">
-                          Team {teamNum} {isUserTeam && '(YOU)'}
-                        </h4>
-                        <div className="space-y-1">
-                          {teamPicks.map((pick) => (
-                            <div
-                              key={pick.id}
-                              className="flex items-center gap-2 text-sm"
-                            >
-                              <span className="text-muted-foreground w-6">
-                                R{pick.round_number}
-                              </span>
-                              <span className="flex-1 truncate">
-                                {pick.player?.name}
-                              </span>
-                              <PositionBadge
-                                position={pick.player?.position || ''}
-                                className="text-[10px]"
-                              />
-                            </div>
-                          ))}
+              <div className="py-4">
+                <div className="rounded-lg p-4 bg-accent/10 border border-accent/30">
+                  <h4 className="font-display text-lg mb-3">Your Team</h4>
+                  <div className="space-y-2">
+                    {selectedDraft.picks
+                      .filter((p) => p.team_number === selectedDraft.user_pick_position)
+                      .map((pick) => (
+                        <div
+                          key={pick.id}
+                          className="flex items-center gap-3 text-sm bg-secondary/30 rounded-lg p-2"
+                        >
+                          <span className="text-muted-foreground w-8 font-mono">
+                            Rd {pick.round_number}
+                          </span>
+                          <span className="text-muted-foreground w-12 font-mono">
+                            #{pick.pick_number}
+                          </span>
+                          <span className="flex-1 font-medium">
+                            {pick.player?.name}
+                          </span>
+                          <span className="text-muted-foreground text-xs">
+                            {pick.player?.team || 'FA'}
+                          </span>
+                          <PositionBadge
+                            position={pick.player?.position || ''}
+                          />
                         </div>
-                      </div>
-                    );
-                  }
-                )}
+                      ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>

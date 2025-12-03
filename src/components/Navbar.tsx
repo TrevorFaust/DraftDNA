@@ -8,11 +8,13 @@ export const Navbar = () => {
   const { user, signOut } = useAuth();
   const location = useLocation();
 
-  const navItems = [
-    { path: '/rankings', label: 'Rankings', icon: ListOrdered },
-    { path: '/mock-draft', label: 'Mock Draft', icon: Zap },
-    { path: '/history', label: 'History', icon: History },
-  ];
+  const navItems = user
+    ? [
+        { path: '/rankings', label: 'Rankings', icon: ListOrdered },
+        { path: '/mock-draft', label: 'Mock Draft', icon: Zap },
+        { path: '/history', label: 'History', icon: History },
+      ]
+    : [];
 
   return (
     <nav className="sticky top-0 z-50 glass-card border-b border-border/50 px-4 py-3">
