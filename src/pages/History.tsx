@@ -5,10 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { PositionBadge } from '@/components/PositionBadge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Calendar, Users, Layers, ChevronRight, Trash2, Loader2, FolderPlus, Folder, X, Plus } from 'lucide-react';
-import type { MockDraft, DraftPick, Player, League } from '@/types/database';
+import { Calendar, Users, Layers, ChevronRight, Trash2, Loader2, Folder } from 'lucide-react';
+import type { MockDraft, DraftPick, Player } from '@/types/database';
+import { useLeagues } from '@/hooks/useLeagues';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,18 +34,12 @@ interface DraftWithPicks extends MockDraft {
 
 const History = () => {
   const { user, loading: authLoading } = useAuth();
+  const { selectedLeague: globalSelectedLeague, leagues } = useLeagues();
   const navigate = useNavigate();
   const [drafts, setDrafts] = useState<DraftWithPicks[]>([]);
-  const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDraft, setSelectedDraft] = useState<DraftWithPicks | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
-  const [showNewLeagueDialog, setShowNewLeagueDialog] = useState(false);
-  const [newLeagueName, setNewLeagueName] = useState('');
-  const [newLeagueTeams, setNewLeagueTeams] = useState('12');
-  const [newLeaguePosition, setNewLeaguePosition] = useState('1');
-  const [creatingLeague, setCreatingLeague] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -57,15 +51,6 @@ const History = () => {
     if (!user) return;
 
     try {
-      // Fetch leagues
-      const { data: leaguesData } = await supabase
-        .from('leagues')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
-
-      setLeagues(leaguesData || []);
-
       // Fetch all players first
       const { data: playersData } = await supabase
         .from('players')
@@ -117,43 +102,6 @@ const History = () => {
     }
   }, [user, fetchData]);
 
-  const createLeague = async () => {
-    if (!user || !newLeagueName.trim()) return;
-    setCreatingLeague(true);
-
-    try {
-      const { error } = await supabase.from('leagues').insert({
-        user_id: user.id,
-        name: newLeagueName.trim(),
-        num_teams: parseInt(newLeagueTeams),
-        user_pick_position: parseInt(newLeaguePosition),
-      });
-
-      if (error) throw error;
-      toast.success('League created');
-      setShowNewLeagueDialog(false);
-      setNewLeagueName('');
-      fetchData();
-    } catch (error) {
-      toast.error('Failed to create league');
-    } finally {
-      setCreatingLeague(false);
-    }
-  };
-
-  const deleteLeague = async (leagueId: string) => {
-    try {
-      await supabase.from('leagues').delete().eq('id', leagueId);
-      setLeagues((prev) => prev.filter((l) => l.id !== leagueId));
-      if (selectedLeagueId === leagueId) {
-        setSelectedLeagueId(null);
-      }
-      toast.success('League deleted');
-    } catch (error) {
-      toast.error('Failed to delete league');
-    }
-  };
-
   const deleteDraft = async (draftId: string) => {
     try {
       await supabase.from('mock_drafts').delete().eq('id', draftId);
@@ -194,9 +142,10 @@ const History = () => {
     return draft.picks.filter((p) => p.team_number === draft.user_pick_position);
   };
 
-  const filteredDrafts = selectedLeagueId === null
-    ? drafts.filter((d) => !d.league_id)
-    : drafts.filter((d) => d.league_id === selectedLeagueId);
+  // When "All Leagues" is selected (null), show all drafts. Otherwise filter by selected league.
+  const filteredDrafts = globalSelectedLeague === null
+    ? drafts
+    : drafts.filter((d) => d.league_id === globalSelectedLeague.id);
 
   const getLeagueById = (id: string | null) => leagues.find((l) => l.id === id);
 
@@ -223,75 +172,18 @@ const History = () => {
           </Button>
         </div>
 
-        {/* League Tabs */}
-        <div className="flex items-center gap-2 mb-6 flex-wrap">
-          <button
-            onClick={() => setSelectedLeagueId(null)}
-            className={cn(
-              'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2',
-              selectedLeagueId === null
-                ? 'bg-accent text-accent-foreground'
-                : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
-            )}
-          >
+        {/* League indicator */}
+        {globalSelectedLeague && (
+          <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
             <Folder className="w-4 h-4" />
-            Uncategorized
-          </button>
-
-          {leagues.map((league) => (
-            <div key={league.id} className="relative group">
-              <button
-                onClick={() => setSelectedLeagueId(league.id)}
-                className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 pr-8',
-                  selectedLeagueId === league.id
-                    ? 'bg-accent text-accent-foreground'
-                    : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
-                )}
-              >
-                <Folder className="w-4 h-4" />
-                {league.name}
-                <span className="text-xs opacity-60">
-                  ({league.num_teams} teams, Pick #{league.user_pick_position})
-                </span>
-              </button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <button className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <X className="w-3 h-3 text-destructive" />
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete league "{league.name}"?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Drafts in this league won't be deleted, they'll move to Uncategorized.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => deleteLeague(league.id)}>
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          ))}
-
-          <button
-            onClick={() => setShowNewLeagueDialog(true)}
-            className="px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all flex items-center gap-1"
-          >
-            <Plus className="w-4 h-4" />
-            New League
-          </button>
-        </div>
+            <span>Showing drafts for: <strong className="text-foreground">{globalSelectedLeague.name}</strong></span>
+          </div>
+        )}
 
         {filteredDrafts.length === 0 ? (
           <div className="glass-card p-12 text-center">
             <p className="text-muted-foreground mb-4">
-              {selectedLeagueId ? 'No drafts in this league yet' : 'No drafts yet'}
+              {globalSelectedLeague ? 'No drafts in this league yet' : 'No drafts yet'}
             </p>
             <Button variant="default" onClick={() => navigate('/mock-draft')}>
               Start Your First Draft
@@ -466,76 +358,6 @@ const History = () => {
                 </div>
               </div>
             )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* New League Dialog */}
-      <Dialog open={showNewLeagueDialog} onOpenChange={setShowNewLeagueDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl flex items-center gap-2">
-              <FolderPlus className="w-5 h-5" />
-              Create New League
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">League Name</label>
-              <Input
-                placeholder="e.g., Work League, Friends League"
-                value={newLeagueName}
-                onChange={(e) => setNewLeagueName(e.target.value)}
-                className="bg-secondary/50 border-border/50"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Number of Teams</label>
-                <select
-                  value={newLeagueTeams}
-                  onChange={(e) => setNewLeagueTeams(e.target.value)}
-                  className="w-full bg-secondary/50 border border-border/50 rounded-md px-3 py-2 text-sm"
-                >
-                  {[8, 10, 12, 14, 16].map((n) => (
-                    <option key={n} value={n}>
-                      {n} teams
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Your Pick Position</label>
-                <select
-                  value={newLeaguePosition}
-                  onChange={(e) => setNewLeaguePosition(e.target.value)}
-                  className="w-full bg-secondary/50 border border-border/50 rounded-md px-3 py-2 text-sm"
-                >
-                  {Array.from({ length: parseInt(newLeagueTeams) }, (_, i) => i + 1).map(
-                    (n) => (
-                      <option key={n} value={n}>
-                        Pick #{n}
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
-            </div>
-
-            <Button
-              className="w-full"
-              onClick={createLeague}
-              disabled={creatingLeague || !newLeagueName.trim()}
-            >
-              {creatingLeague ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                'Create League'
-              )}
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
