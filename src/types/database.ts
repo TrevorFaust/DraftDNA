@@ -28,6 +28,7 @@ export interface MockDraft {
   status: string;
   created_at: string;
   completed_at: string | null;
+  league_id: string | null;
 }
 
 export interface DraftPick {
@@ -37,6 +38,15 @@ export interface DraftPick {
   team_number: number;
   round_number: number;
   pick_number: number;
+  created_at: string;
+}
+
+export interface League {
+  id: string;
+  user_id: string;
+  name: string;
+  num_teams: number;
+  user_pick_position: number;
   created_at: string;
 }
 

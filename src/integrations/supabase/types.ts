@@ -59,12 +59,40 @@ export type Database = {
           },
         ]
       }
+      leagues: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          num_teams: number
+          user_id: string
+          user_pick_position: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          num_teams?: number
+          user_id: string
+          user_pick_position?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          num_teams?: number
+          user_id?: string
+          user_pick_position?: number
+        }
+        Relationships: []
+      }
       mock_drafts: {
         Row: {
           completed_at: string | null
           created_at: string
           draft_order: string
           id: string
+          league_id: string | null
           name: string
           num_rounds: number
           num_teams: number
@@ -77,6 +105,7 @@ export type Database = {
           created_at?: string
           draft_order?: string
           id?: string
+          league_id?: string | null
           name: string
           num_rounds?: number
           num_teams?: number
@@ -89,6 +118,7 @@ export type Database = {
           created_at?: string
           draft_order?: string
           id?: string
+          league_id?: string | null
           name?: string
           num_rounds?: number
           num_teams?: number
@@ -96,7 +126,15 @@ export type Database = {
           user_id?: string
           user_pick_position?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "mock_drafts_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       players: {
         Row: {
