@@ -9,6 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Bell, Palette, HelpCircle, MessageSquare, User, Mail, ArrowLeft } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 const Settings = () => {
@@ -22,7 +29,13 @@ const Settings = () => {
     playerNews: true,
   });
 
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    // Check if light class is present on document
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('light') ? 'light' : 'dark';
+    }
+    return 'dark';
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -30,10 +43,13 @@ const Settings = () => {
     }
   }, [user, authLoading, navigate]);
 
-  const handleThemeChange = (isDark: boolean) => {
-    const newTheme = isDark ? 'dark' : 'light';
+  const handleThemeChange = (newTheme: 'dark' | 'light') => {
     setTheme(newTheme);
-    document.documentElement.classList.toggle('dark', isDark);
+    if (newTheme === 'light') {
+      document.documentElement.classList.add('light');
+    } else {
+      document.documentElement.classList.remove('light');
+    }
     toast({
       title: 'Theme updated',
       description: `Switched to ${newTheme} mode`,
@@ -169,13 +185,18 @@ const Settings = () => {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>Dark Mode</Label>
-                  <p className="text-sm text-muted-foreground">Use dark theme for better night viewing</p>
+                  <Label>Theme</Label>
+                  <p className="text-sm text-muted-foreground">Choose between dark or light mode</p>
                 </div>
-                <Switch
-                  checked={theme === 'dark'}
-                  onCheckedChange={handleThemeChange}
-                />
+                <Select value={theme} onValueChange={(value: 'dark' | 'light') => handleThemeChange(value)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dark">Dark</SelectItem>
+                    <SelectItem value="light">Light</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>

@@ -69,27 +69,66 @@
     --sidebar-ring: 190 95% 50%;
   }
 
-  /* Light mode - keep same dark theme for sports app */
+  /* Light mode - high contrast, paper-like natural reading */
   .light {
-    --background: 222 47% 8%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 190 95% 50%;
-    --primary-foreground: 222 47% 8%;
-    --secondary: 222 47% 15%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 222 30% 18%;
-    --muted-foreground: 215 20% 55%;
-    --accent: 45 100% 55%;
-    --accent-foreground: 222 47% 8%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 222 30% 20%;
-    --input: 222 30% 20%;
-    --ring: 190 95% 50%;
+    --background: 40 30% 96%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Deep teal primary for contrast */
+    --primary: 190 80% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Warm off-white secondary */
+    --secondary: 40 20% 92%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 40 15% 88%;
+    --muted-foreground: 222 20% 40%;
+
+    /* Amber accent */
+    --accent: 35 90% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 40 20% 82%;
+    --input: 40 20% 85%;
+    --ring: 190 80% 35%;
+
+    /* Light mode position colors - higher contrast */
+    --qb: 280 65% 45%;
+    --rb: 145 60% 35%;
+    --wr: 190 75% 35%;
+    --te: 25 85% 45%;
+    --k: 320 60% 45%;
+    --def: 0 65% 45%;
+
+    /* Light mode gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(190 80% 35%), hsl(220 70% 45%));
+    --gradient-gold: linear-gradient(135deg, hsl(35 90% 45%), hsl(25 85% 40%));
+    --gradient-dark: linear-gradient(180deg, hsl(40 30% 96%), hsl(40 20% 92%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(40 20% 97%));
+
+    /* Light mode shadows - subtle */
+    --shadow-glow: 0 0 20px hsl(190 80% 35% / 0.15);
+    --shadow-card: 0 2px 12px hsl(222 47% 11% / 0.08);
+    --shadow-elevated: 0 4px 24px hsl(222 47% 11% / 0.12);
+
+    --sidebar-background: 40 30% 96%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 190 80% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 20% 92%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 40 20% 82%;
+    --sidebar-ring: 190 80% 35%;
   }
 }
 
