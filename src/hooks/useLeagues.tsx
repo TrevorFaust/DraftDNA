@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, useCallback } from 'react';
+import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Tables } from '@/integrations/supabase/types';
@@ -20,12 +20,14 @@ export const LeaguesProvider = ({ children }: { children: React.ReactNode }) => 
   const [leagues, setLeagues] = useState<League[]>([]);
   const [selectedLeague, setSelectedLeague] = useState<League | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasInitialized = useRef(false);
 
   const fetchLeagues = useCallback(async () => {
     if (!user) {
       setLeagues([]);
       setSelectedLeague(null);
       setLoading(false);
+      hasInitialized.current = false;
       return;
     }
 
@@ -39,16 +41,19 @@ export const LeaguesProvider = ({ children }: { children: React.ReactNode }) => 
       if (error) throw error;
       setLeagues(data || []);
       
-      // Auto-select first league if none selected
-      if (!selectedLeague && data && data.length > 0) {
+      // Only auto-select first league on initial load
+      if (!hasInitialized.current && data && data.length > 0) {
         setSelectedLeague(data[0]);
+        hasInitialized.current = true;
+      } else if (!hasInitialized.current) {
+        hasInitialized.current = true;
       }
     } catch (error) {
       console.error('Error fetching leagues:', error);
     } finally {
       setLoading(false);
     }
-  }, [user, selectedLeague]);
+  }, [user]);
 
   useEffect(() => {
     fetchLeagues();
