@@ -96,6 +96,7 @@ export type Database = {
           name: string
           num_rounds: number
           num_teams: number
+          scoring_format: string
           status: string
           user_id: string
           user_pick_position: number
@@ -109,6 +110,7 @@ export type Database = {
           name: string
           num_rounds?: number
           num_teams?: number
+          scoring_format?: string
           status?: string
           user_id: string
           user_pick_position?: number
@@ -122,6 +124,7 @@ export type Database = {
           name?: string
           num_rounds?: number
           num_teams?: number
+          scoring_format?: string
           status?: string
           user_id?: string
           user_pick_position?: number
