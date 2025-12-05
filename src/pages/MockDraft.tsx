@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Zap, Users, Layers, Trophy, Loader2 } from 'lucide-react';
+import { Zap, Users, Layers, Trophy, Loader2, Target } from 'lucide-react';
 
 const MockDraft = () => {
   const { user, loading: authLoading } = useAuth();
@@ -27,6 +27,7 @@ const MockDraft = () => {
   const [numRounds, setNumRounds] = useState('15');
   const [userPickPosition, setUserPickPosition] = useState('1');
   const [draftOrder, setDraftOrder] = useState('snake');
+  const [scoringFormat, setScoringFormat] = useState('standard');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -53,6 +54,7 @@ const MockDraft = () => {
           num_rounds: parseInt(numRounds),
           user_pick_position: parseInt(userPickPosition),
           draft_order: draftOrder,
+          scoring_format: scoringFormat,
           status: 'in_progress',
           league_id: selectedLeague?.id || null,
         })
@@ -176,6 +178,23 @@ const MockDraft = () => {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-muted-foreground" />
+              Scoring Format
+            </Label>
+            <Select value={scoringFormat} onValueChange={setScoringFormat}>
+              <SelectTrigger className="bg-secondary/50 border-border/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="standard">Standard</SelectItem>
+                <SelectItem value="ppr">PPR (Point Per Reception)</SelectItem>
+                <SelectItem value="half_ppr">Half PPR</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="pt-4">
