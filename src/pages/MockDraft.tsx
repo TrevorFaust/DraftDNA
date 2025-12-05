@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useLeagues } from '@/hooks/useLeagues';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import { Zap, Users, Layers, Trophy, Loader2 } from 'lucide-react';
 
 const MockDraft = () => {
   const { user, loading: authLoading } = useAuth();
+  const { selectedLeague } = useLeagues();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -52,6 +54,7 @@ const MockDraft = () => {
           user_pick_position: parseInt(userPickPosition),
           draft_order: draftOrder,
           status: 'in_progress',
+          league_id: selectedLeague?.id || null,
         })
         .select()
         .single();
