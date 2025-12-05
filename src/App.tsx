@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { LeaguesProvider } from "@/hooks/useLeagues";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
 import Rankings from "./pages/Rankings";
 import MockDraft from "./pages/MockDraft";
 import DraftRoom from "./pages/DraftRoom";
@@ -27,6 +28,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/rankings" element={<Rankings />} />
               <Route path="/mock-draft" element={<MockDraft />} />
               <Route path="/draft/:draftId" element={<DraftRoom />} />
