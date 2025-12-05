@@ -52,7 +52,7 @@ export const Navbar = () => {
   return (
     <nav className="sticky top-0 z-50 glass-card border-b border-border/50 px-4 py-3">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
             <Zap className="w-6 h-6 text-primary-foreground" />
           </div>
