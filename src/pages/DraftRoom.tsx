@@ -22,6 +22,7 @@ const DraftRoom = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPick, setCurrentPick] = useState(1);
+  const [isDrafting, setIsDrafting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -109,13 +110,15 @@ const DraftRoom = () => {
   };
 
   const draftPlayer = async (player: RankedPlayer) => {
-    if (!draft || !draftId) return;
+    if (!draft || !draftId || isDrafting) return;
 
     const totalPicks = draft.num_teams * draft.num_rounds;
     if (currentPick > totalPicks) {
       toast.info('Draft is complete!');
       return;
     }
+
+    setIsDrafting(true);
 
     try {
       const newPick: Omit<DraftPick, 'id' | 'created_at'> = {
@@ -148,6 +151,8 @@ const DraftRoom = () => {
       }
     } catch (error) {
       toast.error('Failed to make pick');
+    } finally {
+      setIsDrafting(false);
     }
   };
 
