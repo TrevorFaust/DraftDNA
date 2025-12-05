@@ -147,6 +147,7 @@ const DraftRoom = () => {
           .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('id', draftId);
         
+        setDraft((prev) => prev ? { ...prev, status: 'completed' } : prev);
         toast.success('Draft complete!');
       }
     } catch (error) {
@@ -182,7 +183,18 @@ const DraftRoom = () => {
 
   const isUserPick = draft && getCurrentTeam() === draft.user_pick_position;
   const totalPicks = draft ? draft.num_teams * draft.num_rounds : 0;
-  const isDraftComplete = currentPick > totalPicks;
+  const isDraftComplete = currentPick > totalPicks || draft?.status === 'completed';
+
+  // Handle showing completion screen when draft was already completed
+  useEffect(() => {
+    if (draft && picks.length >= totalPicks && totalPicks > 0 && draft.status !== 'completed') {
+      // Draft is complete but status not updated - update it
+      supabase
+        .from('mock_drafts')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', draftId);
+    }
+  }, [draft, picks.length, totalPicks, draftId]);
 
   if (authLoading || loading) {
     return (
