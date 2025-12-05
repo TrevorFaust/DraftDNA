@@ -1,19 +1,11 @@
-import { useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/Navbar';
-import { Zap, ListOrdered, Trophy, History, ArrowRight, Loader2 } from 'lucide-react';
+import { Zap, ListOrdered, History, ArrowRight, Loader2 } from 'lucide-react';
 
 const Index = () => {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!loading && user) {
-      navigate('/rankings');
-    }
-  }, [user, loading, navigate]);
 
   if (loading) {
     return (
@@ -22,6 +14,10 @@ const Index = () => {
       </div>
     );
   }
+
+  // If logged in, show different CTA
+  const ctaPath = user ? '/dashboard' : '/auth';
+  const ctaText = user ? 'Go to Dashboard' : 'Get Started';
 
   return (
     <div className="min-h-screen bg-background overflow-hidden">
@@ -51,9 +47,9 @@ const Index = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
-              <Link to="/auth">
+              <Link to={ctaPath}>
                 <Button variant="hero" size="xl" className="gap-2">
-                  Get Started <ArrowRight className="w-5 h-5" />
+                  {ctaText} <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
             </div>
