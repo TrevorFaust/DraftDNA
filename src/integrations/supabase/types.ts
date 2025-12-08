@@ -197,6 +197,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          league_id: string | null
           player_id: string
           rank: number
           updated_at: string
@@ -205,6 +206,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          league_id?: string | null
           player_id: string
           rank: number
           updated_at?: string
@@ -213,12 +215,20 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          league_id?: string | null
           player_id?: string
           rank?: number
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_rankings_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_rankings_player_id_fkey"
             columns: ["player_id"]
