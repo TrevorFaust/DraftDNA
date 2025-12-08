@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useLeagues } from '@/hooks/useLeagues';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { PlayerCard } from '@/components/PlayerCard';
@@ -62,6 +63,7 @@ const SortablePlayer = ({ player, rank }: { player: RankedPlayer; rank: number }
 
 const Rankings = () => {
   const { user, loading: authLoading } = useAuth();
+  const { selectedLeague, leagues } = useLeagues();
   const navigate = useNavigate();
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +71,8 @@ const Rankings = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState<string[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+
+  const isAllLeagues = !selectedLeague;
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -97,38 +101,90 @@ const Rankings = () => {
 
       if (playersError) throw playersError;
 
-      // Fetch user's rankings
-      const { data: rankingsData, error: rankingsError } = await supabase
-        .from('user_rankings')
-        .select('*')
-        .eq('user_id', user.id);
+      if (isAllLeagues) {
+        // For "All Leagues", calculate average rank across all leagues
+        const { data: allRankingsData, error: rankingsError } = await supabase
+          .from('user_rankings')
+          .select('*')
+          .eq('user_id', user.id)
+          .not('league_id', 'is', null);
 
-      if (rankingsError) throw rankingsError;
+        if (rankingsError) throw rankingsError;
 
-      // Merge players with rankings
-      const rankingsMap = new Map(
-        rankingsData?.map((r) => [r.player_id, r.rank]) || []
-      );
+        // Group rankings by player_id and calculate average
+        const playerRankings = new Map<string, number[]>();
+        allRankingsData?.forEach((r) => {
+          const existing = playerRankings.get(r.player_id) || [];
+          existing.push(r.rank);
+          playerRankings.set(r.player_id, existing);
+        });
 
-      const rankedPlayers: RankedPlayer[] = (playersData || []).map((p, index) => ({
-        ...p,
-        adp: Number(p.adp),
-        rank: rankingsMap.get(p.id) || index + 1,
-      }));
+        // Calculate average ranks
+        const avgRankingsMap = new Map<string, number>();
+        playerRankings.forEach((ranks, playerId) => {
+          const avg = ranks.reduce((a, b) => a + b, 0) / ranks.length;
+          avgRankingsMap.set(playerId, avg);
+        });
 
-      // Sort by rank
-      rankedPlayers.sort((a, b) => a.rank - b.rank);
+        const rankedPlayers: RankedPlayer[] = (playersData || []).map((p, index) => ({
+          ...p,
+          adp: Number(p.adp),
+          rank: avgRankingsMap.get(p.id) || Number(p.adp) || index + 1,
+        }));
 
-      setPlayers(rankedPlayers);
+        // Sort by calculated average rank
+        rankedPlayers.sort((a, b) => a.rank - b.rank);
+        
+        // Reassign sequential ranks after sorting
+        const sortedPlayers = rankedPlayers.map((p, index) => ({
+          ...p,
+          rank: index + 1,
+        }));
+
+        setPlayers(sortedPlayers);
+      } else {
+        // Fetch league-specific rankings
+        const { data: rankingsData, error: rankingsError } = await supabase
+          .from('user_rankings')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('league_id', selectedLeague.id);
+
+        if (rankingsError) throw rankingsError;
+
+        // Merge players with rankings
+        const rankingsMap = new Map(
+          rankingsData?.map((r) => [r.player_id, r.rank]) || []
+        );
+
+        const rankedPlayers: RankedPlayer[] = (playersData || []).map((p, index) => ({
+          ...p,
+          adp: Number(p.adp),
+          rank: rankingsMap.get(p.id) || Number(p.adp) || index + 1,
+        }));
+
+        // Sort by rank
+        rankedPlayers.sort((a, b) => a.rank - b.rank);
+        
+        // Reassign sequential ranks after sorting
+        const sortedPlayers = rankedPlayers.map((p, index) => ({
+          ...p,
+          rank: index + 1,
+        }));
+
+        setPlayers(sortedPlayers);
+      }
     } catch (error) {
       toast.error('Failed to load players');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, selectedLeague, isAllLeagues]);
 
   useEffect(() => {
     if (user) {
+      setLoading(true);
+      setHasChanges(false);
       fetchPlayers();
     }
   }, [user, fetchPlayers]);
@@ -148,18 +204,23 @@ const Rankings = () => {
   };
 
   const saveRankings = async () => {
-    if (!user) return;
+    if (!user || isAllLeagues) return;
     setSaving(true);
 
     try {
-      // Delete existing rankings
-      await supabase.from('user_rankings').delete().eq('user_id', user.id);
+      // Delete existing rankings for this league
+      await supabase
+        .from('user_rankings')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('league_id', selectedLeague.id);
 
-      // Insert new rankings
+      // Insert new rankings for this league
       const rankings = players.map((p, index) => ({
         user_id: user.id,
         player_id: p.id,
         rank: index + 1,
+        league_id: selectedLeague.id,
       }));
 
       const { error } = await supabase.from('user_rankings').insert(rankings);
@@ -206,35 +267,43 @@ const Rankings = () => {
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="font-display text-4xl tracking-wide">MY RANKINGS</h1>
-            <p className="text-muted-foreground">Drag players to reorder your board</p>
+            <h1 className="font-display text-4xl tracking-wide">
+              {isAllLeagues ? 'COMMUNITY ADP' : 'MY RANKINGS'}
+            </h1>
+            <p className="text-muted-foreground">
+              {isAllLeagues 
+                ? 'Average rankings across all your leagues' 
+                : 'Drag players to reorder your board'}
+            </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resetToADP}
-              className="gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset to ADP
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={saveRankings}
-              disabled={!hasChanges || saving}
-              className="gap-2"
-            >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              Save
-            </Button>
-          </div>
+          {!isAllLeagues && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetToADP}
+                className="gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reset to ADP
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={saveRankings}
+                disabled={!hasChanges || saving}
+                className="gap-2"
+              >
+                {saving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                Save
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 mb-6">
@@ -280,7 +349,7 @@ const Rankings = () => {
           </DropdownMenu>
         </div>
 
-        {hasChanges && (
+        {hasChanges && !isAllLeagues && (
           <div className="glass-card p-3 mb-4 flex items-center justify-between bg-primary/10 border-primary/30">
             <span className="text-sm text-primary">You have unsaved changes</span>
             <Button size="sm" variant="default" onClick={saveRankings} disabled={saving}>
@@ -289,26 +358,38 @@ const Rankings = () => {
           </div>
         )}
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={filteredPlayers.map((p) => p.id)}
-            strategy={verticalListSortingStrategy}
+        {isAllLeagues ? (
+          <div className="space-y-2">
+            {filteredPlayers.map((player) => (
+              <PlayerCard
+                key={player.id}
+                player={player}
+                rank={players.findIndex((p) => p.id === player.id) + 1}
+              />
+            ))}
+          </div>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            <div className="space-y-2">
-              {filteredPlayers.map((player, index) => (
-                <SortablePlayer
-                  key={player.id}
-                  player={player}
-                  rank={players.findIndex((p) => p.id === player.id) + 1}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+            <SortableContext
+              items={filteredPlayers.map((p) => p.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {filteredPlayers.map((player) => (
+                  <SortablePlayer
+                    key={player.id}
+                    player={player}
+                    rank={players.findIndex((p) => p.id === player.id) + 1}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
 
         {filteredPlayers.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
