@@ -264,9 +264,27 @@ const DraftRoom = () => {
             </div>
           </div>
 
-          <Button variant="outline" size="sm" onClick={undoPick} disabled={picks.length === 0}>
-            <X className="w-4 h-4 mr-1" /> Undo
-          </Button>
+          <div className="flex items-center gap-2">
+            {currentPick === totalPicks && (
+              <Button 
+                variant="gold" 
+                size="sm" 
+                onClick={async () => {
+                  await supabase
+                    .from('mock_drafts')
+                    .update({ status: 'completed', completed_at: new Date().toISOString() })
+                    .eq('id', draftId);
+                  setDraft((prev) => prev ? { ...prev, status: 'completed' } : prev);
+                  toast.success('Draft complete!');
+                }}
+              >
+                <Trophy className="w-4 h-4 mr-1" /> Finish Draft
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={undoPick} disabled={picks.length === 0}>
+              <X className="w-4 h-4 mr-1" /> Undo
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
