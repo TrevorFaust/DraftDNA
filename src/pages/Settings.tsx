@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useLeagues } from '@/hooks/useLeagues';
 import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Palette, HelpCircle, MessageSquare, User, Mail, ArrowLeft } from 'lucide-react';
+import { Bell, Palette, HelpCircle, MessageSquare, User, Mail, ArrowLeft, Trophy, Plus, Trash2, Loader2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -17,11 +18,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const Settings = () => {
   const { user, loading: authLoading } = useAuth();
+  const { leagues, refreshLeagues } = useLeagues();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const [newLeagueName, setNewLeagueName] = useState('');
+  const [newLeagueTeams, setNewLeagueTeams] = useState(12);
+  const [newLeaguePosition, setNewLeaguePosition] = useState(1);
+  const [isCreatingLeague, setIsCreatingLeague] = useState(false);
+  const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null);
 
   const [notifications, setNotifications] = useState({
     draftReminders: true,
@@ -30,7 +39,6 @@ const Settings = () => {
   });
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    // Check if light class is present on document
     if (typeof document !== 'undefined') {
       return document.documentElement.classList.contains('light') ? 'light' : 'dark';
     }
@@ -67,6 +75,69 @@ const Settings = () => {
     });
   };
 
+  const handleCreateLeague = async () => {
+    if (!user || !newLeagueName.trim()) return;
+    
+    setIsCreatingLeague(true);
+    try {
+      const { error } = await supabase
+        .from('leagues')
+        .insert({
+          user_id: user.id,
+          name: newLeagueName.trim(),
+          num_teams: newLeagueTeams,
+          user_pick_position: newLeaguePosition,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'League created',
+        description: `${newLeagueName} has been created successfully`,
+      });
+
+      setNewLeagueName('');
+      setNewLeagueTeams(12);
+      setNewLeaguePosition(1);
+      await refreshLeagues();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create league',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingLeague(false);
+    }
+  };
+
+  const handleDeleteLeague = async (leagueId: string, leagueName: string) => {
+    setDeletingLeagueId(leagueId);
+    try {
+      const { error } = await supabase
+        .from('leagues')
+        .delete()
+        .eq('id', leagueId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'League deleted',
+        description: `${leagueName} has been deleted`,
+      });
+
+      await refreshLeagues();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete league',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingLeagueId(null);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -92,6 +163,123 @@ const Settings = () => {
         <h1 className="font-display text-3xl mb-8 text-gradient">Settings</h1>
 
         <div className="space-y-6">
+          {/* League Management */}
+          <Card className="glass-card border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-primary" />
+                League Management
+              </CardTitle>
+              <CardDescription>Create and manage your fantasy leagues</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Create New League */}
+              <div className="space-y-4 p-4 rounded-lg bg-secondary/30 border border-border/50">
+                <h4 className="font-medium">Create New League</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="leagueName">League Name</Label>
+                    <Input
+                      id="leagueName"
+                      placeholder="My Fantasy League"
+                      value={newLeagueName}
+                      onChange={(e) => setNewLeagueName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="numTeams">Number of Teams</Label>
+                    <Select 
+                      value={newLeagueTeams.toString()} 
+                      onValueChange={(val) => setNewLeagueTeams(Number(val))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[8, 10, 12, 14, 16].map((num) => (
+                          <SelectItem key={num} value={num.toString()}>
+                            {num} teams
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pickPosition">Your Pick Position</Label>
+                    <Select 
+                      value={newLeaguePosition.toString()} 
+                      onValueChange={(val) => setNewLeaguePosition(Number(val))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: newLeagueTeams }, (_, i) => i + 1).map((num) => (
+                          <SelectItem key={num} value={num.toString()}>
+                            Pick #{num}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleCreateLeague} 
+                  disabled={!newLeagueName.trim() || isCreatingLeague}
+                  className="w-full sm:w-auto"
+                >
+                  {isCreatingLeague ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4 mr-2" />
+                  )}
+                  Create League
+                </Button>
+              </div>
+
+              <Separator />
+
+              {/* Existing Leagues */}
+              <div className="space-y-3">
+                <h4 className="font-medium">Your Leagues</h4>
+                {leagues.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    No leagues yet. Create one above to get started.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {leagues.map((league) => (
+                      <div 
+                        key={league.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/50"
+                      >
+                        <div>
+                          <div className="font-medium">{league.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {league.num_teams} teams • Pick #{league.user_pick_position}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteLeague(league.id, league.name)}
+                          disabled={deletingLeagueId === league.id}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          {deletingLeagueId === league.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Account Information */}
           <Card className="glass-card border-border/50">
             <CardHeader>
