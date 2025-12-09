@@ -139,6 +139,107 @@ export type Database = {
           },
         ]
       }
+      nfl_schedule: {
+        Row: {
+          away_team: string
+          created_at: string
+          game_date: string | null
+          home_team: string
+          id: string
+          season: number
+          week: number
+        }
+        Insert: {
+          away_team: string
+          created_at?: string
+          game_date?: string | null
+          home_team: string
+          id?: string
+          season: number
+          week: number
+        }
+        Update: {
+          away_team?: string
+          created_at?: string
+          game_date?: string | null
+          home_team?: string
+          id?: string
+          season?: number
+          week?: number
+        }
+        Relationships: []
+      }
+      player_game_stats: {
+        Row: {
+          created_at: string
+          fantasy_points: number | null
+          fumbles: number | null
+          id: string
+          interceptions: number | null
+          opponent: string
+          passing_tds: number | null
+          passing_yards: number | null
+          player_id: string
+          receiving_tds: number | null
+          receiving_yards: number | null
+          receptions: number | null
+          rushing_attempts: number | null
+          rushing_tds: number | null
+          rushing_yards: number | null
+          season: number
+          targets: number | null
+          week: number
+        }
+        Insert: {
+          created_at?: string
+          fantasy_points?: number | null
+          fumbles?: number | null
+          id?: string
+          interceptions?: number | null
+          opponent: string
+          passing_tds?: number | null
+          passing_yards?: number | null
+          player_id: string
+          receiving_tds?: number | null
+          receiving_yards?: number | null
+          receptions?: number | null
+          rushing_attempts?: number | null
+          rushing_tds?: number | null
+          rushing_yards?: number | null
+          season: number
+          targets?: number | null
+          week: number
+        }
+        Update: {
+          created_at?: string
+          fantasy_points?: number | null
+          fumbles?: number | null
+          id?: string
+          interceptions?: number | null
+          opponent?: string
+          passing_tds?: number | null
+          passing_yards?: number | null
+          player_id?: string
+          receiving_tds?: number | null
+          receiving_yards?: number | null
+          receptions?: number | null
+          rushing_attempts?: number | null
+          rushing_tds?: number | null
+          rushing_yards?: number | null
+          season?: number
+          targets?: number | null
+          week?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_game_stats_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           adp: number | null
