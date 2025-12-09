@@ -53,3 +53,34 @@ export interface League {
 export interface RankedPlayer extends Player {
   rank: number;
 }
+
+export interface PlayerGameStats {
+  id: string;
+  player_id: string;
+  season: number;
+  week: number;
+  opponent: string;
+  fantasy_points: number;
+  passing_yards: number;
+  passing_tds: number;
+  interceptions: number;
+  rushing_yards: number;
+  rushing_tds: number;
+  rushing_attempts: number;
+  receptions: number;
+  receiving_yards: number;
+  receiving_tds: number;
+  targets: number;
+  fumbles: number;
+  created_at: string;
+}
+
+export interface NFLSchedule {
+  id: string;
+  season: number;
+  week: number;
+  home_team: string;
+  away_team: string;
+  game_date: string | null;
+  created_at: string;
+}

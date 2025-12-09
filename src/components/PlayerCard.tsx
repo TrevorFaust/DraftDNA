@@ -7,14 +7,24 @@ interface PlayerCardProps {
   rank: number;
   isDragging?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
+  onClick?: () => void;
 }
 
-export const PlayerCard = ({ player, rank, isDragging, dragHandleProps }: PlayerCardProps) => {
+export const PlayerCard = ({ player, rank, isDragging, dragHandleProps, onClick }: PlayerCardProps) => {
+  const handleClick = (e: React.MouseEvent) => {
+    // Only trigger onClick if not dragging
+    if (!isDragging && onClick) {
+      onClick();
+    }
+  };
+
   return (
     <div
       {...dragHandleProps}
+      onClick={handleClick}
       className={cn(
-        'glass-card p-3 flex items-center gap-3 transition-all duration-200 cursor-grab active:cursor-grabbing',
+        'glass-card p-3 flex items-center gap-3 transition-all duration-200',
+        dragHandleProps ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer hover:bg-secondary/60',
         isDragging && 'dragging border-primary'
       )}
     >

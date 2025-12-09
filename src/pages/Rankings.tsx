@@ -5,11 +5,12 @@ import { useLeagues } from '@/hooks/useLeagues';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { PlayerCard } from '@/components/PlayerCard';
+import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { RotateCcw, Search, Filter, Loader2 } from 'lucide-react';
-import type { Player, RankedPlayer } from '@/types/database';
+import type { RankedPlayer } from '@/types/database';
 import {
   DndContext,
   closestCenter,
@@ -34,7 +35,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const SortablePlayer = ({ player, rank }: { player: RankedPlayer; rank: number }) => {
+const SortablePlayer = ({ 
+  player, 
+  rank, 
+  onPlayerClick 
+}: { 
+  player: RankedPlayer; 
+  rank: number;
+  onPlayerClick: (player: RankedPlayer) => void;
+}) => {
   const {
     attributes,
     listeners,
@@ -56,6 +65,7 @@ const SortablePlayer = ({ player, rank }: { player: RankedPlayer; rank: number }
         rank={rank}
         isDragging={isDragging}
         dragHandleProps={listeners}
+        onClick={() => onPlayerClick(player)}
       />
     </div>
   );
@@ -70,6 +80,13 @@ const Rankings = () => {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState<string[]>([]);
+  const [selectedPlayer, setSelectedPlayer] = useState<RankedPlayer | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  const handlePlayerClick = (player: RankedPlayer) => {
+    setSelectedPlayer(player);
+    setDetailDialogOpen(true);
+  };
 
   const isAllLeagues = !selectedLeague;
 
@@ -345,6 +362,7 @@ const Rankings = () => {
                 key={player.id}
                 player={player}
                 rank={players.findIndex((p) => p.id === player.id) + 1}
+                onClick={() => handlePlayerClick(player)}
               />
             ))}
           </div>
@@ -364,6 +382,7 @@ const Rankings = () => {
                     key={player.id}
                     player={player}
                     rank={players.findIndex((p) => p.id === player.id) + 1}
+                    onPlayerClick={handlePlayerClick}
                   />
                 ))}
               </div>
@@ -377,6 +396,12 @@ const Rankings = () => {
           </div>
         )}
       </main>
+
+      <PlayerDetailDialog
+        player={selectedPlayer}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+      />
     </div>
   );
 };
