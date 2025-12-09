@@ -1,5 +1,6 @@
 import { PositionBadge } from './PositionBadge';
 import { cn } from '@/lib/utils';
+import { GripVertical } from 'lucide-react';
 import type { RankedPlayer } from '@/types/database';
 
 interface PlayerCardProps {
@@ -11,23 +12,24 @@ interface PlayerCardProps {
 }
 
 export const PlayerCard = ({ player, rank, isDragging, dragHandleProps, onClick }: PlayerCardProps) => {
-  const handleClick = (e: React.MouseEvent) => {
-    // Only trigger onClick if not dragging
-    if (!isDragging && onClick) {
-      onClick();
-    }
-  };
-
   return (
     <div
-      {...dragHandleProps}
-      onClick={handleClick}
+      onClick={onClick}
       className={cn(
-        'glass-card p-3 flex items-center gap-3 transition-all duration-200',
-        dragHandleProps ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer hover:bg-secondary/60',
+        'glass-card p-3 flex items-center gap-3 transition-all duration-200 cursor-pointer hover:bg-secondary/60',
         isDragging && 'dragging border-primary'
       )}
     >
+      {dragHandleProps && (
+        <div
+          {...dragHandleProps}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="w-5 h-5" />
+        </div>
+      )}
+      
       <div className="w-7 h-7 rounded-md bg-gradient-primary flex items-center justify-center font-display text-sm text-primary-foreground">
         {rank}
       </div>
