@@ -8,7 +8,7 @@ import { PlayerCard } from '@/components/PlayerCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Save, RotateCcw, Search, Filter, Loader2 } from 'lucide-react';
+import { RotateCcw, Search, Filter, Loader2 } from 'lucide-react';
 import type { Player, RankedPlayer } from '@/types/database';
 import {
   DndContext,
@@ -70,7 +70,6 @@ const Rankings = () => {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState<string[]>([]);
-  const [hasChanges, setHasChanges] = useState(false);
 
   const isAllLeagues = !selectedLeague;
 
@@ -184,27 +183,12 @@ const Rankings = () => {
   useEffect(() => {
     if (user) {
       setLoading(true);
-      setHasChanges(false);
       fetchPlayers();
     }
   }, [user, fetchPlayers]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      setPlayers((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        const newItems = arrayMove(items, oldIndex, newIndex);
-        return newItems.map((item, index) => ({ ...item, rank: index + 1 }));
-      });
-      setHasChanges(true);
-    }
-  };
-
-  const saveRankings = async () => {
-    if (!user || isAllLeagues) return;
+  const saveRankings = useCallback(async (playersToSave: RankedPlayer[]) => {
+    if (!user || isAllLeagues || !selectedLeague) return;
     setSaving(true);
 
     try {
@@ -216,7 +200,7 @@ const Rankings = () => {
         .eq('league_id', selectedLeague.id);
 
       // Insert new rankings for this league
-      const rankings = players.map((p, index) => ({
+      const rankings = playersToSave.map((p, index) => ({
         user_id: user.id,
         player_id: p.id,
         rank: index + 1,
@@ -228,18 +212,31 @@ const Rankings = () => {
       if (error) throw error;
 
       toast.success('Rankings saved!');
-      setHasChanges(false);
     } catch (error) {
       toast.error('Failed to save rankings');
     } finally {
       setSaving(false);
     }
+  }, [user, isAllLeagues, selectedLeague]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = players.findIndex((item) => item.id === active.id);
+      const newIndex = players.findIndex((item) => item.id === over.id);
+      const newItems = arrayMove(players, oldIndex, newIndex);
+      const updatedPlayers = newItems.map((item, index) => ({ ...item, rank: index + 1 }));
+      setPlayers(updatedPlayers);
+      saveRankings(updatedPlayers);
+    }
   };
 
   const resetToADP = () => {
     const sorted = [...players].sort((a, b) => a.adp - b.adp);
-    setPlayers(sorted.map((p, index) => ({ ...p, rank: index + 1 })));
-    setHasChanges(true);
+    const resetPlayers = sorted.map((p, index) => ({ ...p, rank: index + 1 }));
+    setPlayers(resetPlayers);
+    saveRankings(resetPlayers);
     toast.info('Rankings reset to ADP');
   };
 
@@ -288,20 +285,12 @@ const Rankings = () => {
                 <RotateCcw className="w-4 h-4" />
                 Reset to ADP
               </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={saveRankings}
-                disabled={!hasChanges || saving}
-                className="gap-2"
-              >
-                {saving ? (
+              {saving && (
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                Save
-              </Button>
+                  Saving...
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -348,15 +337,6 @@ const Rankings = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-
-        {hasChanges && !isAllLeagues && (
-          <div className="glass-card p-3 mb-4 flex items-center justify-between bg-primary/10 border-primary/30">
-            <span className="text-sm text-primary">You have unsaved changes</span>
-            <Button size="sm" variant="default" onClick={saveRankings} disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Now'}
-            </Button>
-          </div>
-        )}
 
         {isAllLeagues ? (
           <div className="space-y-2">
