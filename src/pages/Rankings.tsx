@@ -397,60 +397,155 @@ const Rankings = () => {
         </div>
 
         {isAllLeagues ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* My Rankings Column */}
-            <div>
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border">
-                <User className="w-5 h-5 text-primary" />
-                <h2 className="font-display text-xl tracking-wide">MY RANKINGS</h2>
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* My Rankings Column */}
+              <div className="bg-secondary/30 rounded-lg border border-border/50 p-4">
+                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+                  <User className="w-5 h-5 text-primary" />
+                  <h2 className="font-display text-xl tracking-wide">MY RANKINGS</h2>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Drag to reorder your personal rankings
+                </p>
+                <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={filteredPlayers.map((p) => p.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2">
+                        {filteredPlayers.map((player) => (
+                          <SortablePlayer
+                            key={player.id}
+                            player={player}
+                            rank={players.findIndex((p) => p.id === player.id) + 1}
+                            onPlayerClick={handlePlayerClick}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Drag to reorder your personal rankings
-              </p>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={filteredPlayers.map((p) => p.id)}
-                  strategy={verticalListSortingStrategy}
-                >
+
+              {/* Community Rankings Column */}
+              <div className="bg-secondary/30 rounded-lg border border-border/50 p-4">
+                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+                  <Users className="w-5 h-5 text-accent" />
+                  <h2 className="font-display text-xl tracking-wide">COMMUNITY RANKINGS</h2>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Average rankings across all users
+                </p>
+                <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
                   <div className="space-y-2">
-                    {filteredPlayers.map((player) => (
-                      <SortablePlayer
+                    {filteredCommunityPlayers.map((player) => (
+                      <PlayerCard
                         key={player.id}
                         player={player}
-                        rank={players.findIndex((p) => p.id === player.id) + 1}
-                        onPlayerClick={handlePlayerClick}
+                        rank={communityPlayers.findIndex((p) => p.id === player.id) + 1}
+                        onClick={() => handlePlayerClick(player)}
                       />
                     ))}
                   </div>
-                </SortableContext>
-              </DndContext>
+                </div>
+              </div>
             </div>
 
-            {/* Community Rankings Column */}
-            <div>
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border">
-                <Users className="w-5 h-5 text-accent" />
-                <h2 className="font-display text-xl tracking-wide">COMMUNITY RANKINGS</h2>
+            {/* Differential Analysis Section */}
+            {players.length > 0 && communityPlayers.length > 0 && (
+              <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Highest On */}
+                <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-500/30">
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                    <h2 className="font-display text-xl tracking-wide text-green-400">HIGHEST ON</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Players you rank higher than the community
+                  </p>
+                  <div className="space-y-2">
+                    {(() => {
+                      const diffs = players.map((myPlayer) => {
+                        const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
+                        const communityRank = communityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
+                        return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
+                      });
+                      return diffs
+                        .filter((d) => d.diff > 0)
+                        .sort((a, b) => b.diff - a.diff)
+                        .slice(0, 5)
+                        .map(({ player, myRank, communityRank, diff }) => (
+                          <div
+                            key={player.id}
+                            className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
+                            onClick={() => handlePlayerClick(player)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg font-bold text-green-400">+{diff}</span>
+                              <div>
+                                <p className="font-medium">{player.name}</p>
+                                <p className="text-xs text-muted-foreground">{player.team} • {player.position}</p>
+                              </div>
+                            </div>
+                            <div className="text-right text-sm">
+                              <p className="text-green-400">#{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}</p>
+                            </div>
+                          </div>
+                        ));
+                    })()}
+                  </div>
+                </div>
+
+                {/* Lowest On */}
+                <div className="bg-red-500/10 rounded-lg border border-red-500/30 p-4">
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-red-500/30">
+                    <div className="w-3 h-3 rounded-full bg-red-500" />
+                    <h2 className="font-display text-xl tracking-wide text-red-400">LOWEST ON</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Players you rank lower than the community
+                  </p>
+                  <div className="space-y-2">
+                    {(() => {
+                      const diffs = players.map((myPlayer) => {
+                        const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
+                        const communityRank = communityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
+                        return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
+                      });
+                      return diffs
+                        .filter((d) => d.diff < 0)
+                        .sort((a, b) => a.diff - b.diff)
+                        .slice(0, 5)
+                        .map(({ player, myRank, communityRank, diff }) => (
+                          <div
+                            key={player.id}
+                            className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
+                            onClick={() => handlePlayerClick(player)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg font-bold text-red-400">{diff}</span>
+                              <div>
+                                <p className="font-medium">{player.name}</p>
+                                <p className="text-xs text-muted-foreground">{player.team} • {player.position}</p>
+                              </div>
+                            </div>
+                            <div className="text-right text-sm">
+                              <p className="text-red-400">#{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}</p>
+                            </div>
+                          </div>
+                        ));
+                    })()}
+                  </div>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Average rankings across all users
-              </p>
-              <div className="space-y-2">
-                {filteredCommunityPlayers.map((player) => (
-                  <PlayerCard
-                    key={player.id}
-                    player={player}
-                    rank={communityPlayers.findIndex((p) => p.id === player.id) + 1}
-                    onClick={() => handlePlayerClick(player)}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
+            )}
+          </>
         ) : (
           <DndContext
             sensors={sensors}
