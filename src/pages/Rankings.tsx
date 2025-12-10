@@ -9,7 +9,7 @@ import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { RotateCcw, Search, Filter, Loader2 } from 'lucide-react';
+import { RotateCcw, Search, Filter, Loader2, Users, User } from 'lucide-react';
 import type { RankedPlayer } from '@/types/database';
 import {
   DndContext,
@@ -73,9 +73,10 @@ const SortablePlayer = ({
 
 const Rankings = () => {
   const { user, loading: authLoading } = useAuth();
-  const { selectedLeague, leagues } = useLeagues();
+  const { selectedLeague } = useLeagues();
   const navigate = useNavigate();
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
+  const [communityPlayers, setCommunityPlayers] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,46 +119,71 @@ const Rankings = () => {
       if (playersError) throw playersError;
 
       if (isAllLeagues) {
-        // For "All Leagues", calculate average rank across all leagues
-        const { data: allRankingsData, error: rankingsError } = await supabase
+        // Fetch personal rankings (league_id is null)
+        const { data: personalRankingsData, error: personalError } = await supabase
           .from('user_rankings')
           .select('*')
           .eq('user_id', user.id)
-          .not('league_id', 'is', null);
+          .is('league_id', null);
 
-        if (rankingsError) throw rankingsError;
+        if (personalError) throw personalError;
 
-        // Group rankings by player_id and calculate average
-        const playerRankings = new Map<string, number[]>();
-        allRankingsData?.forEach((r) => {
-          const existing = playerRankings.get(r.player_id) || [];
+        // Create personal rankings map
+        const personalRankingsMap = new Map(
+          personalRankingsData?.map((r) => [r.player_id, r.rank]) || []
+        );
+
+        // Build personal ranked players
+        const personalPlayers: RankedPlayer[] = (playersData || []).map((p, index) => ({
+          ...p,
+          adp: Number(p.adp),
+          rank: personalRankingsMap.get(p.id) || Number(p.adp) || index + 1,
+        }));
+
+        // Sort by rank
+        personalPlayers.sort((a, b) => a.rank - b.rank);
+        const sortedPersonal = personalPlayers.map((p, index) => ({
+          ...p,
+          rank: index + 1,
+        }));
+        setPlayers(sortedPersonal);
+
+        // Fetch community rankings (all users' rankings)
+        const { data: allCommunityRankings, error: communityError } = await supabase
+          .from('user_rankings')
+          .select('player_id, rank');
+
+        if (communityError) throw communityError;
+
+        // Group rankings by player_id and calculate average across all users
+        const communityRankingsMap = new Map<string, number[]>();
+        allCommunityRankings?.forEach((r) => {
+          const existing = communityRankingsMap.get(r.player_id) || [];
           existing.push(r.rank);
-          playerRankings.set(r.player_id, existing);
+          communityRankingsMap.set(r.player_id, existing);
         });
 
         // Calculate average ranks
         const avgRankingsMap = new Map<string, number>();
-        playerRankings.forEach((ranks, playerId) => {
+        communityRankingsMap.forEach((ranks, playerId) => {
           const avg = ranks.reduce((a, b) => a + b, 0) / ranks.length;
           avgRankingsMap.set(playerId, avg);
         });
 
-        const rankedPlayers: RankedPlayer[] = (playersData || []).map((p, index) => ({
+        // Build community ranked players
+        const communityPlayersList: RankedPlayer[] = (playersData || []).map((p, index) => ({
           ...p,
           adp: Number(p.adp),
           rank: avgRankingsMap.get(p.id) || Number(p.adp) || index + 1,
         }));
 
-        // Sort by calculated average rank
-        rankedPlayers.sort((a, b) => a.rank - b.rank);
-        
-        // Reassign sequential ranks after sorting
-        const sortedPlayers = rankedPlayers.map((p, index) => ({
+        // Sort by average rank (lower is better)
+        communityPlayersList.sort((a, b) => a.rank - b.rank);
+        const sortedCommunity = communityPlayersList.map((p, index) => ({
           ...p,
           rank: index + 1,
         }));
-
-        setPlayers(sortedPlayers);
+        setCommunityPlayers(sortedCommunity);
       } else {
         // Fetch league-specific rankings
         const { data: rankingsData, error: rankingsError } = await supabase
@@ -204,24 +230,32 @@ const Rankings = () => {
     }
   }, [user, fetchPlayers]);
 
-  const saveRankings = useCallback(async (playersToSave: RankedPlayer[]) => {
-    if (!user || isAllLeagues || !selectedLeague) return;
+  const saveRankings = useCallback(async (playersToSave: RankedPlayer[], leagueId: string | null) => {
+    if (!user) return;
     setSaving(true);
 
     try {
-      // Delete existing rankings for this league
-      await supabase
-        .from('user_rankings')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('league_id', selectedLeague.id);
+      // Delete existing rankings
+      if (leagueId) {
+        await supabase
+          .from('user_rankings')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('league_id', leagueId);
+      } else {
+        await supabase
+          .from('user_rankings')
+          .delete()
+          .eq('user_id', user.id)
+          .is('league_id', null);
+      }
 
-      // Insert new rankings for this league
+      // Insert new rankings
       const rankings = playersToSave.map((p, index) => ({
         user_id: user.id,
         player_id: p.id,
         rank: index + 1,
-        league_id: selectedLeague.id,
+        league_id: leagueId,
       }));
 
       const { error } = await supabase.from('user_rankings').insert(rankings);
@@ -234,7 +268,7 @@ const Rankings = () => {
     } finally {
       setSaving(false);
     }
-  }, [user, isAllLeagues, selectedLeague]);
+  }, [user]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -245,7 +279,7 @@ const Rankings = () => {
       const newItems = arrayMove(players, oldIndex, newIndex);
       const updatedPlayers = newItems.map((item, index) => ({ ...item, rank: index + 1 }));
       setPlayers(updatedPlayers);
-      saveRankings(updatedPlayers);
+      saveRankings(updatedPlayers, isAllLeagues ? null : selectedLeague?.id ?? null);
     }
   };
 
@@ -253,11 +287,20 @@ const Rankings = () => {
     const sorted = [...players].sort((a, b) => a.adp - b.adp);
     const resetPlayers = sorted.map((p, index) => ({ ...p, rank: index + 1 }));
     setPlayers(resetPlayers);
-    saveRankings(resetPlayers);
+    saveRankings(resetPlayers, isAllLeagues ? null : selectedLeague?.id ?? null);
     toast.info('Rankings reset to ADP');
   };
 
   const filteredPlayers = players.filter((p) => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.team?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPosition =
+      positionFilter.length === 0 || positionFilter.includes(p.position);
+    return matchesSearch && matchesPosition;
+  });
+
+  const filteredCommunityPlayers = communityPlayers.filter((p) => {
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.team?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -278,38 +321,36 @@ const Rankings = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="font-display text-4xl tracking-wide">
-              {isAllLeagues ? 'COMMUNITY ADP' : 'MY RANKINGS'}
+              {isAllLeagues ? 'RANKINGS' : 'MY RANKINGS'}
             </h1>
             <p className="text-muted-foreground">
               {isAllLeagues 
-                ? 'Average rankings across all your leagues' 
+                ? 'Your personal rankings vs community consensus' 
                 : 'Drag players to reorder your board'}
             </p>
           </div>
 
-          {!isAllLeagues && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetToADP}
-                className="gap-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Reset to ADP
-              </Button>
-              {saving && (
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving...
-                </div>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetToADP}
+              className="gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset to ADP
+            </Button>
+            {saving && (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-3 mb-6">
@@ -356,15 +397,59 @@ const Rankings = () => {
         </div>
 
         {isAllLeagues ? (
-          <div className="space-y-2">
-            {filteredPlayers.map((player) => (
-              <PlayerCard
-                key={player.id}
-                player={player}
-                rank={players.findIndex((p) => p.id === player.id) + 1}
-                onClick={() => handlePlayerClick(player)}
-              />
-            ))}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* My Rankings Column */}
+            <div>
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border">
+                <User className="w-5 h-5 text-primary" />
+                <h2 className="font-display text-xl tracking-wide">MY RANKINGS</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Drag to reorder your personal rankings
+              </p>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={filteredPlayers.map((p) => p.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {filteredPlayers.map((player) => (
+                      <SortablePlayer
+                        key={player.id}
+                        player={player}
+                        rank={players.findIndex((p) => p.id === player.id) + 1}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </div>
+
+            {/* Community Rankings Column */}
+            <div>
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border">
+                <Users className="w-5 h-5 text-accent" />
+                <h2 className="font-display text-xl tracking-wide">COMMUNITY RANKINGS</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Average rankings across all users
+              </p>
+              <div className="space-y-2">
+                {filteredCommunityPlayers.map((player) => (
+                  <PlayerCard
+                    key={player.id}
+                    player={player}
+                    rank={communityPlayers.findIndex((p) => p.id === player.id) + 1}
+                    onClick={() => handlePlayerClick(player)}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <DndContext
