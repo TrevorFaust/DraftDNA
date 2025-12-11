@@ -399,6 +399,29 @@ const Rankings = () => {
         {isAllLeagues ? (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Community Rankings Column */}
+              <div className="bg-secondary/30 rounded-lg border border-border/50 p-4">
+                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+                  <Users className="w-5 h-5 text-accent" />
+                  <h2 className="font-display text-xl tracking-wide">COMMUNITY RANKINGS</h2>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Average rankings across all users
+                </p>
+                <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
+                  <div className="space-y-2">
+                    {filteredCommunityPlayers.map((player) => (
+                      <PlayerCard
+                        key={player.id}
+                        player={player}
+                        rank={communityPlayers.findIndex((p) => p.id === player.id) + 1}
+                        onClick={() => handlePlayerClick(player)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               {/* My Rankings Column */}
               <div className="bg-secondary/30 rounded-lg border border-border/50 p-4">
                 <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
@@ -432,39 +455,16 @@ const Rankings = () => {
                   </DndContext>
                 </div>
               </div>
-
-              {/* Community Rankings Column */}
-              <div className="bg-secondary/30 rounded-lg border border-border/50 p-4">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
-                  <Users className="w-5 h-5 text-accent" />
-                  <h2 className="font-display text-xl tracking-wide">COMMUNITY RANKINGS</h2>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Average rankings across all users
-                </p>
-                <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
-                  <div className="space-y-2">
-                    {filteredCommunityPlayers.map((player) => (
-                      <PlayerCard
-                        key={player.id}
-                        player={player}
-                        rank={communityPlayers.findIndex((p) => p.id === player.id) + 1}
-                        onClick={() => handlePlayerClick(player)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Differential Analysis Section */}
             {players.length > 0 && communityPlayers.length > 0 && (
               <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Highest On */}
+                {/* Your Studs */}
                 <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
                   <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-500/30">
                     <div className="w-3 h-3 rounded-full bg-green-500" />
-                    <h2 className="font-display text-xl tracking-wide text-green-400">HIGHEST ON</h2>
+                    <h2 className="font-display text-xl tracking-wide text-green-400">YOUR STUDS</h2>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
                     Players you rank higher than the community
@@ -502,11 +502,11 @@ const Rankings = () => {
                   </div>
                 </div>
 
-                {/* Lowest On */}
+                {/* Your Duds */}
                 <div className="bg-red-500/10 rounded-lg border border-red-500/30 p-4">
                   <div className="flex items-center gap-2 mb-4 pb-2 border-b border-red-500/30">
                     <div className="w-3 h-3 rounded-full bg-red-500" />
-                    <h2 className="font-display text-xl tracking-wide text-red-400">LOWEST ON</h2>
+                    <h2 className="font-display text-xl tracking-wide text-red-400">YOUR DUDS</h2>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
                     Players you rank lower than the community
