@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LogOut, ListOrdered, Zap, History, User, Settings, ChevronDown, Trophy } from 'lucide-react';
+import { LogOut, ListOrdered, Zap, History, User, Settings, ChevronDown, Trophy, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const Navbar = () => {
@@ -77,6 +77,14 @@ export const Navbar = () => {
                     {league.name}
                   </SelectItem>
                 ))}
+                <div className="border-t border-border my-1" />
+                <div
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none hover:bg-accent hover:text-accent-foreground text-primary"
+                  onClick={() => navigate('/settings')}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create League
+                </div>
               </SelectContent>
             </Select>
 
