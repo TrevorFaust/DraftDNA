@@ -29,6 +29,8 @@ export const MyRoster = ({ picks, players, userPickPosition }: MyRosterProps) =>
     { label: 'WR2', positions: ['WR'] },
     { label: 'TE', positions: ['TE'] },
     { label: 'FLEX', positions: ['RB', 'WR', 'TE'] },
+    { label: 'DEF', positions: ['DEF'] },
+    { label: 'K', positions: ['K'] },
   ];
 
   const benchCount = 6;
