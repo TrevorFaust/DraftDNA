@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Zap, Users, Layers, Trophy, Loader2, Target } from 'lucide-react';
+import { Zap, Users, Layers, Trophy, Loader2, Target, Timer } from 'lucide-react';
 
 const MockDraft = () => {
   const { user, loading: authLoading } = useAuth();
@@ -28,7 +28,7 @@ const MockDraft = () => {
   const [userPickPosition, setUserPickPosition] = useState('1');
   const [draftOrder, setDraftOrder] = useState('snake');
   const [scoringFormat, setScoringFormat] = useState('standard');
-
+  const [pickTimer, setPickTimer] = useState('30');
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
@@ -180,21 +180,43 @@ const MockDraft = () => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-muted-foreground" />
-              Scoring Format
-            </Label>
-            <Select value={scoringFormat} onValueChange={setScoringFormat}>
-              <SelectTrigger className="bg-secondary/50 border-border/50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="standard">Standard</SelectItem>
-                <SelectItem value="ppr">PPR (Point Per Reception)</SelectItem>
-                <SelectItem value="half_ppr">Half PPR</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-muted-foreground" />
+                Scoring Format
+              </Label>
+              <Select value={scoringFormat} onValueChange={setScoringFormat}>
+                <SelectTrigger className="bg-secondary/50 border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="ppr">PPR (Point Per Reception)</SelectItem>
+                  <SelectItem value="half_ppr">Half PPR</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Timer className="w-4 h-4 text-muted-foreground" />
+                Pick Timer
+              </Label>
+              <Select value={pickTimer} onValueChange={setPickTimer}>
+                <SelectTrigger className="bg-secondary/50 border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">15 seconds</SelectItem>
+                  <SelectItem value="30">30 seconds</SelectItem>
+                  <SelectItem value="45">45 seconds</SelectItem>
+                  <SelectItem value="60">1 minute</SelectItem>
+                  <SelectItem value="90">1 min 30 sec</SelectItem>
+                  <SelectItem value="120">2 minutes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="pt-4">
@@ -222,7 +244,7 @@ const MockDraft = () => {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li>• <strong className="text-foreground">Snake Draft:</strong> Order reverses each round</li>
             <li>• <strong className="text-foreground">Linear Draft:</strong> Same order every round</li>
-            <li>• You'll pick for all teams manually</li>
+            <li>• CPU teams will auto-pick from the top 5 available players</li>
             <li>• Players are sorted by your rankings (or ADP if no rankings)</li>
           </ul>
         </div>
