@@ -109,8 +109,41 @@ const DraftRoom = () => {
     return Math.ceil(currentPick / draft.num_teams);
   };
 
-  const draftPlayer = async (player: RankedPlayer) => {
+  const draftPlayer = async (player: RankedPlayer, pickNumber: number, teamNumber: number, roundNumber: number) => {
+    if (!draft || !draftId) return;
+
+    const totalPicks = draft.num_teams * draft.num_rounds;
+    if (pickNumber > totalPicks) {
+      return;
+    }
+
+    const newPick: Omit<DraftPick, 'id' | 'created_at'> = {
+      mock_draft_id: draftId,
+      player_id: player.id,
+      team_number: teamNumber,
+      round_number: roundNumber,
+      pick_number: pickNumber,
+    };
+
+    const { data, error } = await supabase
+      .from('draft_picks')
+      .insert(newPick)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return data;
+  };
+
+  const handleUserDraft = async (player: RankedPlayer) => {
     if (!draft || !draftId || isDrafting) return;
+    
+    const isUserTurn = getCurrentTeam() === draft.user_pick_position;
+    if (!isUserTurn) {
+      toast.error("It's not your turn to pick!");
+      return;
+    }
 
     const totalPicks = draft.num_teams * draft.num_rounds;
     if (currentPick > totalPicks) {
@@ -121,24 +154,11 @@ const DraftRoom = () => {
     setIsDrafting(true);
 
     try {
-      const newPick: Omit<DraftPick, 'id' | 'created_at'> = {
-        mock_draft_id: draftId,
-        player_id: player.id,
-        team_number: getCurrentTeam(),
-        round_number: getCurrentRound(),
-        pick_number: currentPick,
-      };
-
-      const { data, error } = await supabase
-        .from('draft_picks')
-        .insert(newPick)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setPicks((prev) => [...prev, data]);
-      setCurrentPick((prev) => prev + 1);
+      const data = await draftPlayer(player, currentPick, getCurrentTeam(), getCurrentRound());
+      if (data) {
+        setPicks((prev) => [...prev, data]);
+        setCurrentPick((prev) => prev + 1);
+      }
 
       // Check if draft is complete
       if (currentPick === totalPicks) {
@@ -156,6 +176,62 @@ const DraftRoom = () => {
       setIsDrafting(false);
     }
   };
+
+  // CPU auto-draft logic
+  useEffect(() => {
+    const runCpuDraft = async () => {
+      if (!draft || !draftId || isDrafting) return;
+      
+      const totalPicks = draft.num_teams * draft.num_rounds;
+      if (currentPick > totalPicks) return;
+      
+      const currentTeam = getCurrentTeam();
+      const isUserTurn = currentTeam === draft.user_pick_position;
+      
+      if (isUserTurn) return; // Wait for user to pick
+      
+      setIsDrafting(true);
+      
+      try {
+        // Get available players (not yet drafted)
+        const draftedIds = new Set(picks.map((p) => p.player_id));
+        const available = players.filter((p) => !draftedIds.has(p.id));
+        
+        if (available.length === 0) return;
+        
+        // Pick randomly from top 5 available
+        const top5 = available.slice(0, Math.min(5, available.length));
+        const randomIndex = Math.floor(Math.random() * top5.length);
+        const cpuPick = top5[randomIndex];
+        
+        // Small delay for UX
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        
+        const data = await draftPlayer(cpuPick, currentPick, currentTeam, getCurrentRound());
+        if (data) {
+          setPicks((prev) => [...prev, data]);
+          setCurrentPick((prev) => prev + 1);
+        }
+
+        // Check if draft is complete
+        if (currentPick === totalPicks) {
+          await supabase
+            .from('mock_drafts')
+            .update({ status: 'completed', completed_at: new Date().toISOString() })
+            .eq('id', draftId);
+          
+          setDraft((prev) => prev ? { ...prev, status: 'completed' } : prev);
+          toast.success('Draft complete!');
+        }
+      } catch (error) {
+        console.error('CPU draft error:', error);
+      } finally {
+        setIsDrafting(false);
+      }
+    };
+    
+    runCpuDraft();
+  }, [currentPick, draft, draftId, isDrafting, picks, players]);
 
   const undoPick = async () => {
     if (picks.length === 0) return;
@@ -308,7 +384,7 @@ const DraftRoom = () => {
                 <div
                   key={player.id}
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors group cursor-pointer"
-                  onClick={() => draftPlayer(player)}
+                  onClick={() => handleUserDraft(player)}
                 >
                   <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-sm font-medium text-muted-foreground">
                     {player.rank}

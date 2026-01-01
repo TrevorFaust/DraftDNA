@@ -56,16 +56,21 @@ const SortablePlayer = ({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    cursor: isDragging ? 'grabbing' : 'grab',
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      {...attributes} 
+      {...listeners}
+      onClick={() => onPlayerClick(player)}
+    >
       <PlayerCard
         player={player}
         rank={rank}
         isDragging={isDragging}
-        dragHandleProps={listeners}
-        onClick={() => onPlayerClick(player)}
       />
     </div>
   );
