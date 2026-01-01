@@ -8,7 +8,7 @@ import { MyRoster } from '@/components/MyRoster';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Search, Check, Loader2, X, Trophy, LogOut } from 'lucide-react';
+import { Search, Check, Loader2, Trophy, LogOut } from 'lucide-react';
 import type { Player, MockDraft, DraftPick, RankedPlayer } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -234,20 +234,6 @@ const DraftRoom = () => {
     runCpuDraft();
   }, [currentPick, draft, draftId, isDrafting, picks, players]);
 
-  const undoPick = async () => {
-    if (picks.length === 0) return;
-
-    const lastPick = picks[picks.length - 1];
-
-    try {
-      await supabase.from('draft_picks').delete().eq('id', lastPick.id);
-      setPicks((prev) => prev.slice(0, -1));
-      setCurrentPick((prev) => prev - 1);
-      toast.info('Pick undone');
-    } catch (error) {
-      toast.error('Failed to undo pick');
-    }
-  };
 
   const draftedPlayerIds = new Set(picks.map((p) => p.player_id));
   const availablePlayers = players.filter((p) => !draftedPlayerIds.has(p.id));
@@ -358,12 +344,9 @@ const DraftRoom = () => {
                 <Trophy className="w-4 h-4 mr-1" /> Finish Draft
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={undoPick} disabled={picks.length === 0}>
-              <X className="w-4 h-4 mr-1" /> Undo
-            </Button>
             <Button 
               variant="destructive" 
-              size="sm" 
+              size="sm"
               onClick={() => navigate('/mock-draft')}
             >
               <LogOut className="w-4 h-4 mr-1" /> Exit Draft
