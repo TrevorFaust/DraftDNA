@@ -4,10 +4,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { PositionBadge } from '@/components/PositionBadge';
+import { MyRoster } from '@/components/MyRoster';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Search, Check, Loader2, X, Trophy } from 'lucide-react';
+import { Search, Check, Loader2, X, Trophy, LogOut } from 'lucide-react';
 import type { Player, MockDraft, DraftPick, RankedPlayer } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -360,10 +361,26 @@ const DraftRoom = () => {
             <Button variant="outline" size="sm" onClick={undoPick} disabled={picks.length === 0}>
               <X className="w-4 h-4 mr-1" /> Undo
             </Button>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={() => navigate('/mock-draft')}
+            >
+              <LogOut className="w-4 h-4 mr-1" /> Exit Draft
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* My Roster */}
+          <div className="lg:col-span-1">
+            <MyRoster 
+              picks={picks} 
+              players={players} 
+              userPickPosition={draft?.user_pick_position || 1} 
+            />
+          </div>
+
           {/* Available Players */}
           <div className="lg:col-span-2 glass-card p-4">
             <div className="flex items-center justify-between mb-4">
@@ -380,7 +397,7 @@ const DraftRoom = () => {
             </div>
 
             <div className="space-y-1 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
-              {filteredPlayers.map((player, index) => (
+              {filteredPlayers.map((player) => (
                 <div
                   key={player.id}
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors group cursor-pointer"
