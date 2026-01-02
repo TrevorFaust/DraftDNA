@@ -76,6 +76,55 @@ const SortablePlayer = ({
   );
 };
 
+// Sortable player with grab handle on the right (for comparison view)
+const SortablePlayerWithHandle = ({ 
+  player, 
+  rank, 
+  onPlayerClick 
+}: { 
+  player: RankedPlayer; 
+  rank: number;
+  onPlayerClick: (player: RankedPlayer) => void;
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: player.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style}
+      className="relative"
+    >
+      <div onClick={() => onPlayerClick(player)}>
+        <PlayerCard
+          player={player}
+          rank={rank}
+          isDragging={isDragging}
+          positionColoredRank
+          showGrabHandle
+        />
+      </div>
+      {/* Invisible drag handle overlay on the grip icon area */}
+      <div 
+        {...attributes}
+        {...listeners}
+        className="absolute right-2 top-0 bottom-0 w-8 flex items-center justify-center cursor-grab active:cursor-grabbing"
+      />
+    </div>
+  );
+};
+
 const Rankings = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedLeague } = useLeagues();
@@ -346,9 +395,11 @@ const Rankings = () => {
       const newItems = arrayMove(players, oldIndex, newIndex);
       const updatedPlayers = newItems.map((item, index) => ({ ...item, rank: index + 1 }));
       setPlayers(updatedPlayers);
-      // For All Leagues, auto-save. For specific leagues in edit mode, don't auto-save
+      // For All Leagues, auto-save. For specific leagues (both edit and comparison view), auto-save
       if (isAllLeagues) {
         saveRankings(updatedPlayers, null);
+      } else if (selectedLeague) {
+        saveRankings(updatedPlayers, selectedLeague.id);
       }
     }
   };
@@ -719,19 +770,30 @@ const Rankings = () => {
                   <h2 className="font-display text-xl tracking-wide">MY RANKINGS</h2>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Your finalized league rankings
+                  Drag the handle to adjust rankings
                 </p>
                 <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
-                  <div className="space-y-2">
-                    {filteredPlayers.map((player) => (
-                      <PlayerCard
-                        key={player.id}
-                        player={player}
-                        rank={players.findIndex((p) => p.id === player.id) + 1}
-                        onClick={() => handlePlayerClick(player)}
-                      />
-                    ))}
-                  </div>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={filteredPlayers.map((p) => p.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2">
+                        {filteredPlayers.map((player) => (
+                          <SortablePlayerWithHandle
+                            key={player.id}
+                            player={player}
+                            rank={players.findIndex((p) => p.id === player.id) + 1}
+                            onPlayerClick={handlePlayerClick}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                 </div>
               </div>
             </div>
