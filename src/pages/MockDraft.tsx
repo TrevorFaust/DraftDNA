@@ -211,9 +211,9 @@ const MockDraft = () => {
                   <SelectItem value="15">15 seconds</SelectItem>
                   <SelectItem value="30">30 seconds</SelectItem>
                   <SelectItem value="45">45 seconds</SelectItem>
-                  <SelectItem value="60">1 minute</SelectItem>
-                  <SelectItem value="90">1 min 30 sec</SelectItem>
-                  <SelectItem value="120">2 minutes</SelectItem>
+                  <SelectItem value="60">60 seconds</SelectItem>
+                  <SelectItem value="90">90 seconds</SelectItem>
+                  <SelectItem value="120">120 seconds</SelectItem>
                 </SelectContent>
               </Select>
             </div>
