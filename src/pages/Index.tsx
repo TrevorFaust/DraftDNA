@@ -15,9 +15,9 @@ const Index = () => {
     );
   }
 
-  // If logged in, show different CTA
-  const ctaPath = user ? '/dashboard' : '/auth';
-  const ctaText = user ? 'Go to Dashboard' : 'Get Started';
+  // If logged in, go to dashboard; if not, still allow access to features
+  const ctaPath = user ? '/dashboard' : '/rankings';
+  const ctaText = user ? 'Go to Dashboard' : 'Start Ranking Players';
 
   return (
     <div className="min-h-screen bg-background overflow-hidden">
@@ -57,35 +57,41 @@ const Index = () => {
 
           {/* Features Grid */}
           <div className="grid md:grid-cols-3 gap-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-            <div className="glass-card p-6 group hover:border-primary/50 transition-all duration-300">
-              <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center mb-4 group-hover:shadow-glow transition-shadow">
-                <ListOrdered className="w-6 h-6 text-primary-foreground" />
+            <Link to="/rankings" className="block">
+              <div className="glass-card p-6 group hover:border-primary/50 transition-all duration-300 cursor-pointer h-full">
+                <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center mb-4 group-hover:shadow-glow transition-shadow">
+                  <ListOrdered className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <h3 className="font-display text-2xl mb-2">CUSTOM RANKINGS</h3>
+                <p className="text-muted-foreground">
+                  Drag-and-drop to build your personal big board. Override ADP with your own valuations.
+                </p>
               </div>
-              <h3 className="font-display text-2xl mb-2">CUSTOM RANKINGS</h3>
-              <p className="text-muted-foreground">
-                Drag-and-drop to build your personal big board. Override ADP with your own valuations.
-              </p>
-            </div>
+            </Link>
 
-            <div className="glass-card p-6 group hover:border-accent/50 transition-all duration-300">
-              <div className="w-12 h-12 rounded-xl bg-gradient-gold flex items-center justify-center mb-4 group-hover:shadow-[0_0_30px_hsl(45_100%_55%/0.3)] transition-shadow">
-                <Zap className="w-6 h-6 text-accent-foreground" />
+            <Link to="/mock-draft" className="block">
+              <div className="glass-card p-6 group hover:border-accent/50 transition-all duration-300 cursor-pointer h-full">
+                <div className="w-12 h-12 rounded-xl bg-gradient-gold flex items-center justify-center mb-4 group-hover:shadow-[0_0_30px_hsl(45_100%_55%/0.3)] transition-shadow">
+                  <Zap className="w-6 h-6 text-accent-foreground" />
+                </div>
+                <h3 className="font-display text-2xl mb-2">MOCK DRAFTS</h3>
+                <p className="text-muted-foreground">
+                  Simulate real drafts with customizable settings. Snake or linear, 8-16 teams.
+                </p>
               </div>
-              <h3 className="font-display text-2xl mb-2">MOCK DRAFTS</h3>
-              <p className="text-muted-foreground">
-                Simulate real drafts with customizable settings. Snake or linear, 8-16 teams.
-              </p>
-            </div>
+            </Link>
 
-            <div className="glass-card p-6 group hover:border-primary/50 transition-all duration-300">
-              <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center mb-4 group-hover:bg-secondary/80 transition-colors">
-                <History className="w-6 h-6 text-foreground" />
+            <Link to="/history" className="block">
+              <div className="glass-card p-6 group hover:border-primary/50 transition-all duration-300 cursor-pointer h-full">
+                <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center mb-4 group-hover:bg-secondary/80 transition-colors">
+                  <History className="w-6 h-6 text-foreground" />
+                </div>
+                <h3 className="font-display text-2xl mb-2">DRAFT HISTORY</h3>
+                <p className="text-muted-foreground">
+                  Review past mock drafts, analyze your picks, and refine your strategy.
+                </p>
               </div>
-              <h3 className="font-display text-2xl mb-2">DRAFT HISTORY</h3>
-              <p className="text-muted-foreground">
-                Review past mock drafts, analyze your picks, and refine your strategy.
-              </p>
-            </div>
+            </Link>
           </div>
 
           {/* Stats Section */}
