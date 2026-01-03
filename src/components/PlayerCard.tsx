@@ -15,17 +15,17 @@ interface PlayerCardProps {
 const getPositionRankClass = (position: string) => {
   switch (position.toUpperCase()) {
     case 'QB':
-      return 'bg-[hsl(280,70%,55%)] text-white';
+      return 'bg-qb/20 text-qb border border-qb/50';
     case 'RB':
-      return 'bg-[hsl(145,70%,45%)] text-white';
+      return 'bg-rb/20 text-rb border border-rb/50';
     case 'WR':
-      return 'bg-[hsl(190,95%,50%)] text-[hsl(222,47%,8%)]';
+      return 'bg-wr/20 text-wr border border-wr/50';
     case 'TE':
-      return 'bg-[hsl(35,100%,50%)] text-[hsl(222,47%,8%)]';
+      return 'bg-te/20 text-te border border-te/50';
     case 'K':
-      return 'bg-[hsl(320,70%,55%)] text-white';
+      return 'bg-k/20 text-k border border-k/50';
     case 'DEF':
-      return 'bg-[hsl(0,70%,55%)] text-white';
+      return 'bg-def/20 text-def border border-def/50';
     default:
       return 'bg-gradient-primary text-primary-foreground';
   }

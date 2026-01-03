@@ -29,11 +29,7 @@ const MockDraft = () => {
   const [draftOrder, setDraftOrder] = useState('snake');
   const [scoringFormat, setScoringFormat] = useState('standard');
   const [pickTimer, setPickTimer] = useState('30');
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
+  // Don't redirect - allow viewing the page without auth
 
   const startDraft = async () => {
     if (!user) return;
@@ -220,22 +216,33 @@ const MockDraft = () => {
           </div>
 
           <div className="pt-4">
-            <Button
-              variant="hero"
-              size="xl"
-              className="w-full"
-              onClick={startDraft}
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <Zap className="w-5 h-5" />
-                  Start Draft
-                </>
-              )}
-            </Button>
+            {user ? (
+              <Button
+                variant="hero"
+                size="xl"
+                className="w-full"
+                onClick={startDraft}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Zap className="w-5 h-5" />
+                    Start Draft
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                variant="hero"
+                size="xl"
+                className="w-full"
+                onClick={() => navigate('/auth')}
+              >
+                Sign In to Start Draft
+              </Button>
+            )}
           </div>
         </div>
 

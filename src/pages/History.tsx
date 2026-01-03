@@ -41,11 +41,7 @@ const History = () => {
   const [selectedDraft, setSelectedDraft] = useState<DraftWithPicks | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
+  // Don't redirect - allow viewing the page without auth
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -149,10 +145,33 @@ const History = () => {
 
   const getLeagueById = (id: string | null) => leagues.find((l) => l.id === id);
 
-  if (authLoading || loading) {
+  if (authLoading || (user && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show sign-in prompt for non-authenticated users
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="max-w-4xl mx-auto px-4 py-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="font-display text-4xl tracking-wide">DRAFT HISTORY</h1>
+              <p className="text-muted-foreground">View your past mock drafts</p>
+            </div>
+          </div>
+          <div className="glass-card p-12 text-center">
+            <p className="text-muted-foreground mb-4">Sign in to view your draft history</p>
+            <Button variant="hero" onClick={() => navigate('/auth')}>
+              Sign In
+            </Button>
+          </div>
+        </main>
       </div>
     );
   }
