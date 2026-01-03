@@ -380,33 +380,49 @@ const DraftRoom = () => {
             </div>
 
             <div className="space-y-1 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
-              {filteredPlayers.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors group cursor-pointer"
-                  onClick={() => handleUserDraft(player)}
-                >
-                  <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-sm font-medium text-muted-foreground">
-                    {player.rank}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{player.name}</span>
-                      <PositionBadge position={player.position} />
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {player.team || 'FA'} • ADP: {player.adp}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+              {filteredPlayers.map((player) => {
+                const getPositionRankClass = (pos: string) => {
+                  switch (pos.toUpperCase()) {
+                    case 'QB': return 'bg-qb/20 text-qb border border-qb/50';
+                    case 'RB': return 'bg-rb/20 text-rb border border-rb/50';
+                    case 'WR': return 'bg-wr/20 text-wr border border-wr/50';
+                    case 'TE': return 'bg-te/20 text-te border border-te/50';
+                    case 'K': return 'bg-k/20 text-k border border-k/50';
+                    case 'DEF': return 'bg-def/20 text-def border border-def/50';
+                    default: return 'bg-muted text-muted-foreground';
+                  }
+                };
+                return (
+                  <div
+                    key={player.id}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors group cursor-pointer"
+                    onClick={() => handleUserDraft(player)}
                   >
-                    <Check className="w-4 h-4" /> Draft
-                  </Button>
-                </div>
-              ))}
+                    <div className={cn(
+                      "w-8 h-8 rounded flex items-center justify-center text-sm font-bold",
+                      getPositionRankClass(player.position)
+                    )}>
+                      {player.rank}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{player.name}</span>
+                        <PositionBadge position={player.position} />
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {player.team || 'FA'} • ADP: {player.adp}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Check className="w-4 h-4" /> Draft
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

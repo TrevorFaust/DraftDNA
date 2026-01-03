@@ -95,8 +95,9 @@ const SortablePlayerWithHandle = ({
     isDragging,
   } = useSortable({ id: player.id });
 
+  // Only allow vertical movement (restrict x axis)
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: transform ? `translate3d(0px, ${transform.y}px, 0)` : undefined,
     transition,
   };
 
@@ -156,15 +157,9 @@ const Rankings = () => {
 
   const positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
+  // Don't redirect - allow non-authenticated users to view rankings (read-only)
 
   const fetchPlayers = useCallback(async () => {
-    if (!user) return;
-
     try {
       // Fetch all players
       const { data: playersData, error: playersError } = await supabase
@@ -173,6 +168,18 @@ const Rankings = () => {
         .order('adp', { ascending: true });
 
       if (playersError) throw playersError;
+
+      // If no user, show ADP-based rankings (read-only)
+      if (!user) {
+        const adpPlayers: RankedPlayer[] = (playersData || []).map((p, index) => ({
+          ...p,
+          adp: Number(p.adp),
+          rank: index + 1,
+        }));
+        setPlayers(adpPlayers);
+        setCommunityPlayers(adpPlayers);
+        return;
+      }
 
       if (isAllLeagues) {
         // Fetch personal rankings (league_id is null)
@@ -340,11 +347,9 @@ const Rankings = () => {
   }, [user, selectedLeague, isAllLeagues]);
 
   useEffect(() => {
-    if (user) {
-      setLoading(true);
-      fetchPlayers();
-    }
-  }, [user, fetchPlayers]);
+    setLoading(true);
+    fetchPlayers();
+  }, [fetchPlayers]);
 
   const saveRankings = useCallback(async (playersToSave: RankedPlayer[], leagueId: string | null) => {
     if (!user) return;
