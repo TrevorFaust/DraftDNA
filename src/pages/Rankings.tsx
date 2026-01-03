@@ -35,48 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const SortablePlayer = ({ 
-  player, 
-  rank, 
-  onPlayerClick 
-}: { 
-  player: RankedPlayer; 
-  rank: number;
-  onPlayerClick: (player: RankedPlayer) => void;
-}) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: player.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    cursor: isDragging ? 'grabbing' : 'grab',
-  };
-
-  return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
-      {...listeners}
-      onClick={() => onPlayerClick(player)}
-    >
-      <PlayerCard
-        player={player}
-        rank={rank}
-        isDragging={isDragging}
-      />
-    </div>
-  );
-};
-
-// Sortable player with grab handle on the right (for comparison view)
+// Sortable player with grab handle on the right and position-colored rank
 const SortablePlayerWithHandle = ({ 
   player, 
   rank, 
@@ -615,7 +574,7 @@ const Rankings = () => {
                     >
                       <div className="space-y-2">
                         {filteredPlayers.map((player) => (
-                          <SortablePlayer
+                          <SortablePlayerWithHandle
                             key={player.id}
                             player={player}
                             rank={players.findIndex((p) => p.id === player.id) + 1}
@@ -731,7 +690,7 @@ const Rankings = () => {
             >
               <div className="space-y-2">
                 {filteredPlayers.map((player) => (
-                  <SortablePlayer
+                  <SortablePlayerWithHandle
                     key={player.id}
                     player={player}
                     rank={players.findIndex((p) => p.id === player.id) + 1}
