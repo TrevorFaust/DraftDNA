@@ -547,6 +547,7 @@ const Rankings = () => {
                         player={player}
                         rank={communityPlayers.findIndex((p) => p.id === player.id) + 1}
                         onClick={() => handlePlayerClick(player)}
+                        positionColoredRank
                       />
                     ))}
                   </div>
@@ -721,6 +722,7 @@ const Rankings = () => {
                         player={player}
                         rank={communityPlayers.findIndex((p) => p.id === player.id) + 1}
                         onClick={() => handlePlayerClick(player)}
+                        positionColoredRank
                       />
                     ))}
                   </div>
