@@ -599,7 +599,7 @@ const Rankings = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Players you rank higher than the community
                   </p>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {(() => {
                       const diffs = players.slice(0, 150).map((myPlayer) => {
                         const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
@@ -640,7 +640,7 @@ const Rankings = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Players you rank lower than the community
                   </p>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {(() => {
                       const diffs = players.slice(0, 150).map((myPlayer) => {
                         const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
@@ -772,7 +772,7 @@ const Rankings = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Players you rank higher than the community
                   </p>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {(() => {
                       const diffs = players.slice(0, 150).map((myPlayer) => {
                         const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
@@ -813,7 +813,7 @@ const Rankings = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Players you rank lower than the community
                   </p>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {(() => {
                       const diffs = players.slice(0, 150).map((myPlayer) => {
                         const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
