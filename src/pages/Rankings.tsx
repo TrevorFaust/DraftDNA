@@ -341,8 +341,6 @@ const Rankings = () => {
       const { error } = await supabase.from('user_rankings').insert(rankings);
 
       if (error) throw error;
-
-      toast.success('Rankings saved!');
     } catch (error) {
       toast.error('Failed to save rankings');
     } finally {
@@ -603,13 +601,13 @@ const Rankings = () => {
                   </p>
                   <div className="space-y-2">
                     {(() => {
-                      const diffs = players.map((myPlayer) => {
+                      const diffs = players.slice(0, 150).map((myPlayer) => {
                         const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
                         const communityRank = communityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
                         return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
                       });
                       return diffs
-                        .filter((d) => d.diff > 0)
+                        .filter((d) => d.diff > 0 && d.myRank <= 150 && d.communityRank <= 150)
                         .sort((a, b) => b.diff - a.diff)
                         .slice(0, 5)
                         .map(({ player, myRank, communityRank, diff }) => (
@@ -645,13 +643,13 @@ const Rankings = () => {
                   </p>
                   <div className="space-y-2">
                     {(() => {
-                      const diffs = players.map((myPlayer) => {
+                      const diffs = players.slice(0, 150).map((myPlayer) => {
                         const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
                         const communityRank = communityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
                         return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
                       });
                       return diffs
-                        .filter((d) => d.diff < 0)
+                        .filter((d) => d.diff < 0 && d.myRank <= 150 && d.communityRank <= 150)
                         .sort((a, b) => a.diff - b.diff)
                         .slice(0, 5)
                         .map(({ player, myRank, communityRank, diff }) => (
@@ -778,13 +776,13 @@ const Rankings = () => {
                   </p>
                   <div className="space-y-2">
                     {(() => {
-                      const diffs = players.map((myPlayer) => {
+                      const diffs = players.slice(0, 150).map((myPlayer) => {
                         const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
                         const communityRank = communityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
                         return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
                       });
                       return diffs
-                        .filter((d) => d.diff > 0)
+                        .filter((d) => d.diff > 0 && d.myRank <= 150 && d.communityRank <= 150)
                         .sort((a, b) => b.diff - a.diff)
                         .slice(0, 5)
                         .map(({ player, myRank, communityRank, diff }) => (
@@ -820,13 +818,13 @@ const Rankings = () => {
                   </p>
                   <div className="space-y-2">
                     {(() => {
-                      const diffs = players.map((myPlayer) => {
+                      const diffs = players.slice(0, 150).map((myPlayer) => {
                         const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
                         const communityRank = communityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
                         return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
                       });
                       return diffs
-                        .filter((d) => d.diff < 0)
+                        .filter((d) => d.diff < 0 && d.myRank <= 150 && d.communityRank <= 150)
                         .sort((a, b) => a.diff - b.diff)
                         .slice(0, 5)
                         .map(({ player, myRank, communityRank, diff }) => (

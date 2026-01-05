@@ -251,7 +251,6 @@ const MockDraft = () => {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li>• <strong className="text-foreground">Snake Draft:</strong> Order reverses each round</li>
             <li>• <strong className="text-foreground">Linear Draft:</strong> Same order every round</li>
-            <li>• CPU teams will auto-pick from the top 5 available players</li>
             <li>• Players are sorted by your rankings (or ADP if no rankings)</li>
           </ul>
         </div>
