@@ -59,12 +59,45 @@ export type Database = {
           },
         ]
       }
+      league_teams: {
+        Row: {
+          created_at: string
+          id: string
+          league_id: string
+          team_name: string | null
+          team_number: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          league_id: string
+          team_name?: string | null
+          team_number: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          league_id?: string
+          team_name?: string | null
+          team_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_teams_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leagues: {
         Row: {
           created_at: string
           id: string
           name: string
           num_teams: number
+          position_limits: Json | null
           user_id: string
           user_pick_position: number
         }
@@ -73,6 +106,7 @@ export type Database = {
           id?: string
           name: string
           num_teams?: number
+          position_limits?: Json | null
           user_id: string
           user_pick_position?: number
         }
@@ -81,6 +115,7 @@ export type Database = {
           id?: string
           name?: string
           num_teams?: number
+          position_limits?: Json | null
           user_id?: string
           user_pick_position?: number
         }
