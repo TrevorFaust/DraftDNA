@@ -13,6 +13,7 @@ import MockDraft from "./pages/MockDraft";
 import DraftRoom from "./pages/DraftRoom";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
+import LeagueSettings from "./pages/LeagueSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
               <Route path="/draft/:draftId" element={<DraftRoom />} />
               <Route path="/history" element={<History />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/league-settings" element={<LeagueSettings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </TooltipProvider>

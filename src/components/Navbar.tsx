@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LogOut, ListOrdered, Zap, History, User, Settings, ChevronDown, Trophy, Plus } from 'lucide-react';
+import { LogOut, ListOrdered, Zap, History, User, Settings, ChevronDown, Trophy, Plus, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const Navbar = () => {
@@ -29,6 +29,7 @@ export const Navbar = () => {
     ? [
         { path: '/rankings', label: 'Rankings', icon: ListOrdered },
         { path: '/mock-draft', label: 'Mock Draft', icon: Zap },
+        { path: '/league-settings', label: 'League Settings', icon: Settings2 },
         { path: '/history', label: 'History', icon: History },
       ]
     : [];
