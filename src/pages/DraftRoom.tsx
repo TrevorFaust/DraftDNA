@@ -471,7 +471,7 @@ const DraftRoom = () => {
               </div>
             </div>
 
-            <div className="space-y-1 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
+            <div className="space-y-1 max-h-[calc(100vh-280px)] overflow-y-auto pr-2 scrollbar-thin">
               {filteredPlayers.map((player) => {
                 const getPositionRankClass = (pos: string) => {
                   switch (pos.toUpperCase()) {
@@ -521,7 +521,7 @@ const DraftRoom = () => {
           {/* Draft Board */}
           <div className="glass-card p-4">
             <h2 className="font-display text-xl mb-4">DRAFT BOARD</h2>
-            <div className="space-y-1 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
+            <div className="space-y-1 max-h-[calc(100vh-280px)] overflow-y-auto pr-2 scrollbar-thin">
               {picks.map((pick) => {
                 const player = players.find((p) => p.id === pick.player_id);
                 if (!player) return null;
