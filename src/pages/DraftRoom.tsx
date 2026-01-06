@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,7 +8,7 @@ import { MyRoster } from '@/components/MyRoster';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Search, Check, Loader2, Trophy, LogOut } from 'lucide-react';
+import { Search, Check, Loader2, Trophy, LogOut, Timer } from 'lucide-react';
 import type { Player, MockDraft, DraftPick, RankedPlayer } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -17,13 +17,15 @@ const DraftRoom = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   
-  const [draft, setDraft] = useState<MockDraft | null>(null);
+  const [draft, setDraft] = useState<(MockDraft & { pick_timer?: number }) | null>(null);
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [picks, setPicks] = useState<DraftPick[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPick, setCurrentPick] = useState(1);
   const [isDrafting, setIsDrafting] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -234,6 +236,82 @@ const DraftRoom = () => {
     runCpuDraft();
   }, [currentPick, draft, draftId, isDrafting, picks, players]);
 
+  // Timer logic for user's turn
+  useEffect(() => {
+    if (!draft || isDrafting || loading) return;
+    
+    const totalPicks = draft.num_teams * draft.num_rounds;
+    if (currentPick > totalPicks || draft.status === 'completed') return;
+    
+    const isUserTurn = getCurrentTeam() === draft.user_pick_position;
+    
+    if (!isUserTurn) {
+      // Clear timer when it's not user's turn
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setTimeRemaining(null);
+      return;
+    }
+    
+    // Start or reset timer for user's turn
+    const timerDuration = draft.pick_timer || 30;
+    setTimeRemaining(timerDuration);
+    
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
+    timerRef.current = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev === null || prev <= 1) {
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [currentPick, draft, isDrafting, loading]);
+
+  // Auto-pick when timer hits 0
+  useEffect(() => {
+    const autoPick = async () => {
+      if (timeRemaining !== 0 || isDrafting || !draft) return;
+      
+      const isUserTurn = getCurrentTeam() === draft.user_pick_position;
+      if (!isUserTurn) return;
+      
+      // Get top available player
+      const draftedIds = new Set(picks.map((p) => p.player_id));
+      const available = players.filter((p) => !draftedIds.has(p.id));
+      
+      if (available.length === 0) return;
+      
+      const topPlayer = available[0];
+      toast.info(`Time's up! Auto-drafting ${topPlayer.name}`);
+      
+      await handleUserDraft(topPlayer);
+    };
+    
+    autoPick();
+  }, [timeRemaining]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
+
 
   const draftedPlayerIds = new Set(picks.map((p) => p.player_id));
   const availablePlayers = players.filter((p) => !draftedPlayerIds.has(p.id));
@@ -307,6 +385,20 @@ const DraftRoom = () => {
           </div>
           
           <div className="flex items-center gap-6">
+            {/* Timer - only show on user's turn */}
+            {isUserPick && timeRemaining !== null && (
+              <div className="text-center">
+                <div className="text-sm text-muted-foreground flex items-center gap-1 justify-center">
+                  <Timer className="w-3 h-3" /> Timer
+                </div>
+                <div className={cn(
+                  "font-display text-3xl transition-colors",
+                  timeRemaining <= 5 ? "text-destructive animate-pulse" : "text-accent"
+                )}>
+                  {timeRemaining}s
+                </div>
+              </div>
+            )}
             <div className="text-center">
               <div className="text-sm text-muted-foreground">Round</div>
               <div className="font-display text-3xl text-gradient">{getCurrentRound()}</div>
