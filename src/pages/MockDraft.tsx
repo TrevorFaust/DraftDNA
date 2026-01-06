@@ -53,6 +53,7 @@ const MockDraft = () => {
           scoring_format: scoringFormat,
           status: 'in_progress',
           league_id: selectedLeague?.id || null,
+          pick_timer: parseInt(pickTimer),
         })
         .select()
         .single();
