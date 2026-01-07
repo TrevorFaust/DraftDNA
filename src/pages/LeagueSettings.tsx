@@ -19,6 +19,7 @@ interface PositionLimits {
   TE: number;
   K: number;
   DEF: number;
+  BENCH: number;
 }
 
 interface TeamName {
@@ -32,7 +33,7 @@ export default function LeagueSettings() {
   const navigate = useNavigate();
   
   const [positionLimits, setPositionLimits] = useState<PositionLimits>({
-    QB: 4, RB: 8, WR: 8, TE: 3, K: 3, DEF: 3
+    QB: 4, RB: 8, WR: 8, TE: 3, K: 3, DEF: 3, BENCH: 7
   });
   const [teamNames, setTeamNames] = useState<TeamName[]>([]);
   const [saving, setSaving] = useState(false);
@@ -55,6 +56,7 @@ export default function LeagueSettings() {
           TE: limits.TE ?? 3,
           K: limits.K ?? 3,
           DEF: limits.DEF ?? 3,
+          BENCH: (limits as PositionLimits).BENCH ?? 7,
         });
       }
 
@@ -230,7 +232,7 @@ export default function LeagueSettings() {
                   {(Object.keys(positionLimits) as Array<keyof PositionLimits>).map((position) => (
                     <div key={position} className="space-y-2">
                       <Label htmlFor={position} className="text-sm font-medium">
-                        {position === 'DEF' ? 'Defense' : position}
+                        {position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position}
                       </Label>
                       <Input
                         id={position}
