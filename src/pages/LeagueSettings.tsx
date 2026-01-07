@@ -32,9 +32,13 @@ export default function LeagueSettings() {
   const { selectedLeague, refreshLeagues } = useLeagues();
   const navigate = useNavigate();
   
-  const [positionLimits, setPositionLimits] = useState<PositionLimits>({
+  const [positionLimits, setPositionLimits] = useState<Record<keyof PositionLimits, number | string>>({
     QB: 4, RB: 8, WR: 8, TE: 3, K: 3, DEF: 3, BENCH: 7
   });
+  
+  const defaultMinimums: PositionLimits = {
+    QB: 1, RB: 2, WR: 2, TE: 1, K: 1, DEF: 1, BENCH: 1
+  };
   const [teamNames, setTeamNames] = useState<TeamName[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -92,11 +96,17 @@ export default function LeagueSettings() {
   };
 
   const handlePositionLimitChange = (position: keyof PositionLimits, value: string) => {
-    const numValue = parseInt(value) || 0;
-    setPositionLimits(prev => ({
-      ...prev,
-      [position]: Math.max(0, Math.min(15, numValue))
-    }));
+    if (value === '') {
+      setPositionLimits(prev => ({ ...prev, [position]: '' }));
+    } else {
+      const numValue = parseInt(value);
+      if (!isNaN(numValue)) {
+        setPositionLimits(prev => ({
+          ...prev,
+          [position]: Math.max(0, Math.min(15, numValue))
+        }));
+      }
+    }
   };
 
   const handleTeamNameChange = (teamNumber: number, name: string) => {
@@ -109,7 +119,19 @@ export default function LeagueSettings() {
     if (!selectedLeague) return;
 
     setSaving(true);
-    const limitsJson = JSON.parse(JSON.stringify(positionLimits));
+    
+    // Apply default minimums for empty values
+    const finalLimits: PositionLimits = {
+      QB: positionLimits.QB === '' ? defaultMinimums.QB : Number(positionLimits.QB),
+      RB: positionLimits.RB === '' ? defaultMinimums.RB : Number(positionLimits.RB),
+      WR: positionLimits.WR === '' ? defaultMinimums.WR : Number(positionLimits.WR),
+      TE: positionLimits.TE === '' ? defaultMinimums.TE : Number(positionLimits.TE),
+      K: positionLimits.K === '' ? defaultMinimums.K : Number(positionLimits.K),
+      DEF: positionLimits.DEF === '' ? defaultMinimums.DEF : Number(positionLimits.DEF),
+      BENCH: positionLimits.BENCH === '' ? defaultMinimums.BENCH : Number(positionLimits.BENCH),
+    };
+    
+    const limitsJson = JSON.parse(JSON.stringify(finalLimits));
     const { error } = await supabase
       .from('leagues')
       .update({ position_limits: limitsJson })
@@ -120,6 +142,7 @@ export default function LeagueSettings() {
       console.error(error);
     } else {
       toast.success('Position limits saved');
+      setPositionLimits(finalLimits);
       refreshLeagues();
     }
     setSaving(false);
