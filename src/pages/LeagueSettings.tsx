@@ -239,7 +239,7 @@ export default function LeagueSettings() {
                         max={15}
                         value={positionLimits[position]}
                         onChange={(e) => handlePositionLimitChange(position, e.target.value)}
-                        className="bg-secondary/50"
+                        className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                   ))}
