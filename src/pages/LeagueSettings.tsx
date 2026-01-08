@@ -11,13 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Save, Users, Settings2, ArrowLeft, Layers } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 interface PositionLimits {
   QB: number;
@@ -80,8 +73,10 @@ export default function LeagueSettings() {
     }
   }, [selectedLeague]);
 
-  const loadTeamNames = async () => {
+  const loadTeamNames = async (teamCount?: number) => {
     if (!selectedLeague) return;
+
+    const count = teamCount ?? selectedLeague.num_teams;
 
     const { data, error } = await supabase
       .from('league_teams')
@@ -96,7 +91,7 @@ export default function LeagueSettings() {
 
     // Initialize with all team slots
     const allTeams: TeamName[] = [];
-    for (let i = 1; i <= selectedLeague.num_teams; i++) {
+    for (let i = 1; i <= count; i++) {
       const existing = data?.find(t => t.team_number === i);
       allTeams.push({
         team_number: i,
@@ -120,14 +115,25 @@ export default function LeagueSettings() {
     }
   };
 
-  const handleNumTeamsChange = async (value: string) => {
+  const handleNumTeamsChange = (value: string) => {
+    if (value === '') {
+      setNumTeams('' as unknown as number);
+      return;
+    }
+    const numValue = parseInt(value);
+    if (!isNaN(numValue)) {
+      setNumTeams(Math.max(2, Math.min(32, numValue)));
+    }
+  };
+
+  const saveNumTeams = async () => {
     if (!selectedLeague) return;
-    const newNumTeams = parseInt(value);
-    setNumTeams(newNumTeams);
+    const finalNumTeams = typeof numTeams === 'number' && numTeams >= 2 ? numTeams : 2;
     
+    setSaving(true);
     const { error } = await supabase
       .from('leagues')
-      .update({ num_teams: newNumTeams })
+      .update({ num_teams: finalNumTeams })
       .eq('id', selectedLeague.id);
 
     if (error) {
@@ -135,9 +141,11 @@ export default function LeagueSettings() {
       console.error(error);
     } else {
       toast.success('Number of teams updated');
+      setNumTeams(finalNumTeams);
       refreshLeagues();
-      loadTeamNames();
+      loadTeamNames(finalNumTeams);
     }
+    setSaving(false);
   };
 
   const handleTeamNameChange = (teamNumber: number, name: string) => {
@@ -290,19 +298,23 @@ export default function LeagueSettings() {
                   <Label htmlFor="numTeams" className="text-sm font-medium">
                     Number of Teams
                   </Label>
-                  <Select value={numTeams.toString()} onValueChange={handleNumTeamsChange}>
-                    <SelectTrigger className="bg-secondary/50 w-full max-w-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[8, 10, 12, 14, 16].map((n) => (
-                        <SelectItem key={n} value={n.toString()}>
-                          {n} teams
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2 max-w-xs">
+                    <Input
+                      id="numTeams"
+                      type="number"
+                      min={2}
+                      max={32}
+                      value={numTeams}
+                      onChange={(e) => handleNumTeamsChange(e.target.value)}
+                      className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-muted-foreground text-sm whitespace-nowrap">/ 32</span>
+                  </div>
                 </div>
+                <Button onClick={saveNumTeams} disabled={saving} className="w-full sm:w-auto">
+                  <Save className="w-4 h-4 mr-2" />
+                  Save
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -322,15 +334,18 @@ export default function LeagueSettings() {
                       <Label htmlFor={position} className="text-sm font-medium">
                         {position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position}
                       </Label>
-                      <Input
-                        id={position}
-                        type="number"
-                        min={0}
-                        max={15}
-                        value={positionLimits[position]}
-                        onChange={(e) => handlePositionLimitChange(position, e.target.value)}
-                        className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id={position}
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={positionLimits[position]}
+                          onChange={(e) => handlePositionLimitChange(position, e.target.value)}
+                          className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-muted-foreground text-sm whitespace-nowrap">/ 15</span>
+                      </div>
                     </div>
                   ))}
                 </div>
