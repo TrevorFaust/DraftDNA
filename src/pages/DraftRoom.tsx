@@ -25,6 +25,7 @@ const DraftRoom = () => {
   const [currentPick, setCurrentPick] = useState(1);
   const [isDrafting, setIsDrafting] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [benchCount, setBenchCount] = useState(6);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -47,6 +48,20 @@ const DraftRoom = () => {
 
       if (draftError) throw draftError;
       setDraft(draftData);
+
+      // Fetch league position limits if draft is tied to a league
+      if (draftData.league_id) {
+        const { data: leagueData } = await supabase
+          .from('leagues')
+          .select('position_limits')
+          .eq('id', draftData.league_id)
+          .single();
+        
+        if (leagueData?.position_limits) {
+          const limits = leagueData.position_limits as { BENCH?: number };
+          setBenchCount(limits.BENCH ?? 6);
+        }
+      }
 
       // Fetch players with user rankings
       const { data: playersData } = await supabase
@@ -452,7 +467,8 @@ const DraftRoom = () => {
             <MyRoster 
               picks={picks} 
               players={players} 
-              userPickPosition={draft?.user_pick_position || 1} 
+              userPickPosition={draft?.user_pick_position || 1}
+              benchCount={benchCount}
             />
           </div>
 
