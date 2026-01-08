@@ -12,9 +12,10 @@ interface MyRosterProps {
   picks: DraftPick[];
   players: RankedPlayer[];
   userPickPosition: number;
+  benchCount?: number;
 }
 
-export const MyRoster = ({ picks, players, userPickPosition }: MyRosterProps) => {
+export const MyRoster = ({ picks, players, userPickPosition, benchCount = 6 }: MyRosterProps) => {
   const userPicks = picks.filter((p) => p.team_number === userPickPosition);
   const draftedPlayers = userPicks
     .map((pick) => players.find((p) => p.id === pick.player_id))
@@ -32,8 +33,6 @@ export const MyRoster = ({ picks, players, userPickPosition }: MyRosterProps) =>
     { label: 'DEF', positions: ['DEF'] },
     { label: 'K', positions: ['K'] },
   ];
-
-  const benchCount = 6;
 
   // Assign players to slots
   const assignedPlayerIds = new Set<string>();

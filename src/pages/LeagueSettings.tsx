@@ -10,7 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Save, Users, Settings2, ArrowLeft } from 'lucide-react';
+import { Save, Users, Settings2, ArrowLeft, Layers } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface PositionLimits {
   QB: number;
@@ -40,6 +47,7 @@ export default function LeagueSettings() {
     QB: 1, RB: 2, WR: 2, TE: 1, K: 1, DEF: 1, BENCH: 1
   };
   const [teamNames, setTeamNames] = useState<TeamName[]>([]);
+  const [numTeams, setNumTeams] = useState(12);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -63,6 +71,9 @@ export default function LeagueSettings() {
           BENCH: (limits as PositionLimits).BENCH ?? 7,
         });
       }
+
+      // Load num teams
+      setNumTeams(selectedLeague.num_teams);
 
       // Load team names
       loadTeamNames();
@@ -103,9 +114,29 @@ export default function LeagueSettings() {
       if (!isNaN(numValue)) {
         setPositionLimits(prev => ({
           ...prev,
-          [position]: Math.max(0, Math.min(15, numValue))
+          [position]: Math.max(1, Math.min(15, numValue))
         }));
       }
+    }
+  };
+
+  const handleNumTeamsChange = async (value: string) => {
+    if (!selectedLeague) return;
+    const newNumTeams = parseInt(value);
+    setNumTeams(newNumTeams);
+    
+    const { error } = await supabase
+      .from('leagues')
+      .update({ num_teams: newNumTeams })
+      .eq('id', selectedLeague.id);
+
+    if (error) {
+      toast.error('Failed to update number of teams');
+      console.error(error);
+    } else {
+      toast.success('Number of teams updated');
+      refreshLeagues();
+      loadTeamNames();
     }
   };
 
@@ -230,10 +261,14 @@ export default function LeagueSettings() {
           </div>
         </div>
 
-        <Tabs defaultValue="positions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 bg-secondary/50">
-            <TabsTrigger value="positions" className="gap-2">
+        <Tabs defaultValue="general" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 bg-secondary/50">
+            <TabsTrigger value="general" className="gap-2">
               <Settings2 className="w-4 h-4" />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="positions" className="gap-2">
+              <Layers className="w-4 h-4" />
               Position Limits
             </TabsTrigger>
             <TabsTrigger value="teams" className="gap-2">
@@ -241,6 +276,36 @@ export default function LeagueSettings() {
               Team Names
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="general">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle>General Settings</CardTitle>
+                <CardDescription>
+                  Configure the basic settings for your league
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="numTeams" className="text-sm font-medium">
+                    Number of Teams
+                  </Label>
+                  <Select value={numTeams.toString()} onValueChange={handleNumTeamsChange}>
+                    <SelectTrigger className="bg-secondary/50 w-full max-w-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[8, 10, 12, 14, 16].map((n) => (
+                        <SelectItem key={n} value={n.toString()}>
+                          {n} teams
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="positions">
             <Card className="glass-card">
