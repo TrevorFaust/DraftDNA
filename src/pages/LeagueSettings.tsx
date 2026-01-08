@@ -288,7 +288,10 @@ export default function LeagueSettings() {
           <TabsContent value="general">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>General Settings</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  General Settings
+                  <span className="text-sm font-normal text-muted-foreground">(max 32)</span>
+                </CardTitle>
                 <CardDescription>
                   Configure the basic settings for your league
                 </CardDescription>
@@ -298,18 +301,15 @@ export default function LeagueSettings() {
                   <Label htmlFor="numTeams" className="text-sm font-medium">
                     Number of Teams
                   </Label>
-                  <div className="flex items-center gap-2 max-w-xs">
-                    <Input
-                      id="numTeams"
-                      type="number"
-                      min={2}
-                      max={32}
-                      value={numTeams}
-                      onChange={(e) => handleNumTeamsChange(e.target.value)}
-                      className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <span className="text-muted-foreground text-sm whitespace-nowrap">/ 32</span>
-                  </div>
+                  <Input
+                    id="numTeams"
+                    type="number"
+                    min={2}
+                    max={32}
+                    value={numTeams}
+                    onChange={(e) => handleNumTeamsChange(e.target.value)}
+                    className="bg-secondary/50 max-w-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                 </div>
                 <Button onClick={saveNumTeams} disabled={saving} className="w-full sm:w-auto">
                   <Save className="w-4 h-4 mr-2" />
@@ -322,7 +322,10 @@ export default function LeagueSettings() {
           <TabsContent value="positions">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Position Limits</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Position Limits
+                  <span className="text-sm font-normal text-muted-foreground">(max 15)</span>
+                </CardTitle>
                 <CardDescription>
                   Set the maximum number of players that can be drafted per position
                 </CardDescription>
@@ -334,18 +337,15 @@ export default function LeagueSettings() {
                       <Label htmlFor={position} className="text-sm font-medium">
                         {position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position}
                       </Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id={position}
-                          type="number"
-                          min={1}
-                          max={15}
-                          value={positionLimits[position]}
-                          onChange={(e) => handlePositionLimitChange(position, e.target.value)}
-                          className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <span className="text-muted-foreground text-sm whitespace-nowrap">/ 15</span>
-                      </div>
+                      <Input
+                        id={position}
+                        type="number"
+                        min={1}
+                        max={15}
+                        value={positionLimits[position]}
+                        onChange={(e) => handlePositionLimitChange(position, e.target.value)}
+                        className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
                     </div>
                   ))}
                 </div>
