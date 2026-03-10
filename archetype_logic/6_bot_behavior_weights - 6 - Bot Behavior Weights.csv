@@ -1,0 +1,41 @@
+"Bot Behavior Weights — Positional Multipliers by Phase, Override Thresholds & Hard Constraints",,,,,,,,,,,,,,,,,,,,,,
+"Weights multiply a player's base value score. 1.0 = neutral, >1.0 = favored, <1.0 = suppressed. Phases: Early = first 27% (R1-4 in 15R), Mid = 27-60% (R5-9), Late = 60%+ (R10+). valueOverride = rounds of ADP value needed to break archetype preference.",,,,,,,,,,,,,,,,,,,,,,
+Archetype / Strategy,Category,RB,,,WR,,,QB,,,TE,,,DST,,,K,,,"Value
+Override","Drift
+Start %",Notes
+,,"Early
+(R1–4)","Mid
+(R5–9)","Late
+(R10+)","Early
+(R1–4)","Mid
+(R5–9)","Late
+(R10+)","Early
+(R1–4)","Mid
+(R5–9)","Late
+(R10+)","Early
+(R1–4)","Mid
+(R5–9)","Late
+(R10+)","Early
+(R1–4)","Mid
+(R5–9)","Late
+(R10+)","Early
+(R1–4)","Mid
+(R5–9)","Late
+(R10+)",(rounds),(% of draft),
+Zero RB,Zero RB,0.3,0.8,1.1,1.4,1.1,0.9,0.9,1.0,1.0,1.1,1.0,1.0,—,—,1.0,—,—,0.8,1.5,55%,Heavily suppresses RB early. WR favored. Relaxes after 55%.
+Hero RB,Hero RB,1.8,0.7,0.9,0.9,1.2,1.0,0.8,1.0,1.0,0.9,0.9,1.0,—,—,1.0,—,—,0.8,1.5,55%,"Spikes RB in R1 only (1.8x), then suppresses. WR picks up mid."
+Robust RB,Robust RB,1.5,1.2,0.9,0.6,0.9,1.1,0.5,1.0,1.1,0.6,0.9,1.0,—,—,1.0,—,—,0.8,1.3,60%,RB heavily favored early AND mid. WR suppressed early.
+BPA,BPA,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,—,—,1.0,—,—,0.8,2,40%,All weights neutral — pure value. Lower override threshold needed.
+Skill Pos Late,Skill Pos Late,0.2,1.1,1.0,0.2,1.1,1.0,1.6,0.9,0.8,1.4,0.9,0.9,—,—,1.0,—,—,0.8,1.5,55%,Heavily suppresses RB+WR in R1-2. QB/TE boosted early.
+Early QB,QB,1.0,1.0,1.0,1.0,1.0,1.0,2.0,0.4,0.3,1.0,1.0,1.0,—,—,1.0,—,—,0.8,1.5,55%,Spikes QB in early phase. Suppresses after first QB taken.
+Mid QB,QB,1.0,1.0,1.0,1.0,1.0,1.0,0.3,1.5,0.5,1.0,1.0,1.0,—,—,1.0,—,—,0.8,1.5,55%,"Suppresses QB early, spikes mid."
+Late QB,QB,1.0,1.0,1.0,1.0,1.0,1.0,0.1,0.4,1.8,1.0,1.0,1.0,—,—,1.0,—,—,0.8,1.5,60%,Strong QB suppression until late phase.
+Punt QB,QB,1.0,1.0,1.0,1.0,1.0,1.0,—,0.1,1.2,1.0,1.0,1.0,—,—,1.0,—,—,0.8,1.5,65%,QB effectively blocked until final phase.
+Early TE,TE,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.0,0.3,0.2,—,—,1.0,—,—,0.8,1.5,55%,"Spikes TE early, suppresses after taken."
+Mid TE,TE,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,0.3,1.6,0.4,—,—,1.0,—,—,0.8,1.5,55%,"Suppresses TE early, spikes mid."
+Stream TE,TE,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,0.1,0.3,1.5,—,—,1.0,—,—,0.8,1.5,60%,TE blocked until late phase.
+Upside,Late,1.0,1.0,1.1,1.0,1.0,1.1,1.0,1.0,1.0,1.0,1.0,1.0,—,—,1.0,—,—,0.8,1.5,60%,Late phase slightly favors high-variance player type tag.
+Floor,Late,1.0,1.0,0.9,1.0,1.0,0.9,1.0,1.0,1.0,1.0,1.0,1.0,—,—,1.0,—,—,0.8,1.5,60%,Late phase avoids boom-or-bust. Slight penalty on high-variance types.
+Handcuff,Late,1.0,1.0,1.3,1.0,1.0,0.9,1.0,1.0,1.0,1.0,1.0,0.9,—,—,1.0,—,—,0.8,1.5,50%,Late phase boosts RB (handcuff type). Requires player-type tag.
+,,,,,,,,,,,,,,,,,,,,,,
+"HARD CONSTRAINTS (apply to all archetypes regardless of weights): DST never before round determined by pct_to_round(0.67, totalRounds). K only in final round. Never exceed startable + 2 bench of any position. Never leave required starter slot empty by pct_to_round(0.67, totalRounds).",,,,,,,,,,,,,,,,,,,,,,

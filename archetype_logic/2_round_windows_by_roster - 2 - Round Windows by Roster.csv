@@ -1,0 +1,28 @@
+Round Windows Scaled by Total Draft Rounds (Roster Size),,,,,,,,,,,,,,,,,,,
+Total rounds = 8 base starters + flex slots + bench size. League size does NOT affect windows. Orange = compressed (flag to user). Blue = 15R baseline (★).,,,,,,,,,,,,,,,,,,,
+Strategy,Detection Rule,15R ★,9R,10R,11R,12R,13R,14R,15R,16R,17R,18R,19R,20R,22R,24R,25R,28R,30R
+RB STRATEGY,,,,,,,,,,,,,,,,,,,
+Zero RB,0 RBs in first 27% of draft,R1–4,R1–3,R1–3,R1–3,R1–4,R1–4,R1–4,R1–4,R1–5,R1–5,R1–5,R1–6,R1–6,R1–6,R1–7,R1–7,R1–8,R1–8
+Hero RB,"Exactly 1 RB in R1, top-6 ADP",R1 only,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1
+Robust RB,2+ RBs in first 20%; 3+ by 40%,R1–3,R1–2,R1–2,R1–3,R1–3,R1–3,R1–3,R1–3,R1–4,R1–4,R1–4,R1–4,R1–4,R1–5,R1–5,R1–5,R1–6,R1–6
+Skill Pos Late,0 RB AND 0 WR in picks 1–2 (absolute),Picks 1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2,P1–2
+BPA,No clustering in any 4-pick window,All rounds,All,All,All,All,All,All,All,All,All,All,All,All,All,All,All,All,All
+WR STRATEGY,,,,,,,,,,,,,,,,,,,
+Hero WR,"Exactly 1 WR in R1, top-8 WR ADP",R1 only,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1,R1
+Robust WR,2+ WRs in rounds 2–33% window; 3+ by 40%,R1–5,R1–3,R1–4,R1–4,R1–4,R1–5,R1–5,R1–5,R2–6,R2–6,R2–6,R2–7,R2–7,R2–8,R2–8,R2–9,R2–10,R2–10
+WR Mid,0 WRs in R1–R2 (absolute); first WR in 13–47% window,R2–7,R2–5,R2–5,R2–6,R2–6,R2–7,R2–7,R2–7,R3–8,R3–8,R3–9,R3–9,R3–10,R3–11,R4–12,R4–12,R4–14,R4–14
+WR Late,0 WRs in first 27% of draft,R1–4,R1–3,R1–3,R1–3,R1–4,R1–4,R1–4,R1–4,R1–5,R1–5,R1–5,R1–6,R1–6,R1–6,R1–7,R1–7,R1–8,R1–8
+QB STRATEGY,,,,,,,,,,,,,,,,,,,
+Early QB,First QB in first 20% of draft,R1–3,R1–2,R1–2,R1–3,R1–3,R1–3,R1–3,R1–3,R1–4,R1–4,R1–4,R1–4,R1–4,R1–5,R1–5,R1–5,R1–6,R1–6
+Mid QB,First QB in 20–53% window,R3–8,R2–5,R2–6,R3–6,R3–7,R3–7,R3–8,R3–8,R4–9,R4–10,R4–10,R4–11,R4–11,R5–12,R5–13,R5–14,R6–15,R6–16
+Late QB,First QB in 53–80% window,R8–12,R5–8,R6–8,R6–9,R7–10,R7–11,R8–12,R8–12,R9–13,R10–14,R10–15,R11–16,R11–16,R12–18,R13–20,R14–20,R15–23,R16–24
+Punt QB,First QB in final 20% of draft,R12+,R8+,R8+,R9+,R10+,R11+,R12+,R12+,R13+,R14+,R15+,R16+,R16+,R18+,R20+,R20+,R23+,R24+
+TE STRATEGY,,,,,,,,,,,,,,,,,,,
+Early TE,First TE in first 20% of draft,R1–3,R1–2,R1–2,R1–3,R1–3,R1–3,R1–3,R1–3,R1–4,R1–4,R1–4,R1–4,R1–4,R1–5,R1–5,R1–5,R1–6,R1–6
+Mid TE,First TE in 20–53% window,R3–8,R2–5,R2–6,R3–6,R3–7,R3–7,R3–8,R3–8,R4–9,R4–10,R4–10,R4–11,R4–11,R5–12,R5–13,R5–14,R6–15,R6–16
+Stream TE,First TE after 53% of draft,R8+,R5+,R6+,R6+,R7+,R7+,R8+,R8+,R9+,R10+,R10+,R11+,R11+,R12+,R13+,R14+,R15+,R16+
+LATE ROUND PHILOSOPHY,,,,,,,,,,,,,,,,,,,
+Upside,≥60% high-variance picks in final 40%,R9+,R6+,R6+,R7+,R8+,R8+,R9+,R9+,R10+,R11+,R11+,R12+,R12+,R14+,R15+,R15+,R17+,R18+
+Floor,≥60% high-floor picks in final 40%,R9+,R6+,R6+,R7+,R8+,R8+,R9+,R9+,R10+,R11+,R11+,R12+,R12+,R14+,R15+,R15+,R17+,R18+
+VBD,Picks in 33–80% track top 15% VBD scores,R5–12,R3–8,R4–8,R4–9,R4–10,R5–11,R5–12,R5–12,R6–13,R6–14,R6–15,R7–16,R7–16,R8–18,R8–20,R9–20,R10–23,R10–24
+Handcuff,2+ handcuff RBs in 47–100% window,R8+,R5+,R5+,R6+,R6+,R7+,R7+,R8+,R8+,R8+,R9+,R9+,R10+,R11+,R12+,R12+,R14+,R15+

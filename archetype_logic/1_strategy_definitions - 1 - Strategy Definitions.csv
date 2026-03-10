@@ -1,0 +1,31 @@
+"Draft Strategy Definitions — Detection Rules, Round Windows & Priority Order",,,,,
+"Every strategy with its 15R baseline window, detection rule, description, and priority in the overlap resolution chain. Strategies are checked in priority order — first match wins. BPA is always last.",,,,,
+Strategy,"Window
+Start %",15R Baseline,Detection Rule,Description,Priority & Overlap Notes
+RB STRATEGY,,,,,
+Zero RB,0% (start),R1–4,0 RBs in first 27% of draft,"Deliberate avoidance. 0 RBs in first 4 rounds (15R baseline). Relies on WR/TE early, waiver RBs late.","2nd — broad absence signal. Beats BPA, loses to Hero/Robust/Skill."
+Hero RB,0% (start),R1 only,"Exactly 1 RB in R1, top-6 ADP","One elite bell-cow anchor in round 1, then pivot to WR. Requires top-6 RB ADP to qualify.",1st — most specific. R1 pick + ADP qualifier makes it unambiguous.
+Robust RB,0% (start),R1–3,2+ RBs in first 20%; 3+ by 40%,Volume approach. Stack RBs in rounds 1-3. No single player needs to be elite.,2nd — clustering signal. Checked before Zero RB.
+Skill Pos Late,0% (start),"Picks 1–2
+(absolute)",0 RB AND 0 WR in picks 1–2 (absolute),QB or TE in rounds 1-2. Picks 1-2 are always absolute regardless of total rounds.,3rd — absence of BOTH skill positions. Very specific signal.
+BPA,0% (start),"All rounds
+(fallback)",No clustering in any 4-pick window,"Pure value, no positional bias. Default fallback — never first check.",5th (last) — elimination fallback only.
+WR STRATEGY,,,,,
+Hero WR,0% (start),R1 only,"Exactly 1 WR in R1, top-8 WR ADP",One elite WR anchor in round 1. Requires top-8 WR ADP to qualify.,1st — most specific. Mutually exclusive with Hero RB.
+Robust WR,7%,R1–5,2+ WRs in rounds 2–33% window; 3+ by 40%,Aggressively stack WRs in early-middle rounds. Natural complement to Zero RB.,2nd — clustering in rounds 2-5.
+WR Mid,13%,R2–7,0 WRs in R1–R2 (absolute); first WR in 13–47% window,Delay WR to middle rounds. Lower bound R1-2 is always absolute.,3rd — first WR in the middle window.
+WR Late,0% (start),R1–4,0 WRs in first 27% of draft,Punt WR early. Complement to Robust RB. First WR in round 5+.,"4th — broad absence, same structure as Zero RB."
+QB STRATEGY,,,,,
+Early QB,0% (start),R1–3,First QB in first 20% of draft,Elite QB anchor. Top-3 QB by ADP. R1-3 in 15R draft.,Checked 1st. Clear early pick signal.
+Mid QB,20%,R3–8,First QB in 20–53% window,Most common. Balanced approach. Rounds 4-8 in 15R draft.,Checked 2nd. Widest window — default for most drafters.
+Late QB,53%,R8–12,First QB in 53–80% window,Intentionally delayed. Rounds 9-12 in 15R draft. Can compress in short drafts.,Checked 3rd. Flag if window < 2 rounds.
+Punt QB,80%,R12+,First QB in final 20% of draft,Full waiver reliance. Last 3 rounds in 15R. QB taken only when forced.,Checked 4th. Flag if total rounds < 11.
+TE STRATEGY,,,,,
+Early TE,0% (start),R1–3,First TE in first 20% of draft,Elite TE premium pick. Rounds 1-3 in 15R. Top-3 TE by ADP.,Checked 1st.
+Mid TE,20%,R3–8,First TE in 20–53% window,Second-wave TE. Reliable starter. Rounds 4-8 in 15R.,Checked 2nd. Fills the dead middle — most common real behavior.
+Stream TE,53%,R8+,First TE after 53% of draft,Full waiver/matchup approach. Round 9+ in 15R.,Checked 3rd.
+LATE ROUND PHILOSOPHY,,,,,
+Upside,60%,R9+,≥60% high-variance picks in final 40%,"Boom-or-bust late rounds. Rookies, unclear roles, breakout candidates.",Checked 3rd. Requires player variance tag.
+Floor,60%,R9+,≥60% high-floor picks in final 40%,"Safe, proven depth. Consistent targets, locked-in roles.",Checked 4th. Requires player floor tag. Default if neither hits 60%.
+VBD,33%,R5–12,Picks in 33–80% track top 15% VBD scores,Replacement-level math. Picks consistently outperform their positional baseline.,Checked 2nd. Requires pre-computed VBD scores per player.
+Handcuff,47%,R8+,2+ handcuff RBs in 47–100% window,Protects RB investments. 2+ picks are tagged backup RBs behind starters.,Checked 1st — most specific. Requires handcuff player-type tag.

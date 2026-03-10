@@ -1,0 +1,39 @@
+Fantasy Football Draft Bot — Master Reference Spreadsheet,
+"This workbook is the complete configuration and logic reference for building fantasy football draft bots. It covers all 20 draft strategies, how they scale with roster size and league size, positional scarcity modeling, bot behavior weights, and ready-to-paste JavaScript config. Each tab is self-contained but designed to be read together. Feed this to your Cursor agent as the source of truth before writing any draft logic.",
+,
+Tab,What It Contains & How to Use It
+Tab 1 — Strategy Definitions,"All 20 strategies with descriptions, detection rules, round windows (15R baseline), and priority order for overlap resolution.
+
+Feeds into: Tabs 2, 3, 6
+
+Cursor note: Feed this first. Defines what each archetype IS and how it is detected. Priority order prevents false matches."
+Tab 2 — Round Windows by Roster,"Every strategy's round window scaled across 9–30 total draft rounds. Windows are percentage-based so they scale automatically with any roster config.
+
+Feeds into: Tab 6
+
+Cursor note: Use the 15R baseline column as default. Show orange cells to user as a 'compressed strategy' warning in the UI."
+Tab 3 — Roster Config Builder,"Maps every flex+bench combination to a total round count. Shows where early/mid/late/final windows fall for each config. This is how user settings translate to round numbers.
+
+Feeds into: Tab 2
+
+Cursor note: getTotalRounds(flexSlots, benchSize) → look up in this table or use the formula: 8 + flex + bench."
+Tab 4 — Draft Rate Assumptions,"Per-round pick rates for each position in a 12-team baseline. Includes QB cascade spike model (R5-6) and TE elite spread (picks 15-35). Scales linearly by league size.
+
+Feeds into: Tab 5
+
+Cursor note: These rates power the scarcity model. Adjust them if your league data shows different behavior. Do NOT use these as round windows — they only drive scarcity calculations."
+Tab 5 — Scarcity by League Size,"Round at which each positional tier (Elite/Starter/Streamer) exhausts for every league size from 4–32 teams. Based on the draft rates in Tab 4.
+
+Feeds into: Tab 6
+
+Cursor note: Use this to set valueOverrideThreshold and positional urgency per league size. Red = act fast, Yellow = moderate, Green = patient."
+Tab 6 — Bot Behavior Weights,"Positional weight multipliers (early/mid/late phases) for each archetype. Includes drift start round, value override threshold by league size, and hard constraint rules.
+
+Feeds into: JS Config (Tab 7)
+
+Cursor note: This is the most important tab for implementation. Each archetype is a named config object with weights[position][phase] multipliers."
+Tab 7 — JS Config Reference,"Complete ready-to-paste JavaScript: DRAFT_THRESHOLDS, DETECTION_PRIORITY, buildDraftConfig(), getTotalRounds(), getCollapseWarnings(), and ARCHETYPE_WEIGHTS objects.
+
+Feeds into: Your codebase
+
+Cursor note: Copy this directly into your project. It references all the logic from tabs 1–6 in executable form."

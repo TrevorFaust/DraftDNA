@@ -5,7 +5,10 @@ export interface Player {
   team: string | null;
   adp: number;
   bye_week: number | null;
+  jersey_number: number | null;
+  season: number | null;
   created_at: string;
+  espn_id?: string | null;
 }
 
 export interface UserRanking {
@@ -29,6 +32,16 @@ export interface MockDraft {
   created_at: string;
   completed_at: string | null;
   league_id: string | null;
+  passed_players?: Array<{ pick_number: number; passed_players: string[] }>;
+  is_favorite?: boolean;
+  cpu_speed?: 'slow' | 'normal' | 'fast' | 'rapid' | 'instant'; // 'instant' kept for backward compatibility
+  pick_timer?: number;
+  /** Optional: archetype id(s) per CPU team. 2–3 ids per team (e.g. hero_rb + mid_qb + late_te). Legacy: single string still supported. */
+  cpu_archetypes?: Record<number, string | string[]>;
+  /** Archetype name (e.g. The Captain) detected for the user when draft was completed. Used for Badges. */
+  user_detected_archetype?: string | null;
+  /** Index into full archetype list (0-based) for correct badge slot when names duplicate. */
+  user_detected_archetype_index?: number | null;
 }
 
 export interface DraftPick {
@@ -39,6 +52,8 @@ export interface DraftPick {
   round_number: number;
   pick_number: number;
   created_at: string;
+  /** True when the pick was made by auto-draft (timer expiry), not explicit user selection */
+  is_autodraft?: boolean;
 }
 
 export interface League {
@@ -47,6 +62,15 @@ export interface League {
   name: string;
   num_teams: number;
   user_pick_position: number;
+  created_at: string;
+}
+
+export interface LeagueKeeper {
+  id: string;
+  league_id: string;
+  team_number: number;
+  player_id: string;
+  round_number: number;
   created_at: string;
 }
 

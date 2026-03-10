@@ -1,0 +1,24 @@
+Roster Configuration → Total Rounds Reference,,,,,,,,
+"Total Rounds = 8 base starters (QB+2RB+2WR+TE+DST+K) + Flex Slots + Bench Size. Use getTotalRounds(flex, bench) = 8 + flex + bench in code.",,,,,,,,
+Roster Config,Flex,Bench,Formula,"Total
+Rounds","Early
+(0–20%)","Mid
+(20–53%)","Late
+(53–80%)","Final
+(60–100%)"
+Minimum,0,1,8+0+1=9,9,R1–2,R3–5,R6–8,R6+
+Compact,0,3,8+0+3=11,11,R1–3,R4–6,R7–9,R7+
+Standard no flex,0,6,8+0+6=14,14,R1–3,R4–8,R9–12,R9+
+Standard ★ ★,1,6,8+1+6=15,15,R1–3,R4–8,R9–12,R9+
+Standard + 1 flex,2,6,8+2+6=16,16,R1–4,R5–9,R10–13,R10+
+2 flex,2,8,8+2+8=18,18,R1–4,R5–10,R11–15,R11+
+3 flex,3,6,8+3+6=17,17,R1–4,R5–10,R11–14,R11+
+4 flex,4,6,8+4+6=18,18,R1–4,R5–10,R11–15,R11+
+5 flex,5,6,8+5+6=19,19,R1–4,R5–11,R12–16,R12+
+Max flex,6,6,8+6+6=20,20,R1–4,R5–11,R12–16,R12+
+Max flex + lg bench,6,10,8+6+10=24,24,R1–5,R6–13,R14–20,R15+
+Max flex + deep bench,6,12,8+6+12=26,26,R1–6,R7–14,R15–21,R16+
+Near max roster,6,14,8+6+14=28,28,R1–6,R7–15,R16–23,R17+
+Maximum roster,6,15,8+6+15=29,29,R1–6,R7–16,R17–24,R18+
+,,,,,,,,
+"CODE: function getTotalRounds(flexSlots, benchSize) { return 8 + flexSlots + benchSize; }   // Max possible = 8 + 6 + 15 = 29 rounds",,,,,,,,
