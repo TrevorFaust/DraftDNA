@@ -1,0 +1,361 @@
+#,Archetype Name,Named?,RB Strategy,WR Strategy,QB Strategy,TE Strategy,Late Round Philosophy
+193,The Blue Chip,✓,Robust RB,Hero WR,Early QB,Early TE,Floor
+337,The Fortress,✓,Zero RB,Hero WR,Early QB,Early TE,Floor
+373,The Blueprint,✓,Zero RB,Robust WR,Early QB,Early TE,Floor
+1,The Captain,✓,BPA,Robust WR,Early QB,Early TE,Floor
+97,The Empire,✓,Hero RB,Robust WR,Early QB,Early TE,Floor
+49,The Commander in Chief,✓,BPA,WR Late,Early QB,Early TE,Floor
+265,The Lock In,✓,Skill Pos Late,WR Late,Early QB,Early TE,Floor
+229,The Power Formation,✓,Robust RB,WR Late,Early QB,Early TE,Floor
+145,The Sure Thing,✓,Hero RB,WR Late,Early QB,Early TE,Floor
+301,The Premium Build,✓,Skill Pos Late,WR Mid,Early QB,Early TE,Floor
+202,The Long Shot,✓,Robust RB,Hero WR,Late QB,Early TE,Floor
+346,The Rock,✓,Zero RB,Hero WR,Late QB,Early TE,Floor
+13,The Disciplined,✓,BPA,Robust WR,Late QB,Early TE,Floor
+382,The Pillar,✓,Zero RB,Robust WR,Late QB,Early TE,Floor
+109,The Stronghold,✓,Hero RB,Robust WR,Late QB,Early TE,Floor
+157,The Immovable Object,✓,Hero RB,WR Late,Late QB,Early TE,Floor
+274,The Locked In,✓,Skill Pos Late,WR Late,Late QB,Early TE,Floor
+61,The Quiet Storm,✓,BPA,WR Late,Late QB,Early TE,Floor
+238,The Sure Thing,✓,Robust RB,WR Late,Late QB,Early TE,Floor
+310,The Safe Premium,✓,Skill Pos Late,WR Mid,Late QB,Early TE,Floor
+355,The Conservative,✓,Zero RB,Hero WR,Mid QB,Early TE,Floor
+211,The Cornerstone,✓,Robust RB,Hero WR,Mid QB,Early TE,Floor
+391,The Foundation,✓,Zero RB,Robust WR,Mid QB,Early TE,Floor
+25,The Steady Hand,✓,BPA,Robust WR,Mid QB,Early TE,Floor
+121,The TE Hoarder,✓,Hero RB,Robust WR,Mid QB,Early TE,Floor
+169,The Fortress Wall,✓,Hero RB,WR Late,Mid QB,Early TE,Floor
+247,The Portfolio,✓,Robust RB,WR Late,Mid QB,Early TE,Floor
+283,The Safe Inversion,✓,Skill Pos Late,WR Late,Mid QB,Early TE,Floor
+73,The Stabilizer,✓,BPA,WR Late,Mid QB,Early TE,Floor
+319,The Cautious Premium,✓,Skill Pos Late,WR Mid,Mid QB,Early TE,Floor
+364,The Anchor,✓,Zero RB,Hero WR,Punt QB,Early TE,Floor
+220,The Monk,✓,Robust RB,Hero WR,Punt QB,Early TE,Floor
+400,The Bedrock,✓,Zero RB,Robust WR,Punt QB,Early TE,Floor
+133,The Reliable,✓,Hero RB,Robust WR,Punt QB,Early TE,Floor
+37,The Safe Harbor,✓,BPA,Robust WR,Punt QB,Early TE,Floor
+256,The Behemoth,✓,Robust RB,WR Late,Punt QB,Early TE,Floor
+181,The Iron Curtain,✓,Hero RB,WR Late,Punt QB,Early TE,Floor
+292,The Safe Chaos,✓,Skill Pos Late,WR Late,Punt QB,Early TE,Floor
+85,The Steady Maverick,✓,BPA,WR Late,Punt QB,Early TE,Floor
+328,The TE Anchor,✓,Skill Pos Late,WR Mid,Punt QB,Early TE,Floor
+340,The Coalition,✓,Zero RB,Hero WR,Early QB,Mid TE,Floor
+196,The Grand Slam,✓,Robust RB,Hero WR,Early QB,Mid TE,Floor
+5,The Calculated Risk,✓,BPA,Robust WR,Early QB,Mid TE,Floor
+376,The Commander,✓,Zero RB,Robust WR,Early QB,Mid TE,Floor
+101,The Ironclad Plan,✓,Hero RB,Robust WR,Early QB,Mid TE,Floor
+149,The Blueprint,✓,Hero RB,WR Late,Early QB,Mid TE,Floor
+53,The Even Hand,✓,BPA,WR Late,Early QB,Mid TE,Floor
+268,The Methodical Premium,✓,Skill Pos Late,WR Late,Early QB,Mid TE,Floor
+232,The Power Broker,✓,Robust RB,WR Late,Early QB,Mid TE,Floor
+304,The Unorthodox,✓,Skill Pos Late,WR Mid,Early QB,Mid TE,Floor
+205,The Reliable Roster,✓,Robust RB,Hero WR,Late QB,Mid TE,Floor
+349,The Steady Anchor,✓,Zero RB,Hero WR,Late QB,Mid TE,Floor
+385,The Route Runner,✓,Zero RB,Robust WR,Late QB,Mid TE,Floor
+17,The Stabilizer,✓,BPA,Robust WR,Late QB,Mid TE,Floor
+113,The Veteran,✓,Hero RB,Robust WR,Late QB,Mid TE,Floor
+277,The Deep Value,✓,Skill Pos Late,WR Late,Late QB,Mid TE,Floor
+241,The Hard Hat,✓,Robust RB,WR Late,Late QB,Mid TE,Floor
+65,The Pragmatist,✓,BPA,WR Late,Late QB,Mid TE,Floor
+161,The Reliable Duo,✓,Hero RB,WR Late,Late QB,Mid TE,Floor
+313,The Patient,✓,Skill Pos Late,WR Mid,Late QB,Mid TE,Floor
+214,The Balanced Attack,✓,Robust RB,Hero WR,Mid QB,Mid TE,Floor
+358,The Pairing,✓,Zero RB,Hero WR,Mid QB,Mid TE,Floor
+125,The Bulwark,✓,Hero RB,Robust WR,Mid QB,Mid TE,Floor
+29,The Even Keel,✓,BPA,Robust WR,Mid QB,Mid TE,Floor
+394,The Safe Bet,✓,Zero RB,Robust WR,Mid QB,Mid TE,Floor
+77,The Contrarian's Cousin,✓,BPA,WR Late,Mid QB,Mid TE,Floor
+173,The Old School,✓,Hero RB,WR Late,Mid QB,Mid TE,Floor
+286,The Patient Investor,✓,Skill Pos Late,WR Late,Mid QB,Mid TE,Floor
+250,The Trench Worker,✓,Robust RB,WR Late,Mid QB,Mid TE,Floor
+322,The Patient Drafter,✓,Skill Pos Late,WR Mid,Mid QB,Mid TE,Floor
+367,The Pragmatic Renegade,✓,Zero RB,Hero WR,Punt QB,Mid TE,Floor
+223,The Quiet Storm,✓,Robust RB,Hero WR,Punt QB,Mid TE,Floor
+41,The Minimalist,✓,BPA,Robust WR,Punt QB,Mid TE,Floor
+403,The Minimalist,✓,Zero RB,Robust WR,Punt QB,Mid TE,Floor
+137,The Stoic,✓,Hero RB,Robust WR,Punt QB,Mid TE,Floor
+89,The Controlled Burn,✓,BPA,WR Late,Punt QB,Mid TE,Floor
+259,The Steel Curtain,✓,Robust RB,WR Late,Punt QB,Mid TE,Floor
+295,The Survivalist,✓,Skill Pos Late,WR Late,Punt QB,Mid TE,Floor
+185,The Workhorse,✓,Hero RB,WR Late,Punt QB,Mid TE,Floor
+331,The Grinder's Path,✓,Skill Pos Late,WR Mid,Punt QB,Mid TE,Floor
+343,The Ironclad,✓,Zero RB,Hero WR,Early QB,Stream TE,Floor
+199,The Power Play,✓,Robust RB,Hero WR,Early QB,Stream TE,Floor
+105,The General,✓,Hero RB,Robust WR,Early QB,Stream TE,Floor
+9,The Scout Team,✓,BPA,Robust WR,Early QB,Stream TE,Floor
+379,The Signal Corps,✓,Zero RB,Robust WR,Early QB,Stream TE,Floor
+57,The Deliberate,✓,BPA,WR Late,Early QB,Stream TE,Floor
+153,The Field General,✓,Hero RB,WR Late,Early QB,Stream TE,Floor
+235,The Formation,✓,Robust RB,WR Late,Early QB,Stream TE,Floor
+271,The Signal First,✓,Skill Pos Late,WR Late,Early QB,Stream TE,Floor
+307,The Steady Signal,✓,Skill Pos Late,WR Mid,Early QB,Stream TE,Floor
+352,The Pragmatist,✓,Zero RB,Hero WR,Late QB,Stream TE,Floor
+208,The Reliable Duo,✓,Robust RB,Hero WR,Late QB,Stream TE,Floor
+388,The Grinder,✓,Zero RB,Robust WR,Late QB,Stream TE,Floor
+21,The Scout,✓,BPA,Robust WR,Late QB,Stream TE,Floor
+117,The Steady Hand,✓,Hero RB,Robust WR,Late QB,Stream TE,Floor
+69,The Disciplined Pro,✓,BPA,WR Late,Late QB,Stream TE,Floor
+165,The Hard Hat,✓,Hero RB,WR Late,Late QB,Stream TE,Floor
+280,The Steady Builder,✓,Skill Pos Late,WR Late,Late QB,Stream TE,Floor
+244,The Workhorse Classic,✓,Robust RB,WR Late,Late QB,Stream TE,Floor
+316,The Patient Builder,✓,Skill Pos Late,WR Mid,Late QB,Stream TE,Floor
+217,The Coalition,✓,Robust RB,Hero WR,Mid QB,Stream TE,Floor
+361,The Veteran Move,✓,Zero RB,Hero WR,Mid QB,Stream TE,Floor
+129,The Conservative,✓,Hero RB,Robust WR,Mid QB,Stream TE,Floor
+33,The Indexer,✓,BPA,Robust WR,Mid QB,Stream TE,Floor
+397,The Steady Receiver,✓,Zero RB,Robust WR,Mid QB,Stream TE,Floor
+289,The Deep Sleeper,✓,Skill Pos Late,WR Late,Mid QB,Stream TE,Floor
+253,The Powerhouse,✓,Robust RB,WR Late,Mid QB,Stream TE,Floor
+177,The Traditionalist,✓,Hero RB,WR Late,Mid QB,Stream TE,Floor
+81,The Workhorse's Cousin,✓,BPA,WR Late,Mid QB,Stream TE,Floor
+325,The Deliberate Builder,✓,Skill Pos Late,WR Mid,Mid QB,Stream TE,Floor
+226,The Iron Will,✓,Robust RB,Hero WR,Punt QB,Stream TE,Floor
+370,The Stoic,✓,Zero RB,Hero WR,Punt QB,Stream TE,Floor
+141,The Blue Collar,✓,Hero RB,Robust WR,Punt QB,Stream TE,Floor
+45,The Monk,✓,BPA,Robust WR,Punt QB,Stream TE,Floor
+406,The Spartan,✓,Zero RB,Robust WR,Punt QB,Stream TE,Floor
+189,The Bruiser,✓,Hero RB,WR Late,Punt QB,Stream TE,Floor
+262,The Bruiser,✓,Robust RB,WR Late,Punt QB,Stream TE,Floor
+298,The Minimalist Extreme,✓,Skill Pos Late,WR Late,Punt QB,Stream TE,Floor
+93,The Minimalist Pro,✓,BPA,WR Late,Punt QB,Stream TE,Floor
+334,The Minimalist Builder,✓,Skill Pos Late,WR Mid,Punt QB,Stream TE,Floor
+194,The Big Four,✓,Robust RB,Hero WR,Early QB,Early TE,Upside
+338,The Two Towers,✓,Zero RB,Hero WR,Early QB,Early TE,Upside
+99,The Franchise,✓,Hero RB,Robust WR,Early QB,Early TE,Upside
+374,The Franchise Builder,✓,Zero RB,Robust WR,Early QB,Early TE,Upside
+3,The Opportunist,✓,BPA,Robust WR,Early QB,Early TE,Upside
+51,The Field General,✓,BPA,WR Late,Early QB,Early TE,Upside
+147,The Luxury Tax,✓,Hero RB,WR Late,Early QB,Early TE,Upside
+230,The Triple Crown,✓,Robust RB,WR Late,Early QB,Early TE,Upside
+266,The Two Premium,✓,Skill Pos Late,WR Late,Early QB,Early TE,Upside
+302,The Kelce-Allen Special,✓,Skill Pos Late,WR Mid,Early QB,Early TE,Upside
+203,The Dark Horse,✓,Robust RB,Hero WR,Late QB,Early TE,Upside
+347,The High Roller,✓,Zero RB,Hero WR,Late QB,Early TE,Upside
+111,The Maverick,✓,Hero RB,Robust WR,Late QB,Early TE,Upside
+383,The Premium Collector,✓,Zero RB,Robust WR,Late QB,Early TE,Upside
+15,The Pure Play,✓,BPA,Robust WR,Late QB,Early TE,Upside
+159,The Cornerstone,✓,Hero RB,WR Late,Late QB,Early TE,Upside
+275,The Last Resort Premium,✓,Skill Pos Late,WR Late,Late QB,Early TE,Upside
+63,The Maverick's Twin,✓,BPA,WR Late,Late QB,Early TE,Upside
+239,The Trenches,✓,Robust RB,WR Late,Late QB,Early TE,Upside
+311,The Premium TE Play,✓,Skill Pos Late,WR Mid,Late QB,Early TE,Upside
+212,The Loaded Roster,✓,Robust RB,Hero WR,Mid QB,Early TE,Upside
+356,The Troika,✓,Zero RB,Hero WR,Mid QB,Early TE,Upside
+392,The Double Down,✓,Zero RB,Robust WR,Mid QB,Early TE,Upside
+123,The Hero,✓,Hero RB,Robust WR,Mid QB,Early TE,Upside
+27,The Market Timer,✓,BPA,Robust WR,Mid QB,Early TE,Upside
+248,The Full House,✓,Robust RB,WR Late,Mid QB,Early TE,Upside
+284,The Inverted Draft,✓,Skill Pos Late,WR Late,Mid QB,Early TE,Upside
+75,The Pivot,✓,BPA,WR Late,Mid QB,Early TE,Upside
+171,The Thunder,✓,Hero RB,WR Late,Mid QB,Early TE,Upside
+320,The TE Believer,✓,Skill Pos Late,WR Mid,Mid QB,Early TE,Upside
+365,The All-In,✓,Zero RB,Hero WR,Punt QB,Early TE,Upside
+221,The Iconoclast,✓,Robust RB,Hero WR,Punt QB,Early TE,Upside
+39,The Chaos Agent,✓,BPA,Robust WR,Punt QB,Early TE,Upside
+401,The Swing Trader,✓,Zero RB,Robust WR,Punt QB,Early TE,Upside
+135,The Wildcatter,✓,Hero RB,Robust WR,Punt QB,Early TE,Upside
+183,The Brute Force,✓,Hero RB,WR Late,Punt QB,Early TE,Upside
+293,The Chaos Premium,✓,Skill Pos Late,WR Late,Punt QB,Early TE,Upside
+87,The Maverick,✓,BPA,WR Late,Punt QB,Early TE,Upside
+257,The Tank,✓,Robust RB,WR Late,Punt QB,Early TE,Upside
+329,The TE Truther,✓,Skill Pos Late,WR Mid,Punt QB,Early TE,Upside
+197,The Big Three,✓,Robust RB,Hero WR,Early QB,Mid TE,Upside
+341,The Star Collector,✓,Zero RB,Hero WR,Early QB,Mid TE,Upside
+7,The Free Agent,✓,BPA,Robust WR,Early QB,Mid TE,Upside
+377,The Gambler,✓,Zero RB,Robust WR,Early QB,Mid TE,Upside
+103,The Power Broker,✓,Hero RB,Robust WR,Early QB,Mid TE,Upside
+269,The Early Adopter,✓,Skill Pos Late,WR Late,Early QB,Mid TE,Upside
+55,The Opportunist's Mirror,✓,BPA,WR Late,Early QB,Mid TE,Upside
+151,The Signal Caller,✓,Hero RB,WR Late,Early QB,Mid TE,Upside
+233,The Triple Threat,✓,Robust RB,WR Late,Early QB,Mid TE,Upside
+305,The Upside Down,✓,Skill Pos Late,WR Mid,Early QB,Mid TE,Upside
+350,The Boom or Bust,✓,Zero RB,Hero WR,Late QB,Mid TE,Upside
+206,The Late Surge,✓,Robust RB,Hero WR,Late QB,Mid TE,Upside
+19,The Sleeper,✓,BPA,Robust WR,Late QB,Mid TE,Upside
+115,The Upside Seeker,✓,Hero RB,Robust WR,Late QB,Mid TE,Upside
+386,The Wide Open,✓,Zero RB,Robust WR,Late QB,Mid TE,Upside
+67,The Free Thinker,✓,BPA,WR Late,Late QB,Mid TE,Upside
+163,The Late Bloomer,✓,Hero RB,WR Late,Late QB,Mid TE,Upside
+278,The Longshot,✓,Skill Pos Late,WR Late,Late QB,Mid TE,Upside
+242,The Lottery Ticket,✓,Robust RB,WR Late,Late QB,Mid TE,Upside
+314,The Gambler's Process,✓,Skill Pos Late,WR Mid,Late QB,Mid TE,Upside
+215,The Dual Threat,✓,Robust RB,Hero WR,Mid QB,Mid TE,Upside
+359,The Dynamic Duo,✓,Zero RB,Hero WR,Mid QB,Mid TE,Upside
+127,The Complete Package,✓,Hero RB,Robust WR,Mid QB,Mid TE,Upside
+31,The Sleeper Agent,✓,BPA,Robust WR,Mid QB,Mid TE,Upside
+395,The Streaker,✓,Zero RB,Robust WR,Mid QB,Mid TE,Upside
+175,The Backfield Boss,✓,Hero RB,WR Late,Mid QB,Mid TE,Upside
+251,The Gridiron,✓,Robust RB,WR Late,Mid QB,Mid TE,Upside
+287,The Late Bloomer Special,✓,Skill Pos Late,WR Late,Mid QB,Mid TE,Upside
+79,The Underdog,✓,BPA,WR Late,Mid QB,Mid TE,Upside
+323,The Slow Burn,✓,Skill Pos Late,WR Mid,Mid QB,Mid TE,Upside
+224,The Chaos Theory,✓,Robust RB,Hero WR,Punt QB,Mid TE,Upside
+368,The Renegade,✓,Zero RB,Hero WR,Punt QB,Mid TE,Upside
+404,The Anarchist,✓,Zero RB,Robust WR,Punt QB,Mid TE,Upside
+139,The Gambit,✓,Hero RB,Robust WR,Punt QB,Mid TE,Upside
+43,The Pure Opportunist,✓,BPA,Robust WR,Punt QB,Mid TE,Upside
+260,The Bulldozer,✓,Robust RB,WR Late,Punt QB,Mid TE,Upside
+296,The Dumpster Fire Chic,✓,Skill Pos Late,WR Late,Punt QB,Mid TE,Upside
+187,The Ground Game,✓,Hero RB,WR Late,Punt QB,Mid TE,Upside
+91,The Wildcard,✓,BPA,WR Late,Punt QB,Mid TE,Upside
+332,The Hail Mary,✓,Skill Pos Late,WR Mid,Punt QB,Mid TE,Upside
+344,The Big Play,✓,Zero RB,Hero WR,Early QB,Stream TE,Upside
+200,The Triple Header,✓,Robust RB,Hero WR,Early QB,Stream TE,Upside
+380,The Air Raid,✓,Zero RB,Robust WR,Early QB,Stream TE,Upside
+107,The Bold Franchise,✓,Hero RB,Robust WR,Early QB,Stream TE,Upside
+11,The Opportunist's Gambit,✓,BPA,Robust WR,Early QB,Stream TE,Upside
+272,The Bold Departure,✓,Skill Pos Late,WR Late,Early QB,Stream TE,Upside
+155,The Franchise QB,✓,Hero RB,WR Late,Early QB,Stream TE,Upside
+236,The Gambler's Gambit,✓,Robust RB,WR Late,Early QB,Stream TE,Upside
+59,The Open Field,✓,BPA,WR Late,Early QB,Stream TE,Upside
+308,The Air Strike,✓,Skill Pos Late,WR Mid,Early QB,Stream TE,Upside
+353,The Daredevil,✓,Zero RB,Hero WR,Late QB,Stream TE,Upside
+209,The Late Bloomer,✓,Robust RB,Hero WR,Late QB,Stream TE,Upside
+119,The Bold,✓,Hero RB,Robust WR,Late QB,Stream TE,Upside
+389,The Boom Factory,✓,Zero RB,Robust WR,Late QB,Stream TE,Upside
+23,The Value Hunter,✓,BPA,Robust WR,Late QB,Stream TE,Upside
+167,The Bet Hedger,✓,Hero RB,WR Late,Late QB,Stream TE,Upside
+281,The Hail Mary Classic,✓,Skill Pos Late,WR Late,Late QB,Stream TE,Upside
+245,The Hammer Drop,✓,Robust RB,WR Late,Late QB,Stream TE,Upside
+71,The Stoic,✓,BPA,WR Late,Late QB,Stream TE,Upside
+317,The Late Skill Surge,✓,Skill Pos Late,WR Mid,Late QB,Stream TE,Upside
+218,The Contrarian,✓,Robust RB,Hero WR,Mid QB,Stream TE,Upside
+362,The Showstopper,✓,Zero RB,Hero WR,Mid QB,Stream TE,Upside
+131,The Air Raid Classic,✓,Hero RB,Robust WR,Mid QB,Stream TE,Upside
+398,The Air Raid Classic,✓,Zero RB,Robust WR,Mid QB,Stream TE,Upside
+35,The Pivot,✓,BPA,Robust WR,Mid QB,Stream TE,Upside
+83,The Dark Horse,✓,BPA,WR Late,Mid QB,Stream TE,Upside
+179,The Ground & Pound,✓,Hero RB,WR Late,Mid QB,Stream TE,Upside
+254,The Hammer,✓,Robust RB,WR Late,Mid QB,Stream TE,Upside
+290,The Waiver King,✓,Skill Pos Late,WR Late,Mid QB,Stream TE,Upside
+326,The Delayed Attack,✓,Skill Pos Late,WR Mid,Mid QB,Stream TE,Upside
+227,The Maverick's Mirror,✓,Robust RB,Hero WR,Punt QB,Stream TE,Upside
+371,The Moonshot,✓,Zero RB,Hero WR,Punt QB,Stream TE,Upside
+47,The Iconoclast,✓,BPA,Robust WR,Punt QB,Stream TE,Upside
+143,The Lone Wolf,✓,Hero RB,Robust WR,Punt QB,Stream TE,Upside
+407,The Pure Chaos,✓,Zero RB,Robust WR,Punt QB,Stream TE,Upside
+95,The Free Spirit,✓,BPA,WR Late,Punt QB,Stream TE,Upside
+263,The Gunslinger's Nemesis,✓,Robust RB,WR Late,Punt QB,Stream TE,Upside
+191,The Lone Ranger,✓,Hero RB,WR Late,Punt QB,Stream TE,Upside
+299,The Total Chaos,✓,Skill Pos Late,WR Late,Punt QB,Stream TE,Upside
+335,The Chaos Builder,✓,Skill Pos Late,WR Mid,Punt QB,Stream TE,Upside
+195,The Asset Manager,✓,Robust RB,Hero WR,Early QB,Early TE,VBD
+339,The Dual Anchor,✓,Zero RB,Hero WR,Early QB,Early TE,VBD
+375,The Architect,✓,Zero RB,Robust WR,Early QB,Early TE,VBD
+100,The Dynasty,✓,Hero RB,Robust WR,Early QB,Early TE,VBD
+4,The Value GM,✓,BPA,Robust WR,Early QB,Early TE,VBD
+148,The Balance Sheet,✓,Hero RB,WR Late,Early QB,Early TE,VBD
+267,The Premium Purist,✓,Skill Pos Late,WR Late,Early QB,Early TE,VBD
+52,The Strategist,✓,BPA,WR Late,Early QB,Early TE,VBD
+231,The War Room General,✓,Robust RB,WR Late,Early QB,Early TE,VBD
+303,The Non-Conformist,✓,Skill Pos Late,WR Mid,Early QB,Early TE,VBD
+348,The Purist,✓,Zero RB,Hero WR,Late QB,Early TE,VBD
+204,The Underdog Play,✓,Robust RB,Hero WR,Late QB,Early TE,VBD
+384,The Accountant,✓,Zero RB,Robust WR,Late QB,Early TE,VBD
+112,The Librarian,✓,Hero RB,Robust WR,Late QB,Early TE,VBD
+16,The Robot,✓,BPA,Robust WR,Late QB,Early TE,VBD
+276,The Late Value,✓,Skill Pos Late,WR Late,Late QB,Early TE,VBD
+64,The Logician,✓,BPA,WR Late,Late QB,Early TE,VBD
+240,The Return on Rushes,✓,Robust RB,WR Late,Late QB,Early TE,VBD
+160,The Value Engineer,✓,Hero RB,WR Late,Late QB,Early TE,VBD
+312,The TE Premium Value,✓,Skill Pos Late,WR Mid,Late QB,Early TE,VBD
+213,The Complete Roster,✓,Robust RB,Hero WR,Mid QB,Early TE,VBD
+357,The Professor,✓,Zero RB,Hero WR,Mid QB,Early TE,VBD
+28,The Accountant,✓,BPA,Robust WR,Mid QB,Early TE,VBD
+393,The Optimizer,✓,Zero RB,Robust WR,Mid QB,Early TE,VBD
+124,The Stack Master,✓,Hero RB,Robust WR,Mid QB,Early TE,VBD
+76,The Long Game,✓,BPA,WR Late,Mid QB,Early TE,VBD
+249,The Machine,✓,Robust RB,WR Late,Mid QB,Early TE,VBD
+172,The Return on Investment,✓,Hero RB,WR Late,Mid QB,Early TE,VBD
+285,The Value Inversion,✓,Skill Pos Late,WR Late,Mid QB,Early TE,VBD
+321,The Balanced Premium,✓,Skill Pos Late,WR Mid,Mid QB,Early TE,VBD
+222,The Actuarial,✓,Robust RB,Hero WR,Punt QB,Early TE,VBD
+366,The Cold Eye,✓,Zero RB,Hero WR,Punt QB,Early TE,VBD
+40,The Actuarial,✓,BPA,Robust WR,Punt QB,Early TE,VBD
+402,The Quant,✓,Zero RB,Robust WR,Punt QB,Early TE,VBD
+136,The Systematic,✓,Hero RB,Robust WR,Punt QB,Early TE,VBD
+88,The Data Driven,✓,BPA,WR Late,Punt QB,Early TE,VBD
+258,The Juggernaut,✓,Robust RB,WR Late,Punt QB,Early TE,VBD
+184,The Sledgehammer,✓,Hero RB,WR Late,Punt QB,Early TE,VBD
+294,The Value Chaos,✓,Skill Pos Late,WR Late,Punt QB,Early TE,VBD
+330,The TE Value Hunter,✓,Skill Pos Late,WR Mid,Punt QB,Early TE,VBD
+198,The GM,✓,Robust RB,Hero WR,Early QB,Mid TE,VBD
+342,The Synergist,✓,Zero RB,Hero WR,Early QB,Mid TE,VBD
+8,The Computer,✓,BPA,Robust WR,Early QB,Mid TE,VBD
+104,The Executive Suite,✓,Hero RB,Robust WR,Early QB,Mid TE,VBD
+378,The Tactician,✓,Zero RB,Robust WR,Early QB,Mid TE,VBD
+234,The Draft Board,✓,Robust RB,WR Late,Early QB,Mid TE,VBD
+152,The Strategist,✓,Hero RB,WR Late,Early QB,Mid TE,VBD
+270,The Structured Gamble,✓,Skill Pos Late,WR Late,Early QB,Mid TE,VBD
+56,The Systems Thinker,✓,BPA,WR Late,Early QB,Mid TE,VBD
+306,The Contrarian Formula,✓,Skill Pos Late,WR Mid,Early QB,Mid TE,VBD
+351,The Long Game,✓,Zero RB,Hero WR,Late QB,Mid TE,VBD
+207,The Value Hunter,✓,Robust RB,Hero WR,Late QB,Mid TE,VBD
+116,The Analyst,✓,Hero RB,Robust WR,Late QB,Mid TE,VBD
+20,The Formula,✓,BPA,Robust WR,Late QB,Mid TE,VBD
+387,The Value Seeker,✓,Zero RB,Robust WR,Late QB,Mid TE,VBD
+68,The Cold Eye,✓,BPA,WR Late,Late QB,Mid TE,VBD
+164,The Market Timer,✓,Hero RB,WR Late,Late QB,Mid TE,VBD
+243,The Value Play,✓,Robust RB,WR Late,Late QB,Mid TE,VBD
+279,The Waiver Wire Maestro,✓,Skill Pos Late,WR Late,Late QB,Mid TE,VBD
+315,The Efficiency Expert,✓,Skill Pos Late,WR Mid,Late QB,Mid TE,VBD
+216,The Diversified,✓,Robust RB,Hero WR,Mid QB,Mid TE,VBD
+360,The Formula,✓,Zero RB,Hero WR,Mid QB,Mid TE,VBD
+396,The Efficient Market,✓,Zero RB,Robust WR,Mid QB,Mid TE,VBD
+128,The Fundamentalist,✓,Hero RB,Robust WR,Mid QB,Mid TE,VBD
+32,The Neutral,✓,BPA,Robust WR,Mid QB,Mid TE,VBD
+80,The Arbitrage,✓,BPA,WR Late,Mid QB,Mid TE,VBD
+176,The Classicist,✓,Hero RB,WR Late,Mid QB,Mid TE,VBD
+288,The Efficiency Play,✓,Skill Pos Late,WR Late,Mid QB,Mid TE,VBD
+252,The Meat and Potatoes,✓,Robust RB,WR Late,Mid QB,Mid TE,VBD
+324,The Contrarian BPA,✓,Skill Pos Late,WR Mid,Mid QB,Mid TE,VBD
+369,The Contrarian,✓,Zero RB,Hero WR,Punt QB,Mid TE,VBD
+225,The Spartan,✓,Robust RB,Hero WR,Punt QB,Mid TE,VBD
+44,The Algorithm,✓,BPA,Robust WR,Punt QB,Mid TE,VBD
+405,The Algorithm,✓,Zero RB,Robust WR,Punt QB,Mid TE,VBD
+140,The Methodist,✓,Hero RB,Robust WR,Punt QB,Mid TE,VBD
+261,The No-QB Club,✓,Robust RB,WR Late,Punt QB,Mid TE,VBD
+92,The Quant,✓,BPA,WR Late,Punt QB,Mid TE,VBD
+188,The Run First,✓,Hero RB,WR Late,Punt QB,Mid TE,VBD
+297,The Spartan Builder,✓,Skill Pos Late,WR Late,Punt QB,Mid TE,VBD
+333,The Uncommon Value,✓,Skill Pos Late,WR Mid,Punt QB,Mid TE,VBD
+201,The Brass Tacks,✓,Robust RB,Hero WR,Early QB,Stream TE,VBD
+345,The Executive,✓,Zero RB,Hero WR,Early QB,Stream TE,VBD
+12,The Evaluator,✓,BPA,Robust WR,Early QB,Stream TE,VBD
+381,The Field Marshal,✓,Zero RB,Robust WR,Early QB,Stream TE,VBD
+108,The War Room,✓,Hero RB,Robust WR,Early QB,Stream TE,VBD
+156,The Commander in Chief,✓,Hero RB,WR Late,Early QB,Stream TE,VBD
+60,The Draft Engine,✓,BPA,WR Late,Early QB,Stream TE,VBD
+237,The Draft Room,✓,Robust RB,WR Late,Early QB,Stream TE,VBD
+273,The QB Truther,✓,Skill Pos Late,WR Late,Early QB,Stream TE,VBD
+309,The Quarterback First,✓,Skill Pos Late,WR Mid,Early QB,Stream TE,VBD
+354,The Logician,✓,Zero RB,Hero WR,Late QB,Stream TE,VBD
+210,The Smart Money,✓,Robust RB,Hero WR,Late QB,Stream TE,VBD
+24,The Analyst,✓,BPA,Robust WR,Late QB,Stream TE,VBD
+120,The Methodical,✓,Hero RB,Robust WR,Late QB,Stream TE,VBD
+390,The Realist,✓,Zero RB,Robust WR,Late QB,Stream TE,VBD
+168,The Mileage,✓,Hero RB,WR Late,Late QB,Stream TE,VBD
+246,The Mileage Counter,✓,Robust RB,WR Late,Late QB,Stream TE,VBD
+282,The Process Builder,✓,Skill Pos Late,WR Late,Late QB,Stream TE,VBD
+72,The Pure BPA,✓,BPA,WR Late,Late QB,Stream TE,VBD
+318,The Optimizer's Path,✓,Skill Pos Late,WR Mid,Late QB,Stream TE,VBD
+363,The Calculated Risk,✓,Zero RB,Hero WR,Mid QB,Stream TE,VBD
+219,The Diversified Portfolio,✓,Robust RB,Hero WR,Mid QB,Stream TE,VBD
+132,The Scout,✓,Hero RB,Robust WR,Mid QB,Stream TE,VBD
+399,The Spreadsheet,✓,Zero RB,Robust WR,Mid QB,Stream TE,VBD
+36,The Spreadsheet Classic,✓,BPA,Robust WR,Mid QB,Stream TE,VBD
+180,The Arbitrageur,✓,Hero RB,WR Late,Mid QB,Stream TE,VBD
+84,The Smart Money,✓,BPA,WR Late,Mid QB,Stream TE,VBD
+255,The Strongman,✓,Robust RB,WR Late,Mid QB,Stream TE,VBD
+291,The Wire to Wire,✓,Skill Pos Late,WR Late,Mid QB,Stream TE,VBD
+327,The Process,✓,Skill Pos Late,WR Mid,Mid QB,Stream TE,VBD
+372,The Logician's Ghost,✓,Zero RB,Hero WR,Punt QB,Stream TE,VBD
+228,The Stoic's Formula,✓,Robust RB,Hero WR,Punt QB,Stream TE,VBD
+408,The Robot,✓,Zero RB,Robust WR,Punt QB,Stream TE,VBD
+48,The Spartan Analyst,✓,BPA,Robust WR,Punt QB,Stream TE,VBD
+144,The Spartan General,✓,Hero RB,Robust WR,Punt QB,Stream TE,VBD
+264,The Old Faithful,✓,Robust RB,WR Late,Punt QB,Stream TE,VBD
+300,The Pure Contrarian,✓,Skill Pos Late,WR Late,Punt QB,Stream TE,VBD
+96,The Pure Value,✓,BPA,WR Late,Punt QB,Stream TE,VBD
+192,The Run Committee,✓,Hero RB,WR Late,Punt QB,Stream TE,VBD
+336,The Robot Builder,✓,Skill Pos Late,WR Mid,Punt QB,Stream TE,VBD

@@ -19,6 +19,7 @@ export const PositionBadge = ({ position, className }: PositionBadgeProps) => {
       case 'K':
         return 'position-k';
       case 'DEF':
+      case 'D/ST':
         return 'position-def';
       default:
         return 'bg-muted text-muted-foreground';

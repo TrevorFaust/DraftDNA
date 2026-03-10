@@ -1,0 +1,20 @@
+"Positional Tier Scarcity — Round Each Tier Is Fully Exhausted, by League Size",,,,,,,,,,,,,,,,
+Based on realistic per-round draft rates from Tab 4. Scales linearly with league size. Red = gone by R3 (act fast)  |  Yellow = R4-R7  |  Green = R8+ (patient OK)  |  ★ = 12-team baseline,,,,,,,,,,,,,,,,
+Tier,Description,"Tier
+Size",ADP Context,4T,6T,8T,10T,12T ★,14T,16T,18T,20T,22T,24T,28T,32T
+QUARTERBACK TIERS,,,,,,,,,,,,,,,,
+QB Elite,Top 3 QBs (Lamar/Allen/Mahomes tier),3,Picks ~40-70 in 12T; cascade means 2nd/3rd follow within 10 picks of first,After R7,After R6,After R5,After R5,After R5,After R5,After R4,After R4,After R4,After R4,After R4,After R4,After R4
+QB Starter,Top 8 QBs — reliable weekly starters,8,Rounds 4-9 depending on when run starts,After R21,After R11,After R8,After R7,After R7,After R6,After R6,After R6,After R5,After R5,After R5,After R5,After R5
+QB Streamer,Top 16 QBs — viable streamers,16,Rounds 8-13,R30+,R30+,After R21,After R13,After R11,After R9,After R8,After R8,After R7,After R7,After R7,After R6,After R6
+RUNNING BACK TIERS,,,,,,,,,,,,,,,,
+RB Elite,Top 12 RBs — workhorse bell-cows,12,~50% of R1-4 picks are RBs; tier goes fast,After R10,After R5,After R4,After R3,After R2,After R2,After R2,After R2,After R2,After R2,After R1,After R1,After R1
+RB Starter,Top 24 RBs — viable weekly starters,24,,R30+,After R18,After R10,After R7,After R5,After R4,After R4,After R3,After R3,After R3,After R2,After R2,After R2
+RB Depth,Top 36 RBs — flex/handcuff range,36,,R30+,R30+,R30+,After R14,After R10,After R7,After R6,After R5,After R4,After R4,After R4,After R3,After R3
+WIDE RECEIVER TIERS,,,,,,,,,,,,,,,,
+WR Elite,Top 12 WRs — true WR1/WR2,12,~40% of R1-4 picks,After R11,After R6,After R5,After R4,After R3,After R3,After R2,After R2,After R2,After R2,After R2,After R2,After R1
+WR Starter,Top 24 WRs — viable weekly starters,24,,R30+,After R19,After R11,After R8,After R6,After R5,After R5,After R4,After R4,After R3,After R3,After R3,After R2
+WR Depth,Top 36 WRs — flex/streamer territory,36,,R30+,R30+,R29+,After R15,After R11,After R9,After R7,After R6,After R6,After R5,After R5,After R4,After R3
+TIGHT END TIERS,,,,,,,,,,,,,,,,
+TE Elite,"Top 3 TEs — picks 15-35, spread (not a cluster)",3,Low early rate reflects spread: ~1 per round in R1-3,After R7,After R5,After R5,After R4,After R4,After R3,After R3,After R3,After R3,After R3,After R3,After R2,After R2
+TE Starter,"Top 8 TEs — second wave, R4-8 typical",8,,R30+,After R15,After R10,After R8,After R7,After R6,After R5,After R5,After R5,After R5,After R4,After R4,After R4
+TE Streamer,Top 16 TEs — viable streamers,16,,R30+,R30+,R30+,R30+,After R15,After R12,After R10,After R9,After R8,After R7,After R7,After R6,After R5

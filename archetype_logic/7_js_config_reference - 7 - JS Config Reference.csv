@@ -1,0 +1,218 @@
+JavaScript Implementation Reference — Complete Config for Cursor Agent
+"
+// =============================================================================
+// FANTASY FOOTBALL DRAFT BOT — COMPLETE JS CONFIGURATION
+// Source of truth: all values derived from the master reference spreadsheet.
+//
+// TAB REFERENCES:
+//   Tab 1 → DETECTION_PRIORITY, THRESHOLDS_PCT
+//   Tab 2 → getRoundFromPct(), window calculations
+//   Tab 3 → getTotalRounds()
+//   Tab 4 → DRAFT_RATES_12 (for scarcity model)
+//   Tab 5 → getScarcityProfile(), round_tier_exhausted()
+//   Tab 6 → ARCHETYPE_WEIGHTS, HARD_CONSTRAINTS, valueOverrideThreshold
+// =============================================================================
+
+// ── TAB 3: ROSTER → TOTAL ROUNDS ─────────────────────────────────────────────
+function getTotalRounds(flexSlots, benchSize) {
+  return 8 + flexSlots + benchSize;
+  // 8 base starters: QB + 2RB + 2WR + TE + DST + K
+  // Max: 8 + 6 + 15 = 29 rounds
+}
+
+// ── TAB 2: PCT → ABSOLUTE ROUND ──────────────────────────────────────────────
+function pctToRound(pct, totalRounds, direction = ""ceil"") {
+  const raw = pct * totalRounds;
+  if (direction === ""ceil"")  return Math.min(Math.max(1, Math.ceil(raw)),  totalRounds);
+  if (direction === ""floor"") return Math.min(Math.max(1, Math.floor(raw)), totalRounds);
+  return Math.min(Math.max(1, Math.round(raw)), totalRounds);
+}
+
+// ── TAB 1: STRATEGY THRESHOLDS (% of total rounds — never change these) ──────
+const THRESHOLDS_PCT = {
+  rb: {
+    zeroRB:       { avoidEnd: 4/15 },
+    heroRB:       { absoluteRound: 1, minADPRank: 6 },
+    robustRB:     { windowEnd: 3/15, minPicks: 2, totalByPct: 0.40, totalMin: 3 },
+    skillPosLate: { absoluteAvoidPositions: [""RB"",""WR""], absolutePicks: [1,2] },
+    bpa:          { fallback: true },
+  },
+  wr: {
+    heroWR:   { absoluteRound: 1, minWRADPRank: 8 },
+    robustWR: { windowStart: 1/15, windowEnd: 5/15, minPicks: 2, totalByPct: 0.40, totalMin: 3 },
+    wrMid:    { absoluteAvoidBefore: 2, windowStart: 2/15, windowEnd: 7/15 },
+    wrLate:   { avoidEnd: 4/15 },
+  },
+  qb: {
+    earlyQB:  { windowStart: 0.00,  windowEnd: 3/15  },
+    midQB:    { windowStart: 3/15,  windowEnd: 8/15  },
+    lateQB:   { windowStart: 8/15,  windowEnd: 12/15 },
+    puntQB:   { windowStart: 12/15, windowEnd: 1.00  },
+  },
+  te: {
+    earlyTE:  { windowStart: 0.00,  windowEnd: 3/15  },
+    midTE:    { windowStart: 3/15,  windowEnd: 8/15  },
+    streamTE: { windowStart: 8/15,  windowEnd: 1.00  },
+  },
+  late: {
+    upside:   { windowStart: 0.60, windowEnd: 1.00, minRatio: 0.60, playerType: ""highVariance"" },
+    floor:    { windowStart: 0.60, windowEnd: 1.00, minRatio: 0.60, playerType: ""highFloor""    },
+    vbd:      { windowStart: 0.33, windowEnd: 0.80, vbdPercentile: 0.85 },
+    handcuff: { windowStart: 0.47, windowEnd: 1.00, minCount: 2, playerType: ""handcuff"" },
+  },
+};
+
+// ── TAB 1: DETECTION PRIORITY (first match wins) ──────────────────────────────
+const DETECTION_PRIORITY = {
+  rb:   [""heroRB"", ""robustRB"", ""skillPosLate"", ""zeroRB"", ""bpa""],
+  wr:   [""heroWR"", ""robustWR"", ""wrMid"", ""wrLate""],
+  qb:   [""earlyQB"", ""midQB"", ""lateQB"", ""puntQB""],
+  te:   [""earlyTE"", ""midTE"", ""streamTE""],
+  late: [""handcuff"", ""vbd"", ""upside"", ""floor""],
+};
+
+// ── TAB 5: SCARCITY → VALUE OVERRIDE THRESHOLD ───────────────────────────────
+function getValueOverrideThreshold(leagueSize) {
+  if (leagueSize <= 6)  return 2.0;   // very patient — elite players last deep
+  if (leagueSize <= 10) return 1.8;
+  if (leagueSize <= 14) return 1.5;   // standard baseline
+  if (leagueSize <= 18) return 1.3;
+  if (leagueSize <= 24) return 1.2;
+  return 1.0;                          // 24-32 teams: act with high conviction
+}
+
+// ── TABS 1-3: BUILD RESOLVED CONFIG ──────────────────────────────────────────
+function buildDraftConfig(flexSlots, benchSize, leagueSize) {
+  const totalRounds = getTotalRounds(flexSlots, benchSize);
+  function w(pct, dir = ""ceil"") { return pctToRound(pct, totalRounds, dir); }
+
+  return {
+    totalRounds, leagueSize,
+    valueOverrideThreshold: getValueOverrideThreshold(leagueSize),
+    driftStartRound: w(0.55),
+    phases: {
+      earlyEnd: w(0.27),    // end of early phase (R1-4 in 15R)
+      midEnd:   w(0.60),    // end of mid phase (R5-9 in 15R)
+      // late phase = midEnd+1 to totalRounds
+    },
+    windows: {
+      rb: {
+        zeroRB_avoidBefore:  w(4/15),
+        robustRB_end:        w(3/15),
+        robustRB_totalByRnd: w(0.40),
+      },
+      wr: {
+        robustWR_start:      w(1/15, ""floor""),
+        robustWR_end:        w(5/15),
+        wrMid_start:         w(2/15, ""floor""),
+        wrMid_end:           w(7/15),
+        wrLate_avoidBefore:  w(4/15),
+      },
+      qb: {
+        early_end:   w(3/15),
+        mid_start:   w(3/15,  ""floor""),
+        mid_end:     w(8/15),
+        late_start:  w(8/15,  ""floor""),
+        late_end:    w(12/15),
+        punt_start:  w(12/15, ""floor""),
+      },
+      te: {
+        early_end:    w(3/15),
+        mid_start:    w(3/15,  ""floor""),
+        mid_end:      w(8/15),
+        stream_start: w(8/15,  ""floor""),
+      },
+      late: {
+        philosophy_start: w(0.60, ""floor""),
+        vbd_start:        w(0.33, ""floor""),
+        vbd_end:          w(0.80),
+        handcuff_start:   w(0.47, ""floor""),
+      },
+    },
+  };
+}
+
+// ── TAB 6: ARCHETYPE WEIGHTS ──────────────────────────────────────────────────
+// weights[position] = [earlyPhaseMultiplier, midPhaseMultiplier, latePhaseMultiplier]
+// Phase boundaries defined in buildDraftConfig().phases
+const ARCHETYPE_WEIGHTS = {
+  zeroRB:       { RB:[0.3,0.8,1.1], WR:[1.4,1.1,0.9], QB:[0.9,1.0,1.0], TE:[1.1,1.0,1.0], DST:[0,0,1.0], K:[0,0,0.8] },
+  heroRB:       { RB:[1.8,0.7,0.9], WR:[0.9,1.2,1.0], QB:[0.8,1.0,1.0], TE:[0.9,0.9,1.0], DST:[0,0,1.0], K:[0,0,0.8] },
+  robustRB:     { RB:[1.5,1.2,0.9], WR:[0.6,0.9,1.1], QB:[0.5,1.0,1.1], TE:[0.6,0.9,1.0], DST:[0,0,1.0], K:[0,0,0.8] },
+  bpa:          { RB:[1.0,1.0,1.0], WR:[1.0,1.0,1.0], QB:[1.0,1.0,1.0], TE:[1.0,1.0,1.0], DST:[0,0,1.0], K:[0,0,0.8] },
+  skillPosLate: { RB:[0.2,1.1,1.0], WR:[0.2,1.1,1.0], QB:[1.6,0.9,0.8], TE:[1.4,0.9,0.9], DST:[0,0,1.0], K:[0,0,0.8] },
+  earlyQB:      { QB:[2.0,0.4,0.3], _rest: 1.0 },  // _rest = 1.0 for all other positions
+  midQB:        { QB:[0.3,1.5,0.5], _rest: 1.0 },
+  lateQB:       { QB:[0.1,0.4,1.8], _rest: 1.0 },
+  puntQB:       { QB:[0.0,0.1,1.2], _rest: 1.0 },
+  earlyTE:      { TE:[2.0,0.3,0.2], _rest: 1.0 },
+  midTE:        { TE:[0.3,1.6,0.4], _rest: 1.0 },
+  streamTE:     { TE:[0.1,0.3,1.5], _rest: 1.0 },
+  upside:       { RB:[1.0,1.0,1.1], WR:[1.0,1.0,1.1], QB:[1.0,1.0,1.0], TE:[1.0,1.0,1.0], DST:[0,0,1.0], K:[0,0,0.8] },
+  floor:        { RB:[1.0,1.0,0.9], WR:[1.0,1.0,0.9], QB:[1.0,1.0,1.0], TE:[1.0,1.0,1.0], DST:[0,0,1.0], K:[0,0,0.8] },
+  handcuff:     { RB:[1.0,1.0,1.3], WR:[1.0,1.0,0.9], QB:[1.0,1.0,1.0], TE:[1.0,1.0,0.9], DST:[0,0,1.0], K:[0,0,0.8] },
+};
+
+// Combine weights for a multi-strategy archetype
+function getCombinedWeights(strategies, config) {
+  const positions = [""RB"",""WR"",""QB"",""TE"",""DST"",""K""];
+  const phases = [0,1,2];
+  const result = {};
+  positions.forEach(pos => {
+    result[pos] = phases.map(ph => {
+      const weights = strategies.map(s => {
+        const w = ARCHETYPE_WEIGHTS[s];
+        if (!w) return 1.0;
+        if (w[pos]) return w[pos][ph];
+        return w._rest ?? 1.0;
+      });
+      // Multiply all strategy weights together, then apply drift
+      const combined = weights.reduce((a,b) => a*b, 1.0);
+      const driftFactor = getDriftFactor(ph, config);
+      return combined * driftFactor;
+    });
+  });
+  return result;
+}
+
+// Drift: weights relax toward 1.0 after driftStartRound
+function getDriftFactor(phase, config) {
+  if (phase < 2) return 1.0;  // only applies to late phase
+  return 0.85;                 // weights are 85% effective in late phase
+}
+
+// ── TAB 6: HARD CONSTRAINTS ───────────────────────────────────────────────────
+function getHardConstraints(config) {
+  return {
+    dstEarliestRound:  pctToRound(0.67, config.totalRounds),  // never before ~R10 in 15R
+    kickerOnlyRound:   config.totalRounds,                     // kicker = final round only
+    maxRosterByPos: {
+      RB: 5, WR: 5, QB: 2, TE: 2, DST: 1, K: 1
+    },
+    mustHaveStarterBy: pctToRound(0.67, config.totalRounds),  // all starters filled by ~R10
+  };
+}
+
+// ── COLLAPSE WARNINGS ─────────────────────────────────────────────────────────
+function getCollapseWarnings(totalRounds) {
+  const warnings = [];
+  const lateQBWindow = pctToRound(12/15,totalRounds) - pctToRound(8/15,totalRounds);
+  const puntQBWindow = totalRounds - pctToRound(12/15,totalRounds);
+  if (lateQBWindow <= 0) warnings.push({ strategy:""lateQB"",  reason:""Window = 0 rounds"" });
+  if (puntQBWindow <= 1) warnings.push({ strategy:""puntQB"",  reason:""Only 1 round available"" });
+  if (pctToRound(4/15,totalRounds) <= 2) {
+    warnings.push({ strategy:""zeroRB"", reason:""Avoidance window very narrow"" });
+    warnings.push({ strategy:""wrLate"", reason:""Avoidance window very narrow"" });
+  }
+  return warnings;
+}
+
+// ── EXAMPLE: Build a 'Workhorse' bot for a 12-team, 15-round league ───────────
+/*
+const config = buildDraftConfig(1, 6, 12);  // 1 flex, 6 bench, 12 teams → 15R
+const workhorseStrategies = [""robustRB"", ""wrLate"", ""puntQB"", ""streamTE"", ""handcuff""];
+const weights = getCombinedWeights(workhorseStrategies, config);
+const constraints = getHardConstraints(config);
+const warnings = getCollapseWarnings(config.totalRounds);
+*/
+"
