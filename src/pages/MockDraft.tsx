@@ -156,7 +156,8 @@ const MockDraft = () => {
       let leagueType = 'season';
       let isSuperflex = false;
       let positionLimits: any = undefined;
-      
+      let effectivePlayerPool = playerPool;
+
       if (user && selectedLeague) {
         draftOrder = (selectedLeague as any)?.draft_order || 'snake';
         scoringFormat = (selectedLeague as any)?.scoring_format || 'ppr';
@@ -165,7 +166,8 @@ const MockDraft = () => {
         positionLimits = selectedLeague?.position_limits as any;
         // If league has rookies_only, force player pool to rookies
         if ((selectedLeague as any)?.rookies_only && leagueType === 'dynasty') {
-          playerPool = 'rookies';
+          effectivePlayerPool = 'rookies';
+          setPlayerPool('rookies');
         }
         
         // Validate position limits against number of teams (especially DEF limit)
@@ -190,7 +192,8 @@ const MockDraft = () => {
         isSuperflex = tempSettings?.isSuperflex || false;
         positionLimits = tempSettings?.positionLimits;
         if (tempSettings?.rookiesOnly && leagueType === 'dynasty') {
-          playerPool = 'rookies';
+          effectivePlayerPool = 'rookies';
+          setPlayerPool('rookies');
         }
         
         // Validate position limits against number of teams (especially DEF limit)
@@ -218,8 +221,8 @@ const MockDraft = () => {
           userPickPosition: validatedPickPosition,
           pickTimer: pickTimer === '0' ? 0 : parseInt(pickTimer),
           cpuSpeed,
-          playerPool: isDynasty ? playerPool : undefined,
-          rookiesOnly: isDynasty && playerPool === 'rookies',
+          playerPool: isDynasty ? effectivePlayerPool : undefined,
+          rookiesOnly: isDynasty && effectivePlayerPool === 'rookies',
           positionLimits: positionLimits,
           isSuperflex: isSuperflex,
           draftOrder,
@@ -246,7 +249,7 @@ const MockDraft = () => {
           league_id: null,
           pick_timer: pickTimer === '0' ? 0 : parseInt(pickTimer),
           cpu_speed: cpuSpeed,
-          player_pool: isDynasty ? playerPool : undefined,
+          player_pool: isDynasty ? effectivePlayerPool : undefined,
           cpu_archetypes: assignRandomNamedArchetypesForDraft(validatedNumTeams, validatedPickPosition),
         } as MockDraft;
 
@@ -273,7 +276,7 @@ const MockDraft = () => {
           status: 'in_progress',
           league_id: selectedLeague?.id || null,
           pick_timer: pickTimer === '0' ? 0 : parseInt(pickTimer),
-          player_pool: isDynasty ? playerPool : null,
+          player_pool: isDynasty ? effectivePlayerPool : null,
           cpu_speed: cpuSpeed, // Always include cpu_speed
         } as any)
         .select()
@@ -319,7 +322,7 @@ const MockDraft = () => {
                 status: 'in_progress',
                 league_id: selectedLeague?.id || null,
                 pick_timer: pickTimer === '0' ? 0 : parseInt(pickTimer),
-                player_pool: isDynasty ? playerPool : null,
+                player_pool: isDynasty ? effectivePlayerPool : null,
                 cpu_speed: 'normal', // Fallback to normal if rapid isn't allowed
               } as any)
               .select()
@@ -344,10 +347,10 @@ const MockDraft = () => {
               draft_order: draftOrder,
               scoring_format: scoringFormat,
               status: 'in_progress',
-              league_id: selectedLeague?.id || null,
-              pick_timer: pickTimer === '0' ? 0 : parseInt(pickTimer),
-              player_pool: isDynasty ? playerPool : null,
-            } as any)
+            league_id: selectedLeague?.id || null,
+            pick_timer: pickTimer === '0' ? 0 : parseInt(pickTimer),
+            player_pool: isDynasty ? effectivePlayerPool : null,
+          } as any)
             .select()
             .single();
           
