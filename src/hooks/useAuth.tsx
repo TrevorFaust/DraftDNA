@@ -22,6 +22,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const previousUserRef = useRef<User | null>(null);
   const hasMigratedRef = useRef(false);
+  const lastHiddenAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -54,15 +55,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // THEN check for existing session (handle errors so we don't get stuck with bad state)
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       previousUserRef.current = session?.user ?? null;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // When user returns to tab after long idle, do a full page reload for a clean state
+    const IDLE_MS_BEFORE_RELOAD = 30 * 60 * 1000; // 30 minutes
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        lastHiddenAtRef.current = Date.now();
+        return;
+      }
+      const hiddenAt = lastHiddenAtRef.current;
+      if (hiddenAt == null || Date.now() - hiddenAt < IDLE_MS_BEFORE_RELOAD) return;
+      lastHiddenAtRef.current = null;
+      window.location.reload();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const signUp = async (email: string, password: string, options?: { username?: string }) => {
