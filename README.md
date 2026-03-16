@@ -1,107 +1,92 @@
-# Welcome to your Lovable project
+# Draft Board — Fantasy Football Draft Tool
 
-## Project info
+A fantasy football web app for creating custom player rankings, running mock drafts, and preparing for draft day. Features league support, multiple scoring formats, CPU opponents with archetype-based draft logic, and the Pick Six prediction challenge.
 
-**URL**: https://lovable.dev/projects/14042ea5-75ea-4616-850c-27b00d187540
+## Features
 
-## How can I edit this code?
+- **Custom Rankings** — Drag-and-drop big board with community ADP and multiple scoring buckets (standard, PPR, half-PPR, dynasty, superflex, rookies-only)
+- **Mock Drafts** — Configurable mock drafts (8–16 teams, snake or linear, customizable rosters) with CPU opponents that follow draft archetypes
+- **Draft Room** — Live draft simulation with timers, CPU draft speeds, and draft history
+- **Badges** — Archetype achievements earned from completed mock drafts
+- **Pick Six Challenge** — Season prediction contest: pick top 6 at each position (QB, RB, WR, TE, K, D/ST) plus tiebreakers
+- **Statistics** — Player stats and visualization
+- **League Settings** — Multi-league support, keepers, position limits, and custom scoring
+- **Guest Mode** — Use rankings and mock drafts without signing in (data stored in localStorage)
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend:** Vite, React, TypeScript, Tailwind CSS, shadcn-ui
+- **Backend:** Supabase (auth, PostgreSQL database)
+- **State & Data:** TanStack Query, React Hook Form, Zod
+- **UI:** dnd-kit (drag-and-drop), Recharts, Lucide icons, Sonner toasts
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/14042ea5-75ea-4616-850c-27b00d187540) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js & npm (recommended: [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Setup
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# 1. Clone the repository
 git clone <YOUR_GIT_URL>
+cd my-nfl-draft-1
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
+# 2. Install dependencies
 npm i
 
-# Step 4: Set up environment variables (see Environment Setup below)
+# 3. Configure Supabase (see below)
 cp .env.example .env
-# Then edit .env and add your Supabase credentials
+# Edit .env with your Supabase credentials
 
-# Step 5: Start the development server with auto-reloading and an instant preview.
+# 4. Start the development server
 npm run dev
 ```
 
-## Environment Setup
+### Environment Variables
 
-This project requires Supabase configuration. You'll need to set up environment variables before running the application.
+1. Create a project at [Supabase Dashboard](https://supabase.com/dashboard)
+2. Go to **Settings** > **API**
+3. Copy:
+   - **Project URL** → `VITE_SUPABASE_URL`
+   - **Publishable Key** (anon/public) → `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-### Getting Your Supabase Credentials
+Edit `.env`:
 
-1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
-2. Select your project
-3. Navigate to **Settings** > **API**
-4. Copy the following values:
-   - **Project URL** → use for `VITE_SUPABASE_URL`
-   - **Publishable Key** (anon/public key) → use for `VITE_SUPABASE_PUBLISHABLE_KEY`
+```env
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key-here
+```
 
-### Setting Up Environment Variables
+The `.env` file is in `.gitignore`; do not commit it.
 
-1. Copy the example environment file:
-   ```sh
-   cp .env.example .env
-   ```
+## Scripts
 
-2. Open `.env` and replace the placeholder values with your actual Supabase credentials:
-   ```env
-   VITE_SUPABASE_URL=https://your-project-id.supabase.co
-   VITE_SUPABASE_PUBLISHABLE_KEY=your-actual-publishable-key
-   ```
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server with hot reload |
+| `npm run build` | Production build |
+| `npm run preview` | Preview production build locally |
+| `npm run generate:archetypes` | Generate archetype logic from config |
 
-3. Save the file. The `.env` file is already in `.gitignore`, so your secrets won't be committed to version control.
+## Project Structure
 
-**Note:** Never commit your `.env` file or share your publishable keys publicly. The `.env.example` file is safe to commit as it only contains placeholder values.
+```
+src/
+├── components/     # UI components, PlayerCard, Navbar, etc.
+├── constants/      # Archetypes, scoring, NFL data
+├── hooks/          # useAuth, useLeagues, useCommunityRankingsBucket, etc.
+├── pages/          # Index, Rankings, MockDraft, DraftRoom, History, Badges, etc.
+├── utils/          # CPU draft logic, archetype detection, storage helpers
+└── types/          # Database types
+supabase/migrations/  # Database migrations
+scripts/            # Baseline parsing, archetype generation
+```
 
-**Edit a file directly in GitHub**
+## Data Sync
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+For syncing player data and baselines between PostgreSQL and Supabase, see:
 
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/14042ea5-75ea-4616-850c-27b00d187540) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `HOW_TO_SYNC_DATA.md` — Syncing `nfl_players_historical` and `public.players`
+- `sync_instructions.md` — Full guide for postgres ↔ nfl_webapp sync
