@@ -51,6 +51,8 @@ interface ArchetypeBadgeProps {
   earnedFromDraft?: string;
   /** Greyed out with ? icon (not yet earned) */
   locked?: boolean;
+  /** Override flavor text (e.g. for chaos badges) */
+  flavorText?: string;
   className?: string;
 }
 
@@ -61,23 +63,38 @@ export function ArchetypeBadge({
   size = 'sm',
   earnedFromDraft,
   locked = false,
+  flavorText: flavorTextOverride,
   className,
 }: ArchetypeBadgeProps) {
   const archetype = getArchetypeByNameOrImproviser(archetypeName);
   const strategies = archetype?.strategies;
+  const flavorText = flavorTextOverride ?? archetype?.flavorText;
   const description = strategies ? getArchetypeDescription(strategies) : archetypeName;
   const whyText = strategies ? getArchetypeEarnedReason(strategies) : `Complete a draft matching this archetype to unlock.`;
   const { Icon, gradient } = getBadgeStyle(archetypeName, archetypeIndex);
 
   const tooltipContent = (
-    <TooltipContent side="top" className="max-w-[260px]">
+    <TooltipContent side="top" className="max-w-[320px]">
       {locked ? (
-        <p className="text-muted-foreground text-sm">Complete a draft matching this strategy to unlock.</p>
+        <>
+          <p className="font-medium mb-1">{archetypeName}</p>
+          {flavorText ? (
+            <p className="text-muted-foreground text-xs">{flavorText}</p>
+          ) : (
+            <p className="text-muted-foreground text-sm">Complete a draft matching this strategy to unlock.</p>
+          )}
+        </>
       ) : (
         <>
           <p className="font-medium mb-1">{archetypeName}</p>
-          <p className="text-muted-foreground text-xs mb-1">{description}</p>
-          <p className="text-muted-foreground/80 text-xs italic">{whyText}</p>
+          {flavorText ? (
+            <p className="text-muted-foreground text-xs">{flavorText}</p>
+          ) : (
+            <>
+              <p className="text-muted-foreground text-xs mb-1">{description}</p>
+              <p className="text-muted-foreground/80 text-xs italic">{whyText}</p>
+            </>
+          )}
         </>
       )}
     </TooltipContent>

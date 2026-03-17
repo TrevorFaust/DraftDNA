@@ -50,7 +50,7 @@ function resolveStrategies(archetypeIdOrIds: string | string[] | undefined): Arc
   const valid = ids.filter((id): id is DraftArchetypeId => isDraftArchetypeId(id));
   if (valid.length === 0) return null;
 
-  const rbIds = ['zero_rb', 'hero_rb', 'robust_rb', 'bpa'];
+  const rbIds = ['zero_rb', 'hero_rb', 'robust_rb', 'hybrid', 'skill_pos_late', 'bpa'];
   const wrIds = ['zero_wr', 'hero_wr', 'robust_wr']; // zero_wr -> wr_late
   const qbIds = ['early_qb', 'mid_qb', 'late_qb', 'punt_qb'];
   const teIds = ['early_te', 'late_te'];

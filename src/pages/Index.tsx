@@ -3,7 +3,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/Navbar';
 import { ListOrdered, History, ArrowRight, Loader2 } from 'lucide-react';
-import { FootballHelmetIcon } from '@/components/icons/FootballHelmetIcon';
+import { SiteLogo } from '@/components/SiteLogo';
+import { ClipboardList } from 'lucide-react';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -32,7 +33,7 @@ const Index = () => {
         <div className="max-w-6xl mx-auto px-4 pt-20 pb-32 relative">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6 animate-fade-in">
-              <FootballHelmetIcon className="w-4 h-4 text-primary" />
+              <SiteLogo size={16} className="w-4 h-4" />
               <span className="text-sm text-primary">Fantasy Football Draft Tool</span>
             </div>
             
@@ -73,7 +74,7 @@ const Index = () => {
             <Link to="/mock-draft" className="block">
               <div className="glass-card p-6 group hover:border-accent/50 transition-all duration-300 cursor-pointer h-full">
                 <div className="w-12 h-12 rounded-xl bg-gradient-gold flex items-center justify-center mb-4 group-hover:shadow-[0_0_30px_hsl(45_100%_55%/0.3)] transition-shadow">
-                  <FootballHelmetIcon className="w-6 h-6 text-accent-foreground" />
+                  <ClipboardList className="w-6 h-6 text-accent-foreground" />
                 </div>
                 <h3 className="font-display text-2xl mb-2">MOCK DRAFTS</h3>
                 <p className="text-muted-foreground">

@@ -1,7 +1,8 @@
 /**
  * Generates src/constants/archetypeMappings.generated.ts from:
- * - archetype_logic/archetype_mapping(2).csv (named archetypes + 5 strategies)
- * - archetype_logic/detection.scaling_mapping.csv (round windows by total rounds)
+ * - archetype_logic/Fantasy_Football_Archetype_Master.xlsx - Master Archetypes.csv (preferred: named archetypes + flavor text)
+ *   OR archetype_logic/archetype_mapping(2).csv (fallback: no flavor text)
+ * - archetype_logic/detection.scaling_mapping.csv (optional: round windows by total rounds)
  * Run: node scripts/generateArchetypeLogic.mjs
  */
 
@@ -13,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 
 const STRATEGY_TO_ID = {
-  'bpa': 'bpa', 'zero rb': 'zero_rb', 'robust rb': 'robust_rb', 'skill pos late': 'skill_pos_late', 'hero rb': 'hero_rb',
+  'bpa': 'bpa', 'zero rb': 'zero_rb', 'robust rb': 'robust_rb', 'skill pos late': 'skill_pos_late', 'hybrid': 'hybrid', 'hero rb': 'hero_rb',
   'robust wr': 'robust_wr', 'wr late': 'wr_late', 'hero wr': 'hero_wr', 'wr mid': 'wr_mid',
   'early qb': 'early_qb', 'mid qb': 'mid_qb', 'late qb': 'late_qb', 'punt qb': 'punt_qb',
   'early te': 'early_te', 'mid te': 'mid_te', 'stream te': 'stream_te',
@@ -38,14 +39,20 @@ function parseCsv(content) {
 
 function normalize(s) { return (s || '').trim().toLowerCase(); }
 
-// Archetype CSV: #, Archetype Name, Named?, RB, WR, QB, TE, Late
-const archetypePath = path.join(root, 'archetype_logic', 'archetype_mapping(2).csv');
+// Prefer Master Archetypes CSV (has Flavor Text); fallback to legacy mapping
+const masterArchetypePath = path.join(root, 'archetype_logic', 'Fantasy_Football_Archetype_Master.xlsx - Master Archetypes.csv');
+const legacyArchetypePath = path.join(root, 'archetype_logic', 'archetype_mapping(2).csv');
+const archetypePath = fs.existsSync(masterArchetypePath) ? masterArchetypePath : legacyArchetypePath;
 const archetypeCsv = fs.readFileSync(archetypePath, 'utf8');
 const archetypeRows = parseCsv(archetypeCsv);
-const header = archetypeRows[0];
-const dataRows = archetypeRows.slice(1);
+const dataRows = archetypeRows.slice(1); // skip header
+
+// Master CSV columns: #, Archetype Name, Named?, RB Strategy, WR Strategy, QB Strategy, TE Strategy, Late Round Philosophy, Flavor Text (index 8)
+// Legacy CSV columns: #, Archetype Name, Named?, RB, WR, QB, TE, Late (no flavor text)
+const hasFlavorColumn = archetypeRows[0] && normalize(archetypeRows[0][8] || '').includes('flavor');
 
 const archetypes = [];
+const missingFlavor = [];
 for (const row of dataRows) {
   const name = row[1];
   const rb = STRATEGY_TO_ID[normalize(row[3])];
@@ -54,35 +61,44 @@ for (const row of dataRows) {
   const te = STRATEGY_TO_ID[normalize(row[6])];
   const late = STRATEGY_TO_ID[normalize(row[7])];
   if (name && rb && wr && qb && te && late) {
-    archetypes.push({ name, rb, wr, qb, te, late });
+    const flavorText = hasFlavorColumn && row[8] ? (row[8] || '').trim() : undefined;
+    if (hasFlavorColumn && (!flavorText || flavorText.length < 20)) missingFlavor.push(name);
+    archetypes.push({ name, rb, wr, qb, te, late, flavorText: flavorText || undefined });
   }
 }
+if (missingFlavor.length > 0) {
+  console.warn('Archetypes with missing or very short flavor text:', missingFlavor.join(', '));
+}
 
-// Detection CSV: Strategy, Detection Rule, 15R Baseline, 9R, 10R, ..., 30R
+// Override flavor text for archetypes that may be truncated in CSV (e.g. unquoted field with commas)
+const STEADY_BUILDER_FLAVOR = 'The first six rounds were a methodical RB and WR rotation before the tight end position was skipped entirely and the quarterback added deep in the backend after the skill positions were fully stacked. The Steady Builder lays the foundation one skill position at a time and does not address supporting roles until the core is complete. The floor-first backend confirms that every decision on this roster was made in the correct order.';
+for (const a of archetypes) {
+  if (a.name === 'The Steady Builder') a.flavorText = STEADY_BUILDER_FLAVOR;
+}
+
+// Detection CSV (optional): round windows by total rounds
+let strategyWindows = {};
 const detectionPath = path.join(root, 'archetype_logic', 'detection.scaling_mapping.csv');
-const detectionCsv = fs.readFileSync(detectionPath, 'utf8');
-const detectionRows = parseCsv(detectionCsv);
-// Row 0-2 are title/notes/header. Column 0 = Strategy, 1 = Rule, 2 = 15R, 3 = 9R, 4 = 10R, ... 18 = 30R
-const totalRoundsColumns = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 25, 28, 30];
-const colIndexByRounds = {};
-totalRoundsColumns.forEach((r, i) => { colIndexByRounds[r] = i + 3; }); // +3 because 0=Strategy, 1=Rule, 2=15R, 3=9R
-
-const strategyWindows = {}; // strategyKey -> { 9: "R1-4", 10: "...", ... }
-for (let r = 4; r < detectionRows.length; r++) {
-  const row = detectionRows[r];
-  const strategy = (row[0] || '').trim();
-  if (!strategy || strategy === 'RB STRATEGY' || strategy === 'WR STRATEGY' || strategy === 'QB STRATEGY' || strategy === 'TE STRATEGY' || strategy === 'LATE ROUND PHILOSOPHY') continue;
-  const key = normalize(strategy).replace(/\s+/g, '_');
-  strategyWindows[key] = {};
-  totalRoundsColumns.forEach(tr => {
-    const col = colIndexByRounds[tr];
-    strategyWindows[key][tr] = (row[col] || '').trim();
-  });
+if (fs.existsSync(detectionPath)) {
+  const detectionCsv = fs.readFileSync(detectionPath, 'utf8');
+  const detectionRows = parseCsv(detectionCsv);
+  const totalRoundsColumns = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 25, 28, 30];
+  for (let r = 4; r < detectionRows.length; r++) {
+    const row = detectionRows[r];
+    const strategy = (row[0] || '').trim();
+    if (!strategy || strategy === 'RB STRATEGY' || strategy === 'WR STRATEGY' || strategy === 'QB STRATEGY' || strategy === 'TE STRATEGY' || strategy === 'LATE ROUND PHILOSOPHY') continue;
+    const key = normalize(strategy).replace(/\s+/g, '_');
+    strategyWindows[key] = {};
+    totalRoundsColumns.forEach(tr => {
+      const col = totalRoundsColumns.indexOf(tr) + 3;
+      strategyWindows[key][tr] = (row[col] || '').trim();
+    });
+  }
 }
 
 // Build round-window lookup: strategy ID (our IDs) to key in strategyWindows
 const strategyIdToDetectionKey = {
-  zero_rb: 'zero_rb', hero_rb: 'hero_rb', robust_rb: 'robust_rb', skill_pos_late: 'skill_pos_late', bpa: 'bpa',
+  zero_rb: 'zero_rb', hero_rb: 'hero_rb', robust_rb: 'robust_rb', skill_pos_late: 'skill_pos_late', hybrid: 'hybrid', bpa: 'bpa',
   hero_wr: 'hero_wr', robust_wr: 'robust_wr', wr_mid: 'wr_mid', wr_late: 'wr_late',
   early_qb: 'early_qb', mid_qb: 'mid_qb', late_qb: 'late_qb', punt_qb: 'punt_qb',
   early_te: 'early_te', mid_te: 'mid_te', stream_te: 'stream_te',
@@ -92,7 +108,7 @@ const strategyIdToDetectionKey = {
 function out() {
   const lines = [];
   lines.push('/**');
-  lines.push(' * Generated from archetype_logic/archetype_mapping(2).csv and detection.scaling_mapping.csv.');
+  lines.push(' * Generated from Master Archetypes CSV (or archetype_mapping) and optional detection.scaling_mapping.csv.');
   lines.push(' * Do not edit by hand. Run: node scripts/generateArchetypeLogic.mjs');
   lines.push(' */');
   lines.push('');
@@ -101,9 +117,16 @@ function out() {
   lines.push('export interface NamedArchetype {');
   lines.push('  name: string;');
   lines.push('  strategies: ArchetypeStrategies;');
+  lines.push('  /** 1–2 sentence description for tooltips and draft completion. */');
+  lines.push('  flavorText?: string;');
   lines.push('}');
   lines.push('');
-  lines.push(`export const ARCHETYPE_LIST: NamedArchetype[] = ${JSON.stringify(archetypes.map(a => ({ name: a.name, strategies: { rb: a.rb, wr: a.wr, qb: a.qb, te: a.te, late: a.late } })), null, 2)};`);
+  const listEntries = archetypes.map(a => {
+    const o = { name: a.name, strategies: { rb: a.rb, wr: a.wr, qb: a.qb, te: a.te, late: a.late } };
+    if (a.flavorText) o.flavorText = a.flavorText;
+    return o;
+  });
+  lines.push(`export const ARCHETYPE_LIST: NamedArchetype[] = ${JSON.stringify(listEntries, null, 2)};`);
   lines.push('');
   lines.push('const ARCHETYPE_BY_NAME = new Map(ARCHETYPE_LIST.map(a => [a.name.toLowerCase(), a]));');
   lines.push('');

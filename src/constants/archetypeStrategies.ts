@@ -4,12 +4,13 @@
  * map to these IDs via STRATEGY_DISPLAY_TO_ID.
  */
 
-// ─── RB strategies (1 of 5) ─────────────────────────────────────────────────
+// ─── RB strategies (1 of 6) ─────────────────────────────────────────────────
 export const RB_STRATEGY_IDS = [
   'bpa',
   'zero_rb',
   'robust_rb',
   'skill_pos_late',
+  'hybrid',
   'hero_rb',
 ] as const;
 export type RbStrategyId = (typeof RB_STRATEGY_IDS)[number];
@@ -64,6 +65,7 @@ export const STRATEGY_DISPLAY_TO_ID: Record<string, { rb?: RbStrategyId; wr?: Wr
   'zero rb': { rb: 'zero_rb' },
   'robust rb': { rb: 'robust_rb' },
   'skill pos late': { rb: 'skill_pos_late' },
+  'hybrid': { rb: 'hybrid' },
   'hero rb': { rb: 'hero_rb' },
   // WR
   'robust wr': { wr: 'robust_wr' },

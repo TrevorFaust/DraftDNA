@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import { Crown } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { FootballHelmetIcon } from '@/components/icons/FootballHelmetIcon';
+import { SiteLogo } from '@/components/SiteLogo';
 import { getFullTeamName } from '@/utils/teamMapping';
 import type { Player } from '@/types/database';
 
@@ -64,8 +64,8 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
         {/* Header: Pick Six Challenge + 2026 Top 6 Fantasy QBs on same line */}
         <div className="relative flex items-center justify-between gap-3 px-4 pt-2 pb-1 border-b border-cyan-500/30">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center shadow-[0_0_8px_rgba(34,211,238,0.4)]">
-              <FootballHelmetIcon className="w-3 h-3 text-white" />
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center shadow-[0_0_8px_rgba(34,211,238,0.4)] overflow-hidden">
+              <SiteLogo size={14} className="w-3.5 h-3.5" />
             </div>
             <span className="text-slate-400 text-[10px] font-bold tracking-[0.15em] uppercase">
               Pick Six Challenge

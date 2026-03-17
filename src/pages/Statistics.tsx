@@ -139,34 +139,11 @@ const Statistics = () => {
   // Fetch players and rankings (same logic as Rankings page)
   const fetchPlayers = useCallback(async () => {
     try {
-      // Fetch all players with pagination (Supabase default limit is 1000)
-      let allPlayersData: any[] = [];
+      // Single pass: non-D/ST by ADP then D/ST (avoids duplicate full table scan)
+      let nonDefensePlayers: any[] = [];
       let from = 0;
       const pageSize = 1000;
       let hasMore = true;
-
-      while (hasMore) {
-        const { data, error: playersError } = await supabase
-          .from('players')
-          .select('*')
-          .order('adp', { ascending: true })
-          .range(from, from + pageSize - 1);
-
-        if (playersError) throw playersError;
-        
-        if (data && data.length > 0) {
-          allPlayersData = [...allPlayersData, ...data];
-          from += pageSize;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      // Query all players with pagination
-      let nonDefensePlayers: any[] = [];
-      from = 0;
-      hasMore = true;
 
       while (hasMore) {
         const { data, error: nonDefenseError } = await supabase
@@ -553,34 +530,6 @@ const Statistics = () => {
 
         const draftIds = drafts.map(d => d.id);
 
-        // Fetch all players for fallback matching with pagination
-        let allPlayersData: any[] = [];
-        let playersFrom = 0;
-        const playersPageSize = 1000;
-        let playersHasMore = true;
-
-        while (playersHasMore) {
-          const { data, error } = await supabase
-            .from('players')
-            .select('*')
-            .range(playersFrom, playersFrom + playersPageSize - 1);
-
-          if (error) {
-            console.error('Error fetching players:', error);
-            break;
-          }
-
-          if (data && data.length > 0) {
-            allPlayersData = [...allPlayersData, ...data];
-            playersFrom += playersPageSize;
-            playersHasMore = data.length === playersPageSize;
-          } else {
-            playersHasMore = false;
-          }
-        }
-        
-        playersMap = new Map((allPlayersData || []).map(p => [p.id, p]));
-
         // Fetch draft picks with pagination to handle Supabase's 1000 row limit
         // When fetching picks for many drafts, we need to paginate through results
         let allPicksData: any[] = [];
@@ -614,6 +563,20 @@ const Statistics = () => {
         }
         
         picksData = allPicksData;
+        // Build players map from joined data (avoids full players table fetch)
+        (allPicksData || []).forEach((pick: any) => {
+          const p = pick.players;
+          if (p && p.id) playersMap.set(p.id, p);
+        });
+        const missingIds = [...new Set((allPicksData || []).map((p: any) => p.player_id).filter(Boolean))].filter((id) => !playersMap.has(id));
+        if (missingIds.length > 0) {
+          const batchSize = 100;
+          for (let i = 0; i < missingIds.length; i += batchSize) {
+            const batch = missingIds.slice(i, i + batchSize);
+            const { data } = await supabase.from('players').select('*').in('id', batch);
+            (data || []).forEach((p) => playersMap.set(p.id, p));
+          }
+        }
       }
 
       const draftMap = new Map(drafts.map(d => [d.id, d.user_pick_position]));

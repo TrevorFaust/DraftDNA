@@ -295,15 +295,6 @@ export default function LeagueSettings() {
       setUserPickPosition(numTeamsValue);
     }
     
-    // For guests, automatically recalculate DEF limit when numTeams changes
-    // Ensure numTeamsValue is valid (2-32) before calculating
-    if (!user && !selectedLeague && numTeamsValue >= 2 && numTeamsValue <= 32) {
-      const calculatedDefLimit = Math.max(1, Math.floor(32 / numTeamsValue)); // Ensure at least 1
-      setPositionLimits(prev => ({
-        ...prev,
-        DEF: calculatedDefLimit,
-      }));
-    }
   }, [numTeams, userPickPosition, user, selectedLeague]);
 
   // Max keepers = number of draft rounds (starters + bench from current limits)
@@ -315,22 +306,27 @@ export default function LeagueSettings() {
   };
 
   const handlePositionLimitChange = (position: keyof PositionLimits, value: string) => {
-    if (value === '') {
+    const cleaned = value.replace(/-/g, '');
+    if (cleaned === '') {
       setPositionLimits(prev => ({ ...prev, [position]: '' }));
-    } else {
-      const numValue = parseInt(value);
-      if (!isNaN(numValue)) {
-        // Calculate max based on position and number of teams
-        const currentNumTeams = typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || selectedLeague?.num_teams || 12;
-        const maxDefLimit = position === 'DEF' ? Math.floor(32 / currentNumTeams) : 15;
-        const max = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : defaultMaximums[position];
-        // Allow typing any number, but clamp to max only (min will be enforced on save)
-        setPositionLimits(prev => ({
-          ...prev,
-          [position]: Math.min(max, Math.max(0, numValue))
-        }));
-      }
+      return;
     }
+    if (/^0+$/.test(cleaned)) {
+      if (position === 'BENCH') {
+        setPositionLimits(prev => ({ ...prev, [position]: 0 }));
+      } else {
+        setPositionLimits(prev => ({ ...prev, [position]: '' }));
+      }
+      return;
+    }
+    const limited = cleaned.length > 3 ? cleaned.slice(0, 3) : cleaned;
+    const numValue = parseInt(limited, 10);
+    if (isNaN(numValue)) return;
+    const currentNumTeams = typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || selectedLeague?.num_teams || 12;
+    const maxDefLimit = position === 'DEF' ? 29 : 15;
+    const max = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : defaultMaximums[position];
+    const clamped = Math.min(max, Math.max(0, numValue));
+    setPositionLimits(prev => ({ ...prev, [position]: clamped }));
   };
 
   const handleNumTeamsChange = (value: string) => {
@@ -420,12 +416,7 @@ export default function LeagueSettings() {
       const userPickValue = typeof userPickPosition === 'number' ? userPickPosition : parseInt(String(userPickPosition)) || 1;
       const finalUserPickPosition = Math.max(1, Math.min(finalNumTeams, userPickValue));
       
-      // Automatically calculate DEF limit based on number of teams
-      // Formula: maxDefLimit = Math.floor(32 / numTeams)
-      // This ensures all teams can draft at least 1 defense (DEF limit × num_teams ≤ 32)
-      // Ensure finalNumTeams is valid (4-32) before calculating
-      const safeNumTeams = Math.max(4, Math.min(32, finalNumTeams));
-      const calculatedDefLimit = Math.max(1, Math.floor(32 / safeNumTeams)); // Ensure at least 1
+      const defLimit = typeof positionLimits.DEF === 'number' ? positionLimits.DEF : Math.max(1, Math.min(29, parseInt(String(positionLimits.DEF)) || 1));
       
       tempSettingsStorage.save({
         numTeams: finalNumTeams,
@@ -439,20 +430,16 @@ export default function LeagueSettings() {
           QB: typeof positionLimits.QB === 'number' ? positionLimits.QB : parseInt(String(positionLimits.QB)) || 4,
           RB: typeof positionLimits.RB === 'number' ? positionLimits.RB : parseInt(String(positionLimits.RB)) || 8,
           WR: typeof positionLimits.WR === 'number' ? positionLimits.WR : parseInt(String(positionLimits.WR)) || 8,
-          TE: typeof positionLimits.TE === 'number' ? positionLimits.TE : parseInt(String(positionLimits.TE)) || 6, // Default to 6 for guests
+          TE: typeof positionLimits.TE === 'number' ? positionLimits.TE : parseInt(String(positionLimits.TE)) || 6,
           FLEX: typeof positionLimits.FLEX === 'number' ? positionLimits.FLEX : Math.max(1, Math.min(6, parseInt(String(positionLimits.FLEX)) || (isSuperflex ? 2 : 1))),
           K: typeof positionLimits.K === 'number' ? positionLimits.K : parseInt(String(positionLimits.K)) || 3,
-          DEF: calculatedDefLimit, // Automatically calculated based on league size
-          BENCH: typeof positionLimits.BENCH === 'number' ? positionLimits.BENCH : parseInt(String(positionLimits.BENCH)) || 5, // Default to 5 for guests
+          DEF: defLimit,
+          BENCH: typeof positionLimits.BENCH === 'number' ? positionLimits.BENCH : parseInt(String(positionLimits.BENCH)) || 5,
           KEEPERS: typeof positionLimits.KEEPERS === 'number' ? positionLimits.KEEPERS : parseInt(String(positionLimits.KEEPERS)) || 1,
         },
       });
       
-      // Update position limits state to reflect the calculated DEF limit
-      setPositionLimits(prev => ({
-        ...prev,
-        DEF: calculatedDefLimit,
-      }));
+      setPositionLimits(prev => ({ ...prev, DEF: defLimit }));
       
       setNumTeams(finalNumTeams);
       setUserPickPosition(finalUserPickPosition);
@@ -612,6 +599,9 @@ export default function LeagueSettings() {
     if (limits.DEF < 1) {
       return { valid: false, error: 'DEF limit must be at least 1' };
     }
+    if (limits.DEF > 29) {
+      return { valid: false, error: 'DEF limit cannot exceed 29 (smallest league is 4; 29+3=32 defenses)' };
+    }
     
     // Check defense availability - there are only 32 NFL defenses
     // Each team needs at least 1 defense, so we need: numTeams <= 32
@@ -622,17 +612,7 @@ export default function LeagueSettings() {
       };
     }
     
-    // Check if defense limit allows all teams to get at least 1 defense
-    // Worst case: DEF limit * num_teams = total defenses drafted
-    // We need: DEF limit * num_teams <= 32
-    const totalDefensesNeeded = limits.DEF * numTeams;
-    if (totalDefensesNeeded > 32) {
-      const maxDefLimit = Math.floor(32 / numTeams);
-      return {
-        valid: false,
-        error: `Defense limit (${limits.DEF}) is too high for ${numTeams} teams. With ${numTeams} teams, the maximum defense limit is ${maxDefLimit} (${limits.DEF} × ${numTeams} = ${totalDefensesNeeded}, but only 32 NFL defenses exist). This ensures all teams can draft at least 1 defense.`
-      };
-    }
+    // DEF limit is 1–29 (smallest league is 4, so 29+3=32); at draft time the app enforces the 32-defense pool so other teams can fill their DEF slots.
     
     if (limits.BENCH < 0) {
       return { valid: false, error: 'BENCH limit cannot be negative' };
@@ -742,7 +722,7 @@ export default function LeagueSettings() {
       TE: positionLimits.TE === '' ? defaultMinimums.TE : Math.max(defaultMinimums.TE, Number(positionLimits.TE)),
       FLEX: positionLimits.FLEX === '' ? defaultFlex : Math.max(1, Math.min(6, Number(positionLimits.FLEX) || 1)),
       K: positionLimits.K === '' ? defaultMinimums.K : Math.max(defaultMinimums.K, Number(positionLimits.K)),
-      DEF: positionLimits.DEF === '' ? defaultMinimums.DEF : Math.max(defaultMinimums.DEF, Number(positionLimits.DEF)),
+      DEF: positionLimits.DEF === '' ? defaultMinimums.DEF : Math.max(1, Math.min(29, Math.max(defaultMinimums.DEF, Number(positionLimits.DEF)))),
       BENCH: positionLimits.BENCH === '' ? defaultMinimums.BENCH : Math.max(defaultMinimums.BENCH, Number(positionLimits.BENCH)),
       KEEPERS: positionLimits.KEEPERS === '' ? 1 : Math.max(0, Math.min(maxKeepersForSave, Number(positionLimits.KEEPERS) || 0)),
     };
@@ -1361,19 +1341,13 @@ export default function LeagueSettings() {
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         {(Object.keys(positionLimits) as Array<keyof PositionLimits>).map((position) => {
-                          const currentNumTeams = typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || selectedLeague?.num_teams || 12;
-                          const maxDefLimit = position === 'DEF' ? Math.floor(32 / currentNumTeams) : 15;
+                          const maxDefLimit = position === 'DEF' ? 29 : 15;
                           const maxValue = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : 15;
                           const label = position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position === 'KEEPERS' ? 'Keepers' : position === 'FLEX' ? 'Flex' : position;
                           return (
                             <div key={position} className="space-y-2">
                               <Label htmlFor={position} className="text-sm font-medium">
                                 {label}
-                                {position === 'DEF' && (
-                                  <span className="text-xs text-muted-foreground ml-1">
-                                    (max: {maxDefLimit} for {currentNumTeams} teams)
-                                  </span>
-                                )}
                                 {position === 'KEEPERS' && (
                                   <span className="text-xs text-muted-foreground ml-1">
                                     (max: {getMaxKeepers()} rounds)
@@ -1390,8 +1364,10 @@ export default function LeagueSettings() {
                                 type="number"
                                 min={0}
                                 max={maxValue}
+                                maxLength={3}
                                 value={positionLimits[position]}
                                 onChange={(e) => handlePositionLimitChange(position, e.target.value)}
+                                onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                                 className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 disabled
                               />
@@ -1406,19 +1382,13 @@ export default function LeagueSettings() {
                   <>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                       {(Object.keys(positionLimits) as Array<keyof PositionLimits>).map((position) => {
-                        const currentNumTeams = typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || selectedLeague?.num_teams || 12;
-                        const maxDefLimit = position === 'DEF' ? Math.floor(32 / currentNumTeams) : 15;
+                        const maxDefLimit = position === 'DEF' ? 29 : 15;
                         const maxValue = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : 15;
                         const label = position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position === 'KEEPERS' ? 'Keepers' : position === 'FLEX' ? 'Flex' : position;
                         return (
                           <div key={position} className="space-y-2">
                             <Label htmlFor={position} className="text-sm font-medium">
                               {label}
-                              {position === 'DEF' && (
-                                <span className="text-xs text-muted-foreground ml-1">
-                                  (max: {maxDefLimit} for {currentNumTeams} teams)
-                                </span>
-                              )}
                               {position === 'KEEPERS' && (
                                 <span className="text-xs text-muted-foreground ml-1">
                                   (max: {getMaxKeepers()} rounds)
@@ -1435,8 +1405,10 @@ export default function LeagueSettings() {
                               type="number"
                               min={0}
                               max={maxValue}
+                              maxLength={3}
                               value={positionLimits[position]}
                               onChange={(e) => handlePositionLimitChange(position, e.target.value)}
+                              onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                               className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </div>
@@ -1447,13 +1419,13 @@ export default function LeagueSettings() {
                 )}
                 <div className="bg-muted/50 border border-border rounded-lg p-4 text-sm">
                   <p className="font-medium mb-2">Minimum Requirements:</p>
-                  <ul className="space-y-1 text-muted-foreground list-disc list-inside">
+                  <ul className="space-y-1 text-muted-foreground list-disc list-outside pl-5">
                     <li>QB: 1, RB: 2, WR: 2, TE: 1, Flex: 1 (default 2 in superflex), K: 1, DEF: 1, Bench: 0</li>
                     <li>RB + WR + TE must total at least 5 + Flex count (to fill RB1, RB2, WR1, WR2, TE, and all FLEX positions)</li>
                     <li>Total roster size must accommodate all starting positions plus bench</li>
                     <li>Keepers: max per team (0 to number of draft rounds). When selecting keepers, each team may use up to this many keeper slots; keeper picks count toward position limits during the draft.</li>
                     <li className="text-primary/50">Note: Bench slots can be filled by any position, but must still respect position limits. Bench count cannot exceed the total remaining player capacity after filling starting positions.</li>
-                    <li className="text-destructive/50">Defense Limit: There are only 32 NFL defenses available. Defense limit × number of teams must not exceed 32 (e.g., 12 teams × 2 defenses = 24, which is valid).</li>
+                    <li className="text-primary/50">Defense: There are 32 NFL defenses; at draft time you can take a defense only if enough remain for every other team to fill their DEF slots.</li>
                   </ul>
                 </div>
               </CardContent>

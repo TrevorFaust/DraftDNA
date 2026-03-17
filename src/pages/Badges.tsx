@@ -12,6 +12,7 @@ import { ArchetypeBadge } from '@/components/ArchetypeBadge';
 import { getArchetypeIndexForTeam } from '@/utils/archetypeDetection';
 import { tempDraftStorage, tempSettingsStorage } from '@/utils/temporaryStorage';
 import { FULL_ARCHETYPE_LIST } from '@/constants/archetypeListWithImproviser';
+import { CHAOS_ARCHETYPES } from '@/constants/chaosArchetypes';
 import { Loader2, Award, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,11 @@ import type { DraftPick } from '@/types/database';
 /** Map: archetype index -> { draftName, draftId } for tooltip (first draft that earned it). */
 interface EarnedState {
   byIndex: Map<number, { draftName: string; draftId: string }>;
+  count: number;
+}
+/** Map: chaos archetype name -> { draftName, draftId } for chaos badges. */
+interface EarnedChaosState {
+  byName: Map<string, { draftName: string; draftId: string }>;
   count: number;
 }
 
@@ -39,12 +45,14 @@ const Badges = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [earned, setEarned] = useState<EarnedState>({ byIndex: new Map(), count: 0 });
+  const [earnedChaos, setEarnedChaos] = useState<EarnedChaosState>({ byName: new Map(), count: 0 });
   const [loading, setLoading] = useState(true);
   const [lastDiagnostics, setLastDiagnostics] = useState<FetchDiagnostics | null>(null);
 
   const fetchEarnedArchetypes = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     const byIndex = new Map<number, { draftName: string; draftId: string }>();
+    const chaosByName = new Map<string, { draftName: string; draftId: string }>();
 
     try {
       setLastDiagnostics(null);
@@ -60,7 +68,7 @@ const Badges = () => {
       if (user) {
         const { data: drafts, error: draftsError } = await supabase
           .from('mock_drafts')
-          .select('id, name, num_teams, user_pick_position, league_id')
+          .select('id, name, num_teams, user_pick_position, league_id, user_detected_chaos_archetype')
           .eq('user_id', user.id)
           .eq('status', 'completed')
           .limit(500);
@@ -74,7 +82,7 @@ const Badges = () => {
         const leagueIds = [...new Set((drafts || []).map((d) => d.league_id).filter(Boolean))] as string[];
         const leaguesMap = new Map<string, { position_limits?: { FLEX?: number; BENCH?: number } }>();
         if (leagueIds.length > 0) {
-          const leagueBatchSize = 30;
+          const leagueBatchSize = 100;
           for (let lb = 0; lb < leagueIds.length; lb += leagueBatchSize) {
             const batch = leagueIds.slice(lb, lb + leagueBatchSize);
             const { data: leagues } = await supabase
@@ -88,7 +96,7 @@ const Badges = () => {
         if (drafts?.length) {
           const draftIds = drafts.map((d) => d.id);
           let picksData: { mock_draft_id: string; team_number: number; round_number: number; pick_number: number; player_id: string }[] = [];
-          const idBatchSize = 25;
+          const idBatchSize = 80;
           for (let b = 0; b < draftIds.length; b += idBatchSize) {
             const batchIds = draftIds.slice(b, b + idBatchSize);
             let offset = 0;
@@ -112,7 +120,7 @@ const Badges = () => {
           const playersMap = new Map<string, { position?: string; rank?: number; adp?: number }>();
           let playerBatchesFailed = 0;
           if (playerIds.length > 0) {
-            const playerBatchSize = 15;
+            const playerBatchSize = 100;
             for (let i = 0; i < playerIds.length; i += playerBatchSize) {
               const batch = playerIds.slice(i, i + playerBatchSize);
               const { data: players, error: playersError } = await supabase
@@ -132,19 +140,14 @@ const Badges = () => {
           diagnostics.playerBatchesFailed = playerBatchesFailed;
 
           for (const draft of drafts) {
-            const d = draft as { user_detected_archetype_index?: number | null };
-            let idx: number | null =
-              typeof d.user_detected_archetype_index === 'number' &&
-              d.user_detected_archetype_index >= 0 &&
-              d.user_detected_archetype_index < FULL_ARCHETYPE_LIST.length
-                ? d.user_detected_archetype_index
-                : null;
-            if (idx === null) {
-              const picks = picksData.filter((p) => p.mock_draft_id === draft.id);
-              const picksWithPlayer = picks.map((p) => ({
-                ...p,
-                player: playersMap.get(p.player_id) || null,
-              }));
+            // Always re-detect from picks so earned badge maps to current archetype list (closest match)
+            const picks = picksData.filter((p) => p.mock_draft_id === draft.id);
+            const picksWithPlayer = picks.map((p) => ({
+              ...p,
+              player: playersMap.get(p.player_id) || null,
+            }));
+            let idx: number | null = null;
+            if (picksWithPlayer.length > 0) {
               const limits = draft.league_id ? leaguesMap.get(draft.league_id)?.position_limits : undefined;
               const flex = limits?.FLEX ?? 1;
               const bench = limits?.BENCH ?? 6;
@@ -153,9 +156,18 @@ const Badges = () => {
                 benchSize: bench,
                 numTeams: draft.num_teams,
               });
+            } else {
+              const d = draft as { user_detected_archetype_index?: number | null };
+              if (typeof d.user_detected_archetype_index === 'number' && d.user_detected_archetype_index >= 0 && d.user_detected_archetype_index < FULL_ARCHETYPE_LIST.length) {
+                idx = d.user_detected_archetype_index;
+              }
             }
             if (idx !== null && !byIndex.has(idx)) {
               byIndex.set(idx, { draftName: draft.name, draftId: draft.id });
+            }
+            const chaosName = (draft as { user_detected_chaos_archetype?: string | null }).user_detected_chaos_archetype;
+            if (chaosName && !chaosByName.has(chaosName)) {
+              chaosByName.set(chaosName, { draftName: draft.name, draftId: draft.id });
             }
           }
         }
@@ -174,7 +186,7 @@ const Badges = () => {
       let tempPlayerBatchesFailed = 0;
       if (tempPlayerIds.size > 0) {
         const ids = Array.from(tempPlayerIds);
-        const tempBatchSize = 15;
+        const tempBatchSize = 100;
         for (let i = 0; i < ids.length; i += tempBatchSize) {
           const batch = ids.slice(i, i + tempBatchSize);
           const { data: pl, error: plError } = await supabase.from('players').select('id, position, adp').in('id', batch);
@@ -192,27 +204,24 @@ const Badges = () => {
         const temp = tempDraftStorage.getDraft(id);
         if (!temp || temp.draft.status !== 'completed' || !temp.picks?.length) continue;
         const draft = temp.draft;
-        let idx: number | null =
-          typeof draft.user_detected_archetype_index === 'number' &&
-          draft.user_detected_archetype_index >= 0 &&
-          draft.user_detected_archetype_index < FULL_ARCHETYPE_LIST.length
-            ? draft.user_detected_archetype_index
-            : null;
-        if (idx === null) {
-          const picks = temp.picks.map((p: DraftPick) => ({
-            ...p,
-            player: tempPlayersMap.get(p.player_id) || null,
-          }));
-          const flex = tempLimits?.FLEX ?? 1;
-          const bench = tempLimits?.BENCH ?? 6;
-          idx = getArchetypeIndexForTeam(picks, draft.user_pick_position, {
-            flexSlots: flex,
-            benchSize: bench,
-            numTeams: draft.num_teams,
-          });
+        const picks = temp.picks.map((p: DraftPick) => ({
+          ...p,
+          player: tempPlayersMap.get(p.player_id) || null,
+        }));
+        let idx: number | null = getArchetypeIndexForTeam(picks, draft.user_pick_position, {
+          flexSlots: tempLimits?.FLEX ?? 1,
+          benchSize: tempLimits?.BENCH ?? 6,
+          numTeams: draft.num_teams,
+        });
+        if (idx === null && typeof draft.user_detected_archetype_index === 'number' && draft.user_detected_archetype_index >= 0 && draft.user_detected_archetype_index < FULL_ARCHETYPE_LIST.length) {
+          idx = draft.user_detected_archetype_index;
         }
         if (idx !== null && !byIndex.has(idx)) {
           byIndex.set(idx, { draftName: draft.name, draftId: draft.id });
+        }
+        const chaosName = (draft as { user_detected_chaos_archetype?: string | null }).user_detected_chaos_archetype;
+        if (chaosName && !chaosByName.has(chaosName)) {
+          chaosByName.set(chaosName, { draftName: draft.name, draftId: draft.id });
         }
       }
 
@@ -224,6 +233,7 @@ const Badges = () => {
       }
 
       setEarned({ byIndex, count: byIndex.size });
+      setEarnedChaos({ byName: chaosByName, count: chaosByName.size });
     } catch (err) {
       console.error('Failed to fetch earned archetypes:', err);
     } finally {
@@ -328,6 +338,38 @@ const Badges = () => {
               </div>
             );
           })}
+        </div>
+
+        <div className="mt-12 pt-8 border-t border-border">
+          <h2 className="font-display text-xl mb-2">Chaos Badges</h2>
+          <p className="text-muted-foreground text-sm mb-4">
+            {earnedChaos.count} of {CHAOS_ARCHETYPES.length} chaos badges unlocked — wild drafts only
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {CHAOS_ARCHETYPES.map((chaos) => {
+              const earnedInfo = earnedChaos.byName.get(chaos.name);
+              const isEarned = !!earnedInfo;
+              return (
+                <div
+                  key={chaos.name}
+                  className={cn(
+                    'glass-card p-3 rounded-xl flex flex-col items-center justify-center min-h-[90px]',
+                    !isEarned && 'opacity-80'
+                  )}
+                >
+                  <ArchetypeBadge
+                    archetypeName={chaos.name}
+                    iconOnly
+                    size="md"
+                    earnedFromDraft={earnedInfo?.draftName}
+                    locked={!isEarned}
+                    flavorText={chaos.flavorText}
+                    className="shrink-0"
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
       </main>
     </div>
