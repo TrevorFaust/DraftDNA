@@ -42,6 +42,8 @@ export interface MockDraft {
   user_detected_archetype?: string | null;
   /** Index into full archetype list (0-based) for correct badge slot when names duplicate. */
   user_detected_archetype_index?: number | null;
+  /** Chaos archetype name when a chaos trigger fired; replace-type replaces main for display. */
+  user_detected_chaos_archetype?: string | null;
 }
 
 export interface DraftPick {

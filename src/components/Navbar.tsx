@@ -16,8 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LogOut, ListOrdered, History, User, Settings, ChevronDown, Trophy, Plus, Settings2, BarChart3, Home, Award } from 'lucide-react';
-import { FootballHelmetIcon } from '@/components/icons/FootballHelmetIcon';
+import { LogOut, ListOrdered, History, User, Settings, ChevronDown, Trophy, Plus, Settings2, BarChart3, Home, Award, ClipboardList } from 'lucide-react';
+import { SiteLogo } from '@/components/SiteLogo';
 import { cn } from '@/lib/utils';
 
 export const Navbar = () => {
@@ -31,7 +31,7 @@ export const Navbar = () => {
     { path: '/dashboard', label: 'Home', icon: Home },
     { path: '/rankings', label: 'Rankings', icon: ListOrdered },
     { path: '/statistics', label: 'Statistics', icon: BarChart3 },
-    { path: '/mock-draft', label: 'Mock Draft', icon: FootballHelmetIcon },
+    { path: '/mock-draft', label: 'Mock Draft', icon: ClipboardList },
     { path: '/league-settings', label: 'League Settings', icon: Settings2 },
     { path: '/history', label: 'History', icon: History },
     { path: '/badges', label: 'Badges', icon: Award },
@@ -58,11 +58,12 @@ export const Navbar = () => {
   return (
     <nav className="sticky top-0 z-50 glass-card border-b border-border/50 px-4 py-3">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-            <FootballHelmetIcon className="w-6 h-6 text-primary-foreground" />
+        <Link to="/" className="flex items-center justify-center gap-[1px]">
+          <div className="flex flex-col items-center hidden sm:flex">
+            <span className="font-display text-2xl tracking-wide text-gradient leading-tight">Draft</span>
+            <span className="font-display text-2xl tracking-wide text-gradient leading-tight">DNA</span>
           </div>
-          <span className="font-display text-2xl tracking-wide text-gradient hidden sm:inline">DRAFT BOARD</span>
+          <SiteLogo size={56} className="h-14 w-14 shrink-0" />
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-2">

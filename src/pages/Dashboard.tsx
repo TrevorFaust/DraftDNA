@@ -18,7 +18,7 @@ import {
   Medal,
   ChevronRight,
 } from 'lucide-react';
-import { FootballHelmetIcon } from '@/components/icons/FootballHelmetIcon';
+import { ClipboardList } from 'lucide-react';
 import { SEASON, PICK_SIX_VIEW_OTHERS_PICKS } from '@/constants/contest';
 import {
   Dialog,
@@ -181,7 +181,7 @@ const Dashboard = () => {
     {
       title: 'Mock Draft',
       description: 'Start a new mock draft with customizable settings',
-      icon: FootballHelmetIcon,
+      icon: ClipboardList,
       path: '/mock-draft',
       gradient: 'bg-gradient-gold',
       hoverBorder: 'hover:border-accent/50',
@@ -230,7 +230,7 @@ const Dashboard = () => {
               to={action.path}
               className={`glass-card p-6 group ${action.hoverBorder} transition-all duration-300 block`}
             >
-              <div className={`w-14 h-14 rounded-xl ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}>
+              <div className={`w-14 h-14 rounded-xl ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-105 transition-transform overflow-hidden`}>
                 <action.icon className={`w-7 h-7 ${action.iconColor}`} />
               </div>
               <h3 className="font-display text-2xl mb-2 group-hover:text-primary transition-colors">

@@ -177,52 +177,41 @@ const History = () => {
 
       if (draftsError) throw draftsError;
 
-      // Fetch all players for matching (fallback if join doesn't work)
-      const { data: allPlayersData } = await supabase
-        .from('players')
-        .select('*');
-      
-      const playersMap = new Map((allPlayersData || []).map(p => [p.id, p]));
-      setPlayers(allPlayersData || []);
+      const draftIds = (draftsData || []).map((d) => d.id);
+      if (draftIds.length === 0) {
+        setDrafts([]);
+        setPlayers([]);
+        setLoading(false);
+        return;
+      }
 
-      // Fetch picks with player data using a join for each draft
-      const draftsWithPicks: DraftWithPicks[] = await Promise.all(
-        (draftsData || []).map(async (draft) => {
-          // Try to use a join query first
-          const { data: picksData, error: picksError } = await supabase
+      // Single batched picks query (with join) instead of one query per draft
+      const picksByDraftId = new Map<string, (DraftPick & { player: Player })[]>();
+      const playersMap = new Map<string, Player>();
+      const DRAFT_ID_BATCH = 80;
+      const PICKS_PAGE_SIZE = 1000;
+
+      for (let b = 0; b < draftIds.length; b += DRAFT_ID_BATCH) {
+        const batchIds = draftIds.slice(b, b + DRAFT_ID_BATCH);
+        let offset = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data: page, error: picksError } = await supabase
             .from('draft_picks')
-            .select(`
-              *,
-              players (*)
-            `)
-            .eq('mock_draft_id', draft.id)
-            .order('pick_number', { ascending: true });
+            .select(`*, players (*)`)
+            .in('mock_draft_id', batchIds)
+            .order('pick_number', { ascending: true })
+            .range(offset, offset + PICKS_PAGE_SIZE - 1);
 
           if (picksError) {
             console.error('Error fetching picks with join:', picksError);
-            // Fallback: fetch picks separately and match with players
-            const { data: picksOnly } = await supabase
-            .from('draft_picks')
-            .select('*')
-            .eq('mock_draft_id', draft.id)
-            .order('pick_number', { ascending: true });
-
-            const picksWithPlayers = (picksOnly || []).map((pick) => ({
-            ...pick,
-              player: playersMap.get(pick.player_id) as Player | undefined,
-          }));
-
-          return {
-            ...draft,
-              picks: picksWithPlayers.filter(p => p.player) as (DraftPick & { player: Player })[],
-            };
+            break;
           }
-
-          // Transform the joined data to match our interface
-          const picksWithPlayers = (picksData || []).map((pick: any) => {
-            // Handle both join format and fallback format
-            const player = pick.players || playersMap.get(pick.player_id);
-            return {
+          const rows = page || [];
+          for (const pick of rows) {
+            const player = (pick as any).players ?? playersMap.get(pick.player_id) ?? null;
+            if (player && player.id) playersMap.set(player.id, player);
+            const entry: DraftPick & { player: Player | null } = {
               id: pick.id,
               mock_draft_id: pick.mock_draft_id,
               player_id: pick.player_id,
@@ -232,15 +221,46 @@ const History = () => {
               created_at: pick.created_at,
               player: player as Player,
             };
-          }).filter((pick: any) => pick.player); // Filter out picks without players
+            const list = picksByDraftId.get(pick.mock_draft_id) || [];
+            list.push(entry as DraftPick & { player: Player });
+            picksByDraftId.set(pick.mock_draft_id, list);
+          }
+          hasMore = rows.length === PICKS_PAGE_SIZE;
+          offset += PICKS_PAGE_SIZE;
+        }
+      }
 
-          return {
-            ...draft,
-            picks: picksWithPlayers as (DraftPick & { player: Player })[],
-          };
-        })
-      );
+      // Fetch any players missing from join (e.g. deleted or join failed)
+      const missingIds = new Set<string>();
+      picksByDraftId.forEach((picks) => {
+        picks.forEach((p) => {
+          if (p.player_id && !playersMap.has(p.player_id)) missingIds.add(p.player_id);
+        });
+      });
+      if (missingIds.size > 0) {
+        const idArr = Array.from(missingIds);
+        const playerBatchSize = 100;
+        for (let i = 0; i < idArr.length; i += playerBatchSize) {
+          const batch = idArr.slice(i, i + playerBatchSize);
+          const { data } = await supabase.from('players').select('*').in('id', batch);
+          (data || []).forEach((p) => playersMap.set(p.id, p));
+        }
+        // Re-attach player to picks that had missing player
+        picksByDraftId.forEach((picks) => {
+          picks.forEach((p) => {
+            if (!p.player && p.player_id) (p as any).player = playersMap.get(p.player_id) ?? null;
+          });
+        });
+      }
 
+      const draftsWithPicks: DraftWithPicks[] = (draftsData || []).map((draft) => ({
+        ...draft,
+        picks: (picksByDraftId.get(draft.id) || [])
+          .filter((p): p is DraftPick & { player: Player } => p.player != null)
+          .sort((a, b) => a.pick_number - b.pick_number),
+      }));
+
+      setPlayers(Array.from(playersMap.values()));
       setDrafts(draftsWithPicks);
     } catch (error) {
       console.error('Error fetching drafts:', error);
@@ -301,6 +321,22 @@ const History = () => {
   const getUserTeamPicks = (draft: DraftWithPicks) => {
     return draft.picks.filter((p) => p.team_number === draft.user_pick_position);
   };
+
+  /** Deduplicate picks so each (round_number, pick_number) appears once per team. Keeps first occurrence. */
+  const dedupePicksBySlot = (picks: (DraftPick & { player: Player })[]) => {
+    const seen = new Set<string>();
+    return picks.filter((p) => {
+      const key = `${p.team_number}-${p.round_number}-${p.pick_number}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  // Reset selected CPU team when draft changes so we don't show another draft's team
+  useEffect(() => {
+    setSelectedCpuTeam(null);
+  }, [selectedDraft?.id]);
 
   // Fetch league settings and team names when a draft is selected
   useEffect(() => {
@@ -802,9 +838,9 @@ const History = () => {
                         {draft.status === 'completed' ? 'Completed' : 'In Progress'}
                       </span>
                       {draft.status === 'completed' && (() => {
-                        const stored = (draft as { user_detected_archetype?: string | null }).user_detected_archetype;
-                        let archetype: string | null = stored && stored.trim() ? stored.trim() : null;
-                        if (!archetype && draft.picks.length > 0) {
+                        // Always re-detect from picks so old drafts map to current archetype list (closest match)
+                        let archetype: string | null = null;
+                        if (draft.picks.length > 0) {
                           const limits = selectedDraft?.id === draft.id ? draftLeagueSettings?.positionLimits : undefined;
                           const flex = limits?.FLEX ?? 1;
                           const bench = limits?.BENCH ?? 6;
@@ -813,6 +849,9 @@ const History = () => {
                             benchSize: bench,
                             numTeams: draft.num_teams,
                           });
+                        } else {
+                          const stored = (draft as { user_detected_archetype?: string | null }).user_detected_archetype;
+                          archetype = stored && stored.trim() ? stored.trim() : null;
                         }
                         return archetype ? (
                           <ArchetypeBadge
@@ -1028,18 +1067,18 @@ const History = () => {
                 </div>
                 {yourTeamView === 'lineup' ? (
                   (() => {
+                    const userPicksRaw = selectedDraft.picks.filter(
+                      (pick) => pick.player && pick.team_number === selectedDraft.user_pick_position
+                    );
+                    const userPicks = dedupePicksBySlot(userPicksRaw).sort((a, b) => a.pick_number - b.pick_number);
                     // Convert picks to RankedPlayer format for MyRoster component
-                    const rankedPlayers: RankedPlayer[] = selectedDraft.picks
-                      .filter((pick) => pick.player && pick.team_number === selectedDraft.user_pick_position)
-                      .map((pick) => ({
+                    const rankedPlayers: RankedPlayer[] = userPicks.map((pick) => ({
                         ...pick.player!,
                         adp: pick.player?.adp || 999,
                         rank: pick.pick_number,
                       }));
 
-                    const picksForRoster = selectedDraft.picks
-                      .filter((pick) => pick.player && pick.team_number === selectedDraft.user_pick_position)
-                      .map((pick) => ({
+                    const picksForRoster = userPicks.map((pick) => ({
                         id: pick.id,
                         mock_draft_id: pick.mock_draft_id,
                         player_id: pick.player_id,
@@ -1050,17 +1089,16 @@ const History = () => {
                       }));
 
                     const userTeamName = teamNames.get(selectedDraft.user_pick_position) || `Team ${selectedDraft.user_pick_position}`;
-                    const storedUser = (selectedDraft as { user_detected_archetype?: string | null }).user_detected_archetype;
-                    let userArchetype: string = storedUser && storedUser.trim() ? storedUser.trim() : '';
-                    if (!userArchetype) {
-                      const flex = draftLeagueSettings?.positionLimits?.FLEX ?? 1;
-                      const bench = draftLeagueSettings?.positionLimits?.BENCH ?? 6;
-                      userArchetype = getArchetypeForTeam(selectedDraft.picks, selectedDraft.user_pick_position, {
-                        flexSlots: flex,
-                        benchSize: bench,
-                        numTeams: selectedDraft.num_teams,
-                      });
-                    }
+                    // Re-detect from picks so display always matches current archetype list (closest match)
+                    const flex = draftLeagueSettings?.positionLimits?.FLEX ?? 1;
+                    const bench = draftLeagueSettings?.positionLimits?.BENCH ?? 6;
+                    const userArchetype: string = userPicks.length > 0
+                      ? getArchetypeForTeam(userPicks, selectedDraft.user_pick_position, {
+                          flexSlots: flex,
+                          benchSize: bench,
+                          numTeams: selectedDraft.num_teams,
+                        })
+                      : ((selectedDraft as { user_detected_archetype?: string | null }).user_detected_archetype?.trim() || '');
                     return (
                       <div>
                         <div className="mb-3">
@@ -1084,8 +1122,10 @@ const History = () => {
                   })()
                 ) : (
                   <div className="space-y-2">
-                    {selectedDraft.picks
-                      .filter((pick) => pick.team_number === selectedDraft.user_pick_position)
+                    {dedupePicksBySlot(
+                      selectedDraft.picks.filter((pick) => pick.team_number === selectedDraft.user_pick_position && pick.player)
+                    )
+                      .sort((a, b) => a.pick_number - b.pick_number)
                       .map((pick) => (
                         <div
                           key={pick.id}
@@ -1125,7 +1165,8 @@ const History = () => {
                   }
 
                   const currentTeamIndex = cpuTeams.indexOf(selectedCpuTeam);
-                  const teamPicks = selectedDraft.picks.filter((p) => p.team_number === selectedCpuTeam && p.player);
+                  const rawTeamPicks = selectedDraft.picks.filter((p) => p.team_number === selectedCpuTeam && p.player);
+                  const teamPicks = dedupePicksBySlot(rawTeamPicks).sort((a, b) => a.pick_number - b.pick_number);
                   const teamPlayers = teamPicks.map((pick) => pick.player!);
                   const teamName = teamNames.get(selectedCpuTeam) || `Team ${selectedCpuTeam}`;
                   const cpuFlex = draftLeagueSettings?.positionLimits?.FLEX ?? 1;

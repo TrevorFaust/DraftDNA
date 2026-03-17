@@ -1,5 +1,10 @@
 /**
- * Full archetype list including "The Improviser" (flexible/adaptive strategy).
+ * Full archetype list including "The Improviser" (optional 361st archetype).
+ * - ARCHETYPE_LIST = 360 from Master Archetypes CSV.
+ * - The Improviser = code-only fallback: BPA-style with Robust WR, Mid QB, Stream TE, Floor.
+ *   Used when detection lands on a flexible/adaptive profile that doesn't match a named archetype,
+ *   or as a display fallback. Remove THE_IMPROVISER and use only ARCHETYPE_LIST if you want
+ *   exactly 360 archetypes from the file with no extra entry.
  * Use FULL_ARCHETYPE_LIST for Badges page and detection; use getArchetypeByNameOrImproviser for tooltips.
  */
 
@@ -15,6 +20,7 @@ export const THE_IMPROVISER: NamedArchetype = {
     te: 'stream_te',
     late: 'floor',
   },
+  // No flavorText — optional; add a sentence here if you keep this archetype and want tooltip text.
 };
 
 export const FULL_ARCHETYPE_LIST: NamedArchetype[] = [...ARCHETYPE_LIST, THE_IMPROVISER];

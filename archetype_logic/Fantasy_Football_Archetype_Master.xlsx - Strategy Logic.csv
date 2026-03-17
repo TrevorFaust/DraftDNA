@@ -1,0 +1,63 @@
+Strategy,Rule Type,Position,Min Round,Max Round,Count / Operator,Notes / Description
+META — SCALING & LEAGUE SIZE,,,,,,
+"All round thresholds are calibrated for a 12-team standard single-QB league. To adjust for other league sizes use: adjusted_round = base_round × (12 / league_size), rounded down, minimum 1. Example: Early QB = rounds 1-4 in a 12-team league → rounds 1-2 in a 6-team league, rounds 1-6 in a 24-team league. NOTE: Superflex leagues require separate logic entirely — QB becomes a skill-position-tier asset and all QB thresholds change.",,,,,,
+"K and DST are assumed to fill the final 2 rounds of every draft regardless of strategy. Punt QB assumes QB is taken 1-3 rounds before K/DST, typically rounds 11-13 in a 15-round draft.",,,,,,
+RB STRATEGIES,,,,,,
+BPA (Best Player Available),,,,,,
+BPA,Description,—,—,—,—,No intentional positional agenda. Takes highest-ranked available player each round. Distinguisher from Hybrid: BPA distribution varies draft-to-draft with no consistent skill-position preference. Hybrid shows repeated RB+WR dominance in rounds 1-6 across drafts.
+BPA,Fuzzy Rule,Any,1,15,No positional dominance,No single position represents more than 50% of picks in rounds 1-8
+Hero RB,,,,,,
+Hero RB,Hard Rule,RB,1,1,Exactly 1,RB must be selected in round 1 — no exceptions
+Hero RB,Hard Rule,RB,2,4,0 (max),No second RB taken before round 5
+Hero RB,Fuzzy Rule,RB,5,8,1-2,Second RB typically arrives rounds 5-8
+Hero RB,Fuzzy Rule,RB,1,10,2-3 total,Total RB count by round 10 usually 2-3
+Robust RB,,,,,,
+Robust RB,Hard Rule,RB,1,1,Exactly 1,RB must be selected in round 1
+Robust RB,Hard Rule,RB,1,4,3+ (min),At least 3 RBs by end of round 4
+Robust RB,Fuzzy Rule,RB,1,8,4-5 total,Total RB count by round 8 usually 4-5. WRs typically deferred to round 5+
+Zero RB,,,,,,
+Zero RB,Hard Rule,RB,1,6,0 (max),No RB selected before round 7 — no exceptions
+Zero RB,Fuzzy Rule,RB,7,10,First RB here,"First RB typically rounds 7-10. WR, QB, or TE dominate rounds 1-6"
+Hybrid,,,,,,
+Hybrid,Hard Rule,RB,1,6,2+ (min),At least 2 RBs in rounds 1-6
+Hybrid,Hard Rule,WR,1,6,2+ (min),At least 2 WRs in rounds 1-6
+Hybrid,Hard Rule,RB or WR,1,6,4 (max per position),Neither RB nor WR alone can take more than 4 of the first 6 picks — must be a mix
+Hybrid,Fuzzy Rule,RB+WR,1,6,4-6 combined,Rounds 1-6 are predominantly RB and WR. Typical patterns: RB-WR-RB-WR-RB-WR or RB-RB-WR-WR-RB-WR
+Hybrid,Fuzzy Rule,QB or TE,1,4,0-1 (opportunistic only),Early QB or TE only if player fell significantly below his ADP — not a planned pick. Player must have been drafted meaningfully later than his consensus ADP position.
+Hybrid,Fuzzy Rule,RB+WR,1,15,Near roster max,User likely holds near-maximum roster slots at RB and WR by end of draft. Usually only 1 QB and 1 TE on final roster.
+Hybrid,Distinguisher,—,—,—,—,vs BPA: Hybrid drafter has intentional skill-position plan visible across rounds 1-6. BPA shows no consistent positional preference. vs Robust RB: Hybrid includes significant WR volume early. Robust RB takes 3+ RBs by round 4 regardless of WR count.
+WR STRATEGIES,,,,,,
+Robust WR,,,,,,
+Robust WR,Hard Rule,WR,1,1,Exactly 1,WR must be selected in round 1
+Robust WR,Hard Rule,WR,1,4,3+ (min),At least 3 WRs by end of round 4. Mirror of Robust RB logic.
+Robust WR,Fuzzy Rule,WR,1,8,4-5 total,Total WR count by round 8 usually 4-5. RBs typically deferred to round 5+
+WR Late,,,,,,
+WR Late,Hard Rule,WR,1,5,0 (max),No WR selected before round 6 — mirror of Zero RB logic
+WR Late,Fuzzy Rule,WR,6,8,First WR here,"First WR typically rounds 6-8. RB, QB, or TE dominate rounds 1-5"
+Hero WR,,,,,,
+Hero WR,Hard Rule,WR,1,1,Exactly 1,WR must be selected in round 1 — no exceptions
+Hero WR,Hard Rule,WR,2,4,0 (max),No second WR before round 5
+Hero WR,Fuzzy Rule,WR,5,8,1-2,Second WR typically arrives rounds 5-8. Total WR count by round 10 usually 2-3
+WR Mid,,,,,,
+WR Mid,Hard Rule,WR,1,1,0 (max),No WR in round 1
+WR Mid,Hard Rule,WR,2,3,1 (min),First WR arrives by round 3 at latest (not round 1)
+WR Mid,Hard Rule,WR,6,10,2+ (min),At least 2 additional WRs taken in rounds 6-10 — the mid-draft WR cluster
+WR Mid,Fuzzy Rule,WR,1,10,3-4 total,"Total WR count by round 10 usually 3-4. First WR is a value pick in round 2, not a top-3 ADP selection"
+QB STRATEGIES,,,,,,
+Early QB,Timing,QB,1,4,1,"QB secured rounds 1-4. Opportunistic — player fell well below his consensus ADP. In Hybrid builds: only triggered if QB fell past ADP, not as a planned early target. In BPA builds: no ADP condition required."
+Mid QB,Timing,QB,5,9,1,QB taken in middle rounds. Deliberate deferral past the early rush. Typically only 1 QB on roster.
+Late QB,Timing,QB,10,14,1,QB taken round 10+. Confident deferral — drafter believes value exists late and targets a specific player others are undervaluing. Diamond-in-the-rough mentality.
+Punt QB,Timing,QB,11,13,1,"QB taken only when roster rules require it, 1-3 rounds before K and DST slots. Assumes K and DST fill final 2 rounds. Effectively streaming the position."
+TE STRATEGIES,,,,,,
+Early TE,Timing,TE,1,4,1,"TE secured rounds 1-4. Opportunistic — player fell well below his consensus ADP. After the top 8-10 TEs are taken in the first 8 rounds, remaining pool drops sharply in value. In Hybrid builds: only when a tier-1 TE falls past his ADP."
+Mid TE,Timing,TE,5,9,1,TE taken in middle rounds after skill position foundation is established. Typically only 1 TE on roster.
+Stream TE,Timing,TE,12,15,0-1,"No meaningful TE investment. TE taken round 12+ or left to waiver wire. After top 10 TEs are drafted (usually rounds 1-8), remaining pool is volatile and a crapshoot. Veteran TEs = floor lean. Unknown TEs = upside lean."
+LATE ROUND PHILOSOPHIES (applies from round 9+),,,,,,
+Upside,Philosophy,Any,9,15,Boom-or-bust,Prioritizes ceiling over floor. Accepts misses. Projected finishes outside top-15 at position are acceptable. High variance players preferred over reliable low-upside options.
+Floor,Philosophy,Any,9,15,Safe depth,"Reliable, steady depth picks. Targets veterans, known roles, and reliable volume. Avoids injury-risk players and unresolved depth chart situations late."
+VBD,Philosophy,Any,9,15,Value-based,Strict value-based drafting. Takes highest-value player regardless of positional need or narrative. Positional scarcity drives selection. May result in positional redundancy if value is clear enough.
+ARCHETYPE DETECTION NOTES,,,,,,
+DETECTION ORDER: Evaluate RB strategy first → WR strategy → QB timing → TE timing → late round philosophy. Each layer narrows the archetype. The combination of all five produces the archetype ID.,,,,,,
+"HYBRID vs BPA: If rounds 1-6 show consistent RB+WR dominance across multiple drafts by the same user, classify as Hybrid. If the distribution varies draft-to-draft with no skill-position preference, classify as BPA.",,,,,,
+EARLY QB/TE IN HYBRID: An early QB or TE in a Hybrid build should only trigger if the player was drafted meaningfully later than his consensus ADP. ADP-20 player taken at pick 18 = not an opportunistic grab. ADP-20 player taken at pick 28+ = qualifies as Hybrid early QB/TE.,,,,,,
+"SUPERFLEX: All round thresholds assume single-QB leagues. In superflex, QB becomes a skill-position-tier asset. Early QB is no longer an exception — it is expected. Superflex requires its own strategy tab.",,,,,,

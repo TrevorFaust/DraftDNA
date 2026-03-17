@@ -11,6 +11,7 @@ const STRATEGY_LABELS: Record<string, string> = {
   zero_rb: 'Zero RB',
   robust_rb: 'Robust RB',
   skill_pos_late: 'Skill Pos Late',
+  hybrid: 'Hybrid',
   hero_rb: 'Hero RB',
   // WR
   robust_wr: 'Robust WR',

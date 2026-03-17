@@ -27,8 +27,19 @@ import { tempDraftStorage, tempSettingsStorage } from '@/utils/temporaryStorage'
 import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { selectCpuPick, assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
-import { detectArchetypeName, detectArchetypeIndex } from '@/utils/archetypeDetection';
-import { buildDraftConfig } from '@/constants/buildDraftConfig';
+import {
+  detectArchetypeName,
+  detectArchetypeIndex,
+  detectStrategiesFromPicks,
+  getArchetypeBucketFromStrategies,
+  chooseArchetypeIndexFromBucket,
+} from '@/utils/archetypeDetection';
+import { getArchetypeByNameOrImproviser, FULL_ARCHETYPE_LIST } from '@/constants/archetypeListWithImproviser';
+import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
+import { ArchetypeBadge } from '@/components/ArchetypeBadge';
+import { buildDraftConfig, type DraftConfig } from '@/constants/buildDraftConfig';
+import { detectChaosArchetype, type ChaosPick } from '@/utils/chaosDetection';
+import { getAgeFromBirthDate } from '@/utils/playerAge';
 
 const DraftRoom = () => {
   const { draftId } = useParams<{ draftId: string }>();
@@ -687,6 +698,33 @@ const DraftRoom = () => {
     return false; // No available spots
   };
 
+  // Defense pool rule: only 32 NFL defenses; you may draft a DEF only if enough remain for every other team to fill their DEF slots.
+  const canDraftDefense = (teamNumber: number): boolean => {
+    const defLimit = positionLimits?.DEF ?? 1;
+    const defPicks = picks.filter((p) => {
+      const pl = players.find((a) => a.id === p.player_id);
+      return pl && (pl.position === 'DEF' || pl.position === 'D/ST');
+    });
+    const totalDefDrafted = defPicks.length;
+    if (totalDefDrafted >= 32) return false;
+    const defCountByTeam: Record<number, number> = {};
+    for (let t = 1; t <= (draft?.num_teams ?? 0); t++) defCountByTeam[t] = 0;
+    defPicks.forEach((p) => { defCountByTeam[p.team_number] = (defCountByTeam[p.team_number] ?? 0) + 1; });
+    let otherTeamsRemainingSlots = 0;
+    for (let t = 1; t <= (draft?.num_teams ?? 0); t++) {
+      if (t === teamNumber) continue;
+      otherTeamsRemainingSlots += Math.max(0, defLimit - (defCountByTeam[t] ?? 0));
+    }
+    const remainingAfterThisPick = 32 - (totalDefDrafted + 1);
+    return remainingAfterThisPick >= otherTeamsRemainingSlots;
+  };
+
+  useEffect(() => {
+    if (draft && positionFilter === 'DEF' && !canDraftDefense(draft.user_pick_position)) {
+      setPositionFilter('ALL');
+    }
+  }, [draft, positionFilter, picks, positionLimits]);
+
   const draftPlayer = async (player: RankedPlayer, pickNumber: number, teamNumber: number, roundNumber: number, isAutodraft = false) => {
     if (!draft || !draftId) {
       throw new Error('Draft or draftId is missing');
@@ -796,6 +834,13 @@ const DraftRoom = () => {
         toast.error(`You have no more roster spots available for ${playerPos}`);
       }
       return;
+    }
+
+    if (player.position === 'DEF' || player.position === 'D/ST') {
+      if (!canDraftDefense(draft.user_pick_position)) {
+        toast.error('You cannot take another defense; only 32 exist and other teams need room to fill their DEF slots.');
+        return;
+      }
     }
 
     setIsDrafting(true);
@@ -976,53 +1021,23 @@ const DraftRoom = () => {
           return hasAvailableSpotForPosition(p.position, teamDraftedPlayers, spotOpts);
         });
         
-        // Special handling for defenses: ensure all teams get at least 1 defense before any team gets a second
-        // This prevents teams from being left without a defense, especially in larger leagues
+        // Defense pool rule: only 32 NFL defenses; a team may draft a DEF only if enough remain for every other team to fill their DEF slots.
         const defenses = available.filter((p) => p.position === 'D/ST' || p.position === 'DEF');
         const nonDefenses = available.filter((p) => p.position !== 'D/ST' && p.position !== 'DEF');
-        
-        if (defenses.length > 0) {
-          // Count how many teams still need a defense
+        if (defenses.length > 0 && !canDraftDefense(currentTeam)) {
+          available = nonDefenses;
+        } else if (defenses.length > 0) {
           const teamsWithoutDefense = new Set<number>();
           for (let teamNum = 1; teamNum <= draft.num_teams; teamNum++) {
-            const teamPicksForDefense = picks.filter((p) => {
+            const teamDefCount = picks.filter((p) => {
               const pickPlayer = players.find((pl) => pl.id === p.player_id);
               return p.team_number === teamNum && pickPlayer && (pickPlayer.position === 'D/ST' || pickPlayer.position === 'DEF');
-            });
-            if (teamPicksForDefense.length === 0) {
-              teamsWithoutDefense.add(teamNum);
-            }
+            }).length;
+            if (teamDefCount === 0) teamsWithoutDefense.add(teamNum);
           }
-          
-          // Check if current team already has a defense
           const currentTeamHasDefense = teamDraftedPlayers.some((p) => p.position === 'D/ST' || p.position === 'DEF');
-          
-          // Get DEF position limit (default to 3 if not set)
-          const defLimit = positionLimits?.DEF ?? 3;
-          
-          // If current team doesn't have a defense, they can draft one
-          // If current team has a defense, only allow if all teams have at least one defense
-          // OR if the position limit allows multiple defenses and all teams have at least one
-          if (currentTeamHasDefense && teamsWithoutDefense.size > 0) {
-            // This team already has a defense, but other teams don't - remove defenses from available
-            // This ensures all teams get at least one defense before any team gets a second
-            available = nonDefenses;
-          } else if (currentTeamHasDefense && teamsWithoutDefense.size === 0 && defLimit > 1) {
-            // All teams have at least one defense, and position limit allows multiple - allow defenses
-            // (keep both defenses and non-defenses)
-            available = available; // No change needed
-          } else if (currentTeamHasDefense && teamsWithoutDefense.size === 0 && defLimit === 1) {
-            // All teams have at least one defense, but position limit is 1 - remove defenses
-            available = nonDefenses;
-          } else if (!currentTeamHasDefense) {
-            // Current team doesn't have a defense - allow defenses
-            // If they're the last team without a defense, prioritize defense
-            if (teamsWithoutDefense.size === 1) {
-              // Current team is the last one without a defense - prioritize defense
-              // Put defenses at the top of available list
-              available = [...defenses, ...nonDefenses];
-            }
-            // Otherwise, keep both defenses and non-defenses (no change needed)
+          if (!currentTeamHasDefense && teamsWithoutDefense.size === 1) {
+            available = [...defenses, ...nonDefenses];
           }
         }
         
@@ -1483,7 +1498,9 @@ const DraftRoom = () => {
     
     // Check if there's an available roster spot for this position (account for future keepers)
     const spotOpts = draft ? { teamNumber: draft.user_pick_position, currentRound: getCurrentRound() } : undefined;
-    return hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts);
+    if (!hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts)) return false;
+    if (p.position === 'DEF' || p.position === 'D/ST') return draft ? canDraftDefense(draft.user_pick_position) : false;
+    return true;
   });
 
   // Sort filtered players by rank to determine highlight position
@@ -1570,16 +1587,23 @@ const DraftRoom = () => {
     return () => clearTimeout(t);
   }, [picks.length, handleDraftBoardScroll]);
 
-  // Handle showing completion screen when draft was already completed
-  useEffect(() => {
-    if (draft && picks.length >= totalPicks && totalPicks > 0 && draft.status !== 'completed') {
-      const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
-      const benchCount = positionLimits?.BENCH ?? 6;
-      const config = buildDraftConfig(flexCount, benchCount, draft.num_teams);
-      const userPicks = picks.filter((p) => p.team_number === draft.user_pick_position);
+  // Bucket-based archetype assignment: prefer unearned badges in the same strategy bucket, then rotate so The Improviser and all 361 are attainable.
+  const resolveArchetypeForCompletion = useCallback(
+    async (
+      draftVal: MockDraft,
+      picksVal: DraftPick[],
+      playersVal: RankedPlayer[],
+      config: DraftConfig,
+      isSuperflexVal: boolean
+    ): Promise<{
+      userDetectedArchetype: string;
+      userDetectedArchetypeIndex: number;
+      userDetectedChaosArchetype: string | null;
+    }> => {
+      const userPicks = picksVal.filter((p) => p.team_number === draftVal.user_pick_position);
       const teamPicksForDetection = userPicks
         .map((pick) => {
-          const pl = players.find((p) => p.id === pick.player_id);
+          const pl = playersVal.find((p) => p.id === pick.player_id);
           if (!pl) return null;
           return {
             round_number: pick.round_number,
@@ -1587,13 +1611,115 @@ const DraftRoom = () => {
             position: pl.position || '',
             rank: pl.rank ?? pl.adp ?? 999,
             adp: pl.adp ?? pl.rank ?? 999,
+            team: pl.team ?? undefined,
+            name: pl.name ?? undefined,
           };
         })
         .filter((p): p is NonNullable<typeof p> => !!p)
         .sort((a, b) => a.pick_number - b.pick_number);
-      const userDetectedArchetype = detectArchetypeName(teamPicksForDetection, config);
-      const userDetectedArchetypeIndex = detectArchetypeIndex(teamPicksForDetection, config);
+      const strategies = detectStrategiesFromPicks(teamPicksForDetection, config);
+      const bucket = getArchetypeBucketFromStrategies(strategies);
+      let earnedSet = new Set<number>();
+      let timesAssignedFromBucket = 0;
+      let earnedChaosNames = new Set<string>();
+      if (user?.id) {
+        const { data: completed } = await supabase
+          .from('mock_drafts')
+          .select('user_detected_archetype_index, user_detected_chaos_archetype')
+          .eq('user_id', user.id)
+          .eq('status', 'completed');
+        for (const r of completed || []) {
+          const row = r as { user_detected_archetype_index?: number | null; user_detected_chaos_archetype?: string | null };
+          if (typeof row.user_detected_archetype_index === 'number') {
+            earnedSet.add(row.user_detected_archetype_index);
+          }
+          if (row.user_detected_chaos_archetype) {
+            earnedChaosNames.add(row.user_detected_chaos_archetype);
+          }
+        }
+        timesAssignedFromBucket = (completed || []).filter((r) => {
+          const idx = (r as { user_detected_archetype_index?: number }).user_detected_archetype_index;
+          return typeof idx === 'number' && bucket.includes(idx);
+        }).length;
+      } else {
+        const tempIds = tempDraftStorage.getDraftList();
+        const tempIndices: number[] = [];
+        for (const id of tempIds) {
+          const t = tempDraftStorage.getDraft(id);
+          if (t?.draft.status === 'completed') {
+            const d = t.draft as { user_detected_archetype_index?: number; user_detected_chaos_archetype?: string | null };
+            if (typeof d.user_detected_archetype_index === 'number') tempIndices.push(d.user_detected_archetype_index);
+            if (d.user_detected_chaos_archetype) earnedChaosNames.add(d.user_detected_chaos_archetype);
+          }
+        }
+        tempIndices.forEach((i) => earnedSet.add(i));
+        timesAssignedFromBucket = tempIndices.filter((i) => bucket.includes(i)).length;
+      }
+      const chosenIndex = chooseArchetypeIndexFromBucket(bucket, earnedSet, timesAssignedFromBucket);
+      const name = FULL_ARCHETYPE_LIST[chosenIndex]?.name ?? detectArchetypeName(teamPicksForDetection, config);
 
+      // Fetch age for chaos (Old Boys Club, Time Traveler, Retirement Watch)
+      const espnIds = [...new Set(userPicks.map((pick) => {
+        const pl = playersVal.find((p) => p.id === pick.player_id);
+        return pl?.espn_id != null ? String(pl.espn_id) : null;
+      }).filter(Boolean))] as string[];
+      const ageByEspnId = new Map<string, number>();
+      if (espnIds.length > 0) {
+        const batchSize = 100;
+        for (let i = 0; i < espnIds.length; i += batchSize) {
+          const batch = espnIds.slice(i, i + batchSize);
+          const { data: rows } = await supabase.from('players_info').select('espn_id, birth_date').in('espn_id', batch);
+          for (const row of rows || []) {
+            const age = getAgeFromBirthDate(row.birth_date);
+            if (age != null) ageByEspnId.set(String(row.espn_id), age);
+          }
+        }
+      }
+
+      const chaosPicks: ChaosPick[] = userPicks
+        .map((pick) => {
+          const pl = playersVal.find((p) => p.id === pick.player_id);
+          if (!pl) return null;
+          const espnId = pl.espn_id != null ? String(pl.espn_id) : null;
+          const age = espnId != null ? (ageByEspnId.get(espnId) ?? undefined) : undefined;
+          return {
+            round_number: pick.round_number,
+            pick_number: pick.pick_number,
+            position: pl.position || '',
+            rank: pl.rank ?? pl.adp ?? 999,
+            adp: pl.adp ?? pl.rank ?? 999,
+            team: pl.team ?? undefined,
+            name: pl.name ?? undefined,
+            age,
+          };
+        })
+        .filter((p): p is ChaosPick => p != null)
+        .sort((a, b) => a.pick_number - b.pick_number);
+      const chaosName = detectChaosArchetype(chaosPicks, {
+        totalRounds: config.totalRounds,
+        leagueSize: config.leagueSize,
+        isSuperflex: isSuperflexVal,
+      }, earnedChaosNames);
+
+      return {
+        userDetectedArchetype: name,
+        userDetectedArchetypeIndex: chosenIndex,
+        userDetectedChaosArchetype: chaosName ?? null,
+      };
+    },
+    [user?.id]
+  );
+
+  // Handle showing completion screen when draft was already completed
+  useEffect(() => {
+    if (!draft || picks.length < totalPicks || totalPicks <= 0 || draft.status === 'completed') return;
+    const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
+    const benchCount = positionLimits?.BENCH ?? 6;
+    const config = buildDraftConfig(flexCount, benchCount, draft.num_teams);
+    let cancelled = false;
+    (async () => {
+      const { userDetectedArchetype, userDetectedArchetypeIndex, userDetectedChaosArchetype } = await resolveArchetypeForCompletion(draft, picks, players, config, isSuperflex);
+      if (cancelled) return;
       if (isTempDraft) {
         const updatedDraft = {
           ...draft,
@@ -1601,34 +1727,36 @@ const DraftRoom = () => {
           completed_at: new Date().toISOString(),
           user_detected_archetype: userDetectedArchetype,
           user_detected_archetype_index: userDetectedArchetypeIndex,
+          user_detected_chaos_archetype: userDetectedChaosArchetype ?? undefined,
         };
         tempDraftStorage.saveDraft(updatedDraft, picks);
         setDraft(updatedDraft);
       } else {
-        supabase
+        await supabase
           .from('mock_drafts')
           .update({
             status: 'completed',
             completed_at: new Date().toISOString(),
             user_detected_archetype: userDetectedArchetype,
             user_detected_archetype_index: userDetectedArchetypeIndex,
+            user_detected_chaos_archetype: userDetectedChaosArchetype,
           })
-          .eq('id', draftId)
-          .then(() => {
-            setDraft((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    status: 'completed',
-                    user_detected_archetype: userDetectedArchetype,
-                    user_detected_archetype_index: userDetectedArchetypeIndex,
-                  }
-                : prev
-            );
-          });
+          .eq('id', draftId);
+        setDraft((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: 'completed',
+                user_detected_archetype: userDetectedArchetype,
+                user_detected_archetype_index: userDetectedArchetypeIndex,
+                user_detected_chaos_archetype: userDetectedChaosArchetype ?? undefined,
+              }
+            : prev
+        );
       }
-    }
-  }, [draft, picks.length, totalPicks, draftId, picks, isTempDraft, players, positionLimits, isSuperflex]);
+    })();
+    return () => { cancelled = true; };
+  }, [draft, picks.length, totalPicks, draftId, picks, isTempDraft, players, positionLimits, isSuperflex, resolveArchetypeForCompletion]);
 
   // Trigger confetti when draft completes
   useEffect(() => {
@@ -1750,7 +1878,14 @@ const DraftRoom = () => {
       })
       .filter((p): p is NonNullable<typeof p> => !!p)
       .sort((a, b) => a.pick_number - b.pick_number);
-    const detectedArchetype = detectArchetypeName(teamPicksForDetection, config);
+    const detectedArchetype = draft?.user_detected_archetype ?? detectArchetypeName(teamPicksForDetection, config);
+    const chaosName = draft?.user_detected_chaos_archetype ?? null;
+    const isReplaceChaos = chaosName != null && isChaosReplace(chaosName);
+    const displayName = isReplaceChaos ? chaosName : detectedArchetype;
+    const chaosMeta = chaosName ? getChaosArchetypeByName(chaosName) : null;
+    const archetypeMeta = getArchetypeByNameOrImproviser(detectedArchetype);
+    const mainFlavor = archetypeMeta?.flavorText;
+    const flavorText = isReplaceChaos ? (chaosMeta?.flavorText ?? null) : mainFlavor;
 
     return (
       <div className="min-h-screen bg-background">
@@ -1759,8 +1894,57 @@ const DraftRoom = () => {
           <div className="text-center mb-8">
             <Trophy className="w-16 h-16 text-accent mx-auto mb-4" />
             <h1 className="font-display text-4xl mb-4">DRAFT COMPLETE!</h1>
-            <p className="text-xl font-medium text-accent mb-2">You&apos;re {detectedArchetype}</p>
-            <p className="text-muted-foreground mb-6">
+            <p className="text-xl font-medium text-accent mb-1">You&apos;re {displayName}</p>
+            <div className="flex flex-col items-center gap-2 mb-4">
+              {isReplaceChaos && chaosMeta ? (
+                <>
+                  <ArchetypeBadge
+                    archetypeName={chaosName!}
+                    iconOnly={false}
+                    size="md"
+                    flavorText={chaosMeta.flavorText}
+                    locked={false}
+                    className="shrink-0"
+                  />
+                  {chaosMeta.flavorText && (
+                    <p className="text-muted-foreground text-sm max-w-xl">{chaosMeta.flavorText}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <ArchetypeBadge
+                    archetypeName={detectedArchetype}
+                    archetypeIndex={typeof draft?.user_detected_archetype_index === 'number' ? draft.user_detected_archetype_index : undefined}
+                    iconOnly={false}
+                    size="md"
+                    locked={false}
+                    className="shrink-0"
+                  />
+                  {flavorText && (
+                    <p className="text-muted-foreground text-sm max-w-xl">{flavorText}</p>
+                  )}
+                </>
+              )}
+            </div>
+            {!isReplaceChaos && chaosName && chaosMeta && (
+              <div className="mt-6 pt-6 border-t border-border/50 max-w-xl mx-auto">
+                <p className="text-sm font-medium text-accent mb-2">You&apos;re also</p>
+                <div className="flex flex-col items-center gap-2">
+                  <ArchetypeBadge
+                    archetypeName={chaosName}
+                    iconOnly={false}
+                    size="md"
+                    flavorText={chaosMeta.flavorText}
+                    locked={false}
+                    className="shrink-0"
+                  />
+                  {chaosMeta.flavorText && (
+                    <p className="text-muted-foreground text-xs max-w-lg">{chaosMeta.flavorText}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            <p className="text-muted-foreground mb-6 mt-6">
               {draft?.name} has been completed and saved to your history.
             </p>
             <div className="flex justify-center gap-4 flex-wrap">
@@ -2029,8 +2213,7 @@ const DraftRoom = () => {
                     })
                     .filter((p): p is NonNullable<typeof p> => !!p)
                     .sort((a, b) => a.pick_number - b.pick_number);
-                  const userDetectedArchetype = detectArchetypeName(teamPicksForDetection, config);
-                  const userDetectedArchetypeIndex = detectArchetypeIndex(teamPicksForDetection, config);
+                  const { userDetectedArchetype, userDetectedArchetypeIndex, userDetectedChaosArchetype } = await resolveArchetypeForCompletion(draft, picks, players, config, isSuperflex);
                   if (isTempDraft) {
                     const updatedDraft = {
                       ...draft,
@@ -2038,6 +2221,7 @@ const DraftRoom = () => {
                       completed_at: new Date().toISOString(),
                       user_detected_archetype: userDetectedArchetype,
                       user_detected_archetype_index: userDetectedArchetypeIndex,
+                      user_detected_chaos_archetype: userDetectedChaosArchetype ?? undefined,
                     };
                     tempDraftStorage.saveDraft(updatedDraft, picks);
                     setDraft(updatedDraft);
@@ -2050,6 +2234,7 @@ const DraftRoom = () => {
                         completed_at: new Date().toISOString(),
                         user_detected_archetype: userDetectedArchetype,
                         user_detected_archetype_index: userDetectedArchetypeIndex,
+                        user_detected_chaos_archetype: userDetectedChaosArchetype,
                       })
                       .eq('id', draftId);
                     setDraft((prev) =>
@@ -2059,6 +2244,7 @@ const DraftRoom = () => {
                             status: 'completed',
                             user_detected_archetype: userDetectedArchetype,
                             user_detected_archetype_index: userDetectedArchetypeIndex,
+                            user_detected_chaos_archetype: userDetectedChaosArchetype ?? undefined,
                           }
                         : prev
                     );
@@ -2109,7 +2295,9 @@ const DraftRoom = () => {
                     <SelectItem value="WR">WR</SelectItem>
                     <SelectItem value="TE">TE</SelectItem>
                     <SelectItem value="K">K</SelectItem>
-                    <SelectItem value="DEF">DEF</SelectItem>
+                    {draft && canDraftDefense(draft.user_pick_position) && (
+                      <SelectItem value="DEF">DEF</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 <div className="relative w-64">
@@ -2144,7 +2332,9 @@ const DraftRoom = () => {
                   .filter((p): p is RankedPlayer => {
                     if (!p || filteredPlayerIds.has(p.id)) return false;
                     const spotOpts = draft ? { teamNumber: draft.user_pick_position, currentRound: getCurrentRound() } : undefined;
-                    return hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts);
+                    if (!hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts)) return false;
+                    if (p.position === 'DEF' || p.position === 'D/ST') return draft ? canDraftDefense(draft.user_pick_position) : false;
+                    return true;
                   });
                 
                 // Combine filtered players with highlighted players (only when no search/position filter)

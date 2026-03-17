@@ -16,7 +16,7 @@ export interface DraftPickWithPlayer {
 }
 
 const DETECTION_PRIORITY = {
-  rb: ['hero_rb', 'robust_rb', 'skill_pos_late', 'zero_rb', 'bpa'] as RbStrategyId[],
+  rb: ['hero_rb', 'robust_rb', 'hybrid', 'skill_pos_late', 'zero_rb', 'bpa'] as RbStrategyId[],
   wr: ['hero_wr', 'robust_wr', 'wr_mid', 'wr_late'] as WrStrategyId[],
   qb: ['early_qb', 'mid_qb', 'late_qb', 'punt_qb'] as QbStrategyId[],
   te: ['early_te', 'mid_te', 'stream_te'] as TeStrategyId[],
@@ -56,6 +56,13 @@ function detectRb(picks: DraftPickWithPlayer[], config: DraftConfig): RbStrategy
   const rbsIn20 = first20Pct.filter(isRb).length;
   const rbsIn40 = first40Pct.filter(isRb).length;
   if (rbsIn20 >= 2 && rbsIn40 >= 3) return 'robust_rb';
+
+  // Hybrid: intentional skill-position mix — 2+ RB and 2+ WR in first 6 rounds (scaled), neither > 4. See docs/HYBRID_ARCHETYPE.md.
+  const scaledFirst6 = Math.min(totalRounds, Math.ceil(6 * (config.leagueSize || 12) / 12));
+  const first6Picks = picks.filter((p) => p.round_number <= scaledFirst6);
+  const rbIn6 = first6Picks.filter(isRb).length;
+  const wrIn6 = first6Picks.filter(isWr).length;
+  if (rbIn6 >= 2 && wrIn6 >= 2 && rbIn6 <= 4 && wrIn6 <= 4) return 'hybrid';
 
   // Skill Pos Late: 0 RB AND 0 WR in picks 1–2 (absolute)
   if (first2Picks.length >= 2) {
@@ -165,6 +172,39 @@ function hashPicksForTieBreak(picks: DraftPickWithPlayer[]): number {
     h = h & 0x7fffffff;
   }
   return h;
+}
+
+/** Exact strategy match: all five dimensions equal. */
+function strategiesEqual(a: ArchetypeStrategies, b: ArchetypeStrategies): boolean {
+  return a.rb === b.rb && a.wr === b.wr && a.qb === b.qb && a.te === b.te && a.late === b.late;
+}
+
+/**
+ * All archetype indices (into FULL_ARCHETYPE_LIST) that exactly match the given strategy profile.
+ * Used for bucket-based assignment so The Improviser and other variants are attainable;
+ * multiple named archetypes can share the same profile.
+ */
+export function getArchetypeBucketFromStrategies(strategies: ArchetypeStrategies): number[] {
+  const bucket: number[] = [];
+  for (let i = 0; i < FULL_ARCHETYPE_LIST.length; i++) {
+    if (strategiesEqual(FULL_ARCHETYPE_LIST[i].strategies, strategies)) bucket.push(i);
+  }
+  return bucket.length > 0 ? bucket : [0]; // fallback to first if none match (should not happen)
+}
+
+/**
+ * Choose one index from the bucket for badge assignment. Prefers an archetype the user has not
+ * earned yet (in order); if all in bucket are earned, rotates by timesAssignedFromBucket so
+ * repeated drafts with the same profile get different badges when possible.
+ */
+export function chooseArchetypeIndexFromBucket(
+  bucketIndices: number[],
+  earnedIndices: Set<number>,
+  timesAssignedFromBucket: number
+): number {
+  const unearned = bucketIndices.filter((i) => !earnedIndices.has(i));
+  if (unearned.length > 0) return unearned[0];
+  return bucketIndices[timesAssignedFromBucket % bucketIndices.length];
 }
 
 /** Find archetypes with the most matching strategy dimensions; tie-break by draft hash for variety. Returns index into FULL_ARCHETYPE_LIST. */

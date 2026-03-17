@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Mail, Lock, Loader2, ArrowLeft, User, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
-import { FootballHelmetIcon } from '@/components/icons/FootballHelmetIcon';
+import { SiteLogo } from '@/components/SiteLogo';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -300,8 +300,8 @@ const Auth = () => {
         {pendingVerificationEmail ? (
           <div className="space-y-6">
             <div className="flex flex-col items-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center mb-4 shadow-glow">
-                <FootballHelmetIcon className="w-8 h-8 text-primary-foreground" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center mb-4 shadow-glow overflow-hidden">
+                <SiteLogo size={40} className="w-10 h-10" />
               </div>
               <h1 className="font-display text-4xl tracking-wide text-gradient">Verify your email</h1>
               <p className="text-muted-foreground mt-2 text-center">
@@ -348,10 +348,10 @@ const Auth = () => {
         ) : (
           <>
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center mb-4 shadow-glow">
-            <FootballHelmetIcon className="w-8 h-8 text-primary-foreground" />
+          <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center mb-4 shadow-glow overflow-hidden">
+            <SiteLogo size={40} className="w-10 h-10" />
           </div>
-          <h1 className="font-display text-4xl tracking-wide text-gradient">DRAFT BOARD</h1>
+          <h1 className="font-display text-4xl tracking-wide text-gradient">Draft DNA</h1>
           <p className="text-muted-foreground mt-2">
             {isLogin ? 'Welcome back!' : 'Create your account'}
           </p>

@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Users, Layers, Trophy, Loader2, Target, Timer } from 'lucide-react';
-import { FootballHelmetIcon } from '@/components/icons/FootballHelmetIcon';
+import { ClipboardList } from 'lucide-react';
 import { tempDraftStorage, generateTempDraftId, tempSettingsStorage } from '@/utils/temporaryStorage';
 import type { MockDraft } from '@/types/database';
 import { assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
@@ -387,7 +387,7 @@ const MockDraft = () => {
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="text-center mb-8">
           <div className="w-20 h-20 rounded-2xl bg-gradient-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
-            <FootballHelmetIcon className="w-10 h-10 text-primary-foreground" />
+            <ClipboardList className="w-10 h-10 text-primary-foreground" />
           </div>
           <h1 className="font-display text-4xl tracking-wide mb-2">NEW MOCK DRAFT</h1>
           <p className="text-muted-foreground">Configure your draft settings</p>
@@ -668,7 +668,7 @@ const MockDraft = () => {
 
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
-                <FootballHelmetIcon className="w-4 h-4 text-muted-foreground" />
+                <ClipboardList className="w-4 h-4 text-muted-foreground" />
                 CPU Selection Speed
               </Label>
               <Select value={cpuSpeed} onValueChange={(value: 'slow' | 'normal' | 'fast' | 'rapid') => setCpuSpeed(value)}>
@@ -697,7 +697,7 @@ const MockDraft = () => {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  <FootballHelmetIcon className="w-5 h-5" />
+                  <ClipboardList className="w-5 h-5" />
                   Start Draft
                 </>
               )}
