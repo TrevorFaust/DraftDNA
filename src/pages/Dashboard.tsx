@@ -284,7 +284,7 @@ const Dashboard = () => {
               ) : leaderboard.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No entries yet. Make your predictions to get on the board!</p>
               ) : (
-                <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-2">
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
                   {leaderboard.slice(0, 10).map((row) => {
                     const displayName = user && row.user_id === user.id
                       ? 'You'
@@ -390,7 +390,7 @@ const Dashboard = () => {
                 {picksDialogUser && (user && picksDialogUser.user_id === user.id ? "Your Pick Six" : `${picksDialogUser.username?.trim() || "User"}'s Pick Six`)}
               </DialogTitle>
             </DialogHeader>
-            <div className="overflow-y-auto flex-1 pr-2 -mr-2">
+            <div className="overflow-y-auto overflow-x-hidden flex-1 pr-2 -mr-2 scrollbar-thin">
               {userPicksLoading ? (
                 <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
                   <Loader2 className="w-5 h-5 animate-spin" />

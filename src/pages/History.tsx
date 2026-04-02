@@ -33,6 +33,7 @@ import { MyRoster } from '@/components/MyRoster';
 import { cn } from '@/lib/utils';
 import { getArchetypeForTeam } from '@/utils/archetypeDetection';
 import { ArchetypeBadge } from '@/components/ArchetypeBadge';
+import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
 
 interface DraftWithPicks extends MockDraft {
   picks: (DraftPick & { player: Player })[];
@@ -756,10 +757,12 @@ const History = () => {
                 {getCompletedDraftsCount()} draft{getCompletedDraftsCount() !== 1 ? 's' : ''} completed
                 {globalSelectedLeague ? ` in ${globalSelectedLeague.name}` : ' across all leagues'}
               </p>
-              <p>
-                {getIncompleteDraftsCount()} draft{getIncompleteDraftsCount() !== 1 ? 's' : ''} in progress
-                {globalSelectedLeague ? ` in ${globalSelectedLeague.name}` : ' across all leagues'}
-              </p>
+              {getIncompleteDraftsCount() > 0 && (
+                <p>
+                  {getIncompleteDraftsCount()} draft{getIncompleteDraftsCount() !== 1 ? 's' : ''} in progress
+                  {globalSelectedLeague ? ` in ${globalSelectedLeague.name}` : ' across all leagues'}
+                </p>
+              )}
             </div>
           </div>
           <Button variant="hero" onClick={() => navigate('/mock-draft')}>
@@ -838,9 +841,15 @@ const History = () => {
                         {draft.status === 'completed' ? 'Completed' : 'In Progress'}
                       </span>
                       {draft.status === 'completed' && (() => {
-                        // Always re-detect from picks so old drafts map to current archetype list (closest match)
-                        let archetype: string | null = null;
-                        if (draft.picks.length > 0) {
+                        const chaosNm =
+                          (draft as { user_detected_chaos_archetype?: string | null }).user_detected_chaos_archetype?.trim() ||
+                          null;
+                        const chaosMeta = chaosNm ? getChaosArchetypeByName(chaosNm) : undefined;
+                        const replaceChaos = !!(chaosNm && isChaosReplace(chaosNm));
+                        const stored = (draft as { user_detected_archetype?: string | null }).user_detected_archetype?.trim();
+                        const storedIdx = (draft as { user_detected_archetype_index?: number | null }).user_detected_archetype_index;
+                        let archetype: string | null = stored || null;
+                        if (!archetype && draft.picks.length > 0) {
                           const limits = selectedDraft?.id === draft.id ? draftLeagueSettings?.positionLimits : undefined;
                           const flex = limits?.FLEX ?? 1;
                           const bench = limits?.BENCH ?? 6;
@@ -849,18 +858,44 @@ const History = () => {
                             benchSize: bench,
                             numTeams: draft.num_teams,
                           });
-                        } else {
-                          const stored = (draft as { user_detected_archetype?: string | null }).user_detected_archetype;
-                          archetype = stored && stored.trim() ? stored.trim() : null;
                         }
-                        return archetype ? (
-                          <ArchetypeBadge
-                            archetypeName={archetype}
-                            iconOnly
-                            size="sm"
-                            earnedFromDraft={draft.name}
-                          />
-                        ) : null;
+                        const useStoredIndex =
+                          !!(stored && archetype === stored && typeof storedIdx === 'number' && storedIdx >= 0);
+                        const chaosFlavor = chaosMeta?.flavorText;
+                        if (replaceChaos && chaosNm) {
+                          return (
+                            <ArchetypeBadge
+                              archetypeName={chaosNm}
+                              iconOnly
+                              size="sm"
+                              flavorText={chaosFlavor}
+                              earnedFromDraft={draft.name}
+                            />
+                          );
+                        }
+                        if (!archetype && !chaosNm) return null;
+                        return (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {archetype ? (
+                              <ArchetypeBadge
+                                archetypeName={archetype}
+                                archetypeIndex={useStoredIndex ? storedIdx : undefined}
+                                iconOnly
+                                size="sm"
+                                earnedFromDraft={draft.name}
+                              />
+                            ) : null}
+                            {chaosNm ? (
+                              <ArchetypeBadge
+                                archetypeName={chaosNm}
+                                iconOnly
+                                size="sm"
+                                flavorText={chaosFlavor}
+                                earnedFromDraft={draft.name}
+                              />
+                            ) : null}
+                          </div>
+                        );
                       })()}
                     </div>
                     
@@ -999,7 +1034,7 @@ const History = () => {
                 <TabsTrigger value="cpu-teams">Opponent Teams</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="draft-order" className="flex-1 overflow-y-auto mt-4">
+              <TabsContent value="draft-order" className="flex-1 overflow-y-auto overflow-x-hidden mt-4 pr-2 scrollbar-thin">
                 <div className="space-y-2">
                   {selectedDraft.picks.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
@@ -1042,7 +1077,7 @@ const History = () => {
                 </div>
               </TabsContent>
 
-              <TabsContent value="your-team" className="flex-1 overflow-y-auto mt-4 flex flex-col">
+              <TabsContent value="your-team" className="flex-1 overflow-y-auto overflow-x-hidden mt-4 flex flex-col pr-2 scrollbar-thin">
                 <div className="flex items-center justify-end mb-4">
                   <div className="flex gap-2">
                     <Button
@@ -1089,25 +1124,65 @@ const History = () => {
                       }));
 
                     const userTeamName = teamNames.get(selectedDraft.user_pick_position) || `Team ${selectedDraft.user_pick_position}`;
-                    // Re-detect from picks so display always matches current archetype list (closest match)
+                    const chaosNm =
+                      (selectedDraft as { user_detected_chaos_archetype?: string | null }).user_detected_chaos_archetype?.trim() ||
+                      null;
+                    const chaosMeta = chaosNm ? getChaosArchetypeByName(chaosNm) : undefined;
+                    const replaceChaos = !!(chaosNm && isChaosReplace(chaosNm));
+                    const storedArchetype = (selectedDraft as { user_detected_archetype?: string | null }).user_detected_archetype?.trim();
+                    const storedIdx = (selectedDraft as { user_detected_archetype_index?: number | null }).user_detected_archetype_index;
                     const flex = draftLeagueSettings?.positionLimits?.FLEX ?? 1;
                     const bench = draftLeagueSettings?.positionLimits?.BENCH ?? 6;
-                    const userArchetype: string = userPicks.length > 0
-                      ? getArchetypeForTeam(userPicks, selectedDraft.user_pick_position, {
-                          flexSlots: flex,
-                          benchSize: bench,
-                          numTeams: selectedDraft.num_teams,
-                        })
-                      : ((selectedDraft as { user_detected_archetype?: string | null }).user_detected_archetype?.trim() || '');
+                    const mainArchetype: string =
+                      storedArchetype ||
+                      (userPicks.length > 0
+                        ? getArchetypeForTeam(userPicks, selectedDraft.user_pick_position, {
+                            flexSlots: flex,
+                            benchSize: bench,
+                            numTeams: selectedDraft.num_teams,
+                          })
+                        : '');
+                    const mainArchetypeIndex =
+                      storedArchetype &&
+                      mainArchetype === storedArchetype &&
+                      typeof storedIdx === 'number' &&
+                      storedIdx >= 0
+                        ? storedIdx
+                        : undefined;
+                    const chaosFlavor = chaosMeta?.flavorText;
                     return (
                       <div>
-                        <div className="mb-3">
-                          <ArchetypeBadge
-                            archetypeName={userArchetype}
-                            iconOnly
-                            size="md"
-                            earnedFromDraft={selectedDraft.name}
-                          />
+                        <div className="mb-3 flex items-center gap-3 flex-wrap">
+                          {replaceChaos && chaosNm ? (
+                            <ArchetypeBadge
+                              archetypeName={chaosNm}
+                              iconOnly
+                              size="md"
+                              flavorText={chaosFlavor}
+                              earnedFromDraft={selectedDraft.name}
+                            />
+                          ) : (
+                            <>
+                              {mainArchetype ? (
+                                <ArchetypeBadge
+                                  archetypeName={mainArchetype}
+                                  archetypeIndex={mainArchetypeIndex}
+                                  iconOnly
+                                  size="md"
+                                  earnedFromDraft={selectedDraft.name}
+                                />
+                              ) : null}
+                              {chaosNm ? (
+                                <ArchetypeBadge
+                                  archetypeName={chaosNm}
+                                  iconOnly
+                                  size="md"
+                                  flavorText={chaosFlavor}
+                                  earnedFromDraft={selectedDraft.name}
+                                />
+                              ) : null}
+                            </>
+                          )}
                         </div>
                       <MyRoster
                         picks={picksForRoster}
@@ -1152,7 +1227,7 @@ const History = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="cpu-teams" className="flex-1 overflow-y-auto mt-4 flex flex-col">
+              <TabsContent value="cpu-teams" className="flex-1 overflow-y-auto overflow-x-hidden mt-4 flex flex-col pr-2 scrollbar-thin">
                 {(() => {
                   const cpuTeams = Array.from({ length: selectedDraft.num_teams }, (_, i) => i + 1)
                     .filter((teamNum) => teamNum !== selectedDraft.user_pick_position);
@@ -1231,7 +1306,7 @@ const History = () => {
                           </Button>
                         </div>
                       </div>
-                      <div className="flex-1 overflow-y-auto">
+                      <div className="flex-1 overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
                         {cpuTeamsView === 'draft-order' ? (
                           <div className="space-y-2">
                             {teamPicks.map((pick) => (

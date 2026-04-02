@@ -1,16 +1,18 @@
 /**
  * Badge component for draft archetypes.
- * Gold/bronze style like achievement badges. Each archetype gets a unique
- * visual via deterministic hash (icon + gradient).
+ * When composed PNGs exist under public/badges/ (see archetypeBadgeAssets.generated.ts),
+ * earned / preview-unlocked badges show that art; otherwise gold/bronze gradient + icon.
  *
- * iconOnly: small circle with icon; hover shows name + description + why earned.
- * Full badge: pill with icon + name (for badges page grid).
+ * iconOnly: thumbnail (size sm/md); hover shows name + description + why earned.
+ * Full badge: large composed art (name is on the asset), or pill with icon + name for gradient fallback.
  */
 
+import { useState, useEffect } from 'react';
 import { Crown, Trophy, Award, Target, Zap, Star, Shield, Flame, Swords, Sparkles, HelpCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { getArchetypeByNameOrImproviser } from '@/constants/archetypeListWithImproviser';
+import { getArchetypeByName } from '@/constants/archetypeMappings.generated';
 import { getArchetypeDescription, getArchetypeEarnedReason } from '@/constants/archetypeDescriptions';
+import { getArchetypeBadgePublicUrl } from '@/constants/archetypeBadgeAssets.generated';
 import { cn } from '@/lib/utils';
 
 const BADGE_ICONS = [Crown, Trophy, Award, Target, Zap, Star, Shield, Flame, Swords, Sparkles];
@@ -51,6 +53,8 @@ interface ArchetypeBadgeProps {
   earnedFromDraft?: string;
   /** Greyed out with ? icon (not yet earned) */
   locked?: boolean;
+  /** When true with locked, still render full gradient + archetype icon (tooltip stays locked). Badges page preview mode. */
+  showUnlockedAppearance?: boolean;
   /** Override flavor text (e.g. for chaos badges) */
   flavorText?: string;
   className?: string;
@@ -63,15 +67,24 @@ export function ArchetypeBadge({
   size = 'sm',
   earnedFromDraft,
   locked = false,
+  showUnlockedAppearance = false,
   flavorText: flavorTextOverride,
   className,
 }: ArchetypeBadgeProps) {
-  const archetype = getArchetypeByNameOrImproviser(archetypeName);
+  const archetype = getArchetypeByName(archetypeName);
   const strategies = archetype?.strategies;
   const flavorText = flavorTextOverride ?? archetype?.flavorText;
   const description = strategies ? getArchetypeDescription(strategies) : archetypeName;
   const whyText = strategies ? getArchetypeEarnedReason(strategies) : `Complete a draft matching this archetype to unlock.`;
   const { Icon, gradient } = getBadgeStyle(archetypeName, archetypeIndex);
+
+  const badgeAssetUrl = getArchetypeBadgePublicUrl(archetypeName);
+  const [assetLoadFailed, setAssetLoadFailed] = useState(false);
+  useEffect(() => {
+    setAssetLoadFailed(false);
+  }, [badgeAssetUrl]);
+  const showCustomArt =
+    !!badgeAssetUrl && (!locked || showUnlockedAppearance) && !assetLoadFailed;
 
   const tooltipContent = (
     <TooltipContent side="top" className="max-w-[320px]">
@@ -101,15 +114,51 @@ export function ArchetypeBadge({
   );
 
   if (iconOnly) {
+    const circleLocked = locked && !showUnlockedAppearance;
     const circleSize = size === 'sm' ? 'w-7 h-7' : 'w-10 h-10';
     const iconSize = size === 'sm' ? 'w-3.5 h-3.5' : 'w-5 h-5';
+    /** Portrait composed badges (360×480): readable ribbon text needs width, not a tiny crop. */
+    const customThumbClass =
+      size === 'sm'
+        ? 'w-[min(100%,7.5rem)] max-w-[7.5rem] aspect-[3/4]'
+        : 'w-full max-w-[min(100%,11rem)] sm:max-w-[12.5rem] aspect-[3/4]';
+
+    if (showCustomArt && badgeAssetUrl) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                'cursor-default flex items-center justify-center',
+                customThumbClass,
+                circleLocked && 'opacity-45 grayscale',
+                className
+              )}
+              role="img"
+              aria-label={archetypeName}
+            >
+              <img
+                src={badgeAssetUrl}
+                alt={archetypeName}
+                className="max-h-full max-w-full w-full h-full object-contain object-center select-none pointer-events-none"
+                loading="lazy"
+                decoding="async"
+                onError={() => setAssetLoadFailed(true)}
+              />
+            </div>
+          </TooltipTrigger>
+          {tooltipContent}
+        </Tooltip>
+      );
+    }
+
     return (
       <Tooltip>
         <TooltipTrigger asChild>
           <div
             className={cn(
               'rounded-full flex items-center justify-center border shadow-sm cursor-default',
-              locked
+              circleLocked
                 ? 'bg-muted/60 border-muted-foreground/20 text-muted-foreground'
                 : cn('border-amber-500/30 bg-gradient-to-br text-amber-950', gradient),
               circleSize,
@@ -118,7 +167,27 @@ export function ArchetypeBadge({
             role="img"
             aria-label={archetypeName}
           >
-            {locked ? <HelpCircle className={iconSize} /> : <Icon className={iconSize} />}
+            {circleLocked ? <HelpCircle className={iconSize} /> : <Icon className={iconSize} />}
+          </div>
+        </TooltipTrigger>
+        {tooltipContent}
+      </Tooltip>
+    );
+  }
+
+  if (showCustomArt && badgeAssetUrl) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={cn('inline-flex flex-col items-center max-w-[min(100vw-2rem,28rem)]', className)}>
+            <img
+              src={badgeAssetUrl}
+              alt={archetypeName}
+              className="w-full h-auto max-h-[min(75vh,36rem)] object-contain select-none"
+              loading="lazy"
+              decoding="async"
+              onError={() => setAssetLoadFailed(true)}
+            />
           </div>
         </TooltipTrigger>
         {tooltipContent}

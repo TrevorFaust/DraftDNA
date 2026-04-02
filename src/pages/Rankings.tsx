@@ -205,7 +205,7 @@ const Rankings = () => {
   const { selectedLeague, leagues, loading: leaguesLoading } = useLeagues();
   const [guestSettingsVersion, setGuestSettingsVersion] = useState(0);
   const bucket = useCommunityRankingsBucket(user ? undefined : guestSettingsVersion);
-  const { teamNames: defenseTeamNames } = useNflTeams();
+  const { teamNames: defenseTeamNames, teams: nflTeams } = useNflTeams();
   const navigate = useNavigate();
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [communityPlayers, setCommunityPlayers] = useState<RankedPlayer[]>([]);
@@ -298,6 +298,15 @@ const Rankings = () => {
   const bucketKey = `${displayBucket.scoringFormat}/${displayBucket.leagueType}/${displayBucket.isSuperflex}/${displayBucket.rookiesOnly || false}`;
   bucketRef.current = bucketKey;
   communityBucketRef.current = displayBucket;
+  const defenseTeamAbbrByName = useMemo(
+    () =>
+      new Map(
+        (nflTeams || [])
+          .filter((t) => t.team_name && t.team_abbr)
+          .map((t) => [t.team_name as string, t.team_abbr as string])
+      ),
+    [nflTeams]
+  );
   selectedLeagueIdRef.current = selectedLeague?.id ?? null;
 
   // Guest only: persist bucket to League Settings so Rankings dropdown and League Settings always match
@@ -404,7 +413,7 @@ const Rankings = () => {
             id: `defense-${teamName.replace(/\s/g, '-').toLowerCase()}`,
             name: teamName,
             position: 'D/ST',
-            team: null,
+            team: defenseTeamAbbrByName.get(teamName) ?? null,
             season: 2025,
             adp,
             bye_week: null,
@@ -435,10 +444,13 @@ const Rankings = () => {
       defensePlayers = defensePlayers.sort((a, b) => a.name.localeCompare(b.name));
       defensePlayers = defensePlayers.map((defense, index) => {
         const adp = 150 + Math.floor((index / Math.max(defensePlayers.length, 1)) * 50);
+        const normalizedTeam = defense.team && defense.team !== 'FA'
+          ? defense.team
+          : (defenseTeamAbbrByName.get(defense.name) ?? defense.team);
         if (Number(defense.adp) >= 200 || Number(defense.adp) < 150) {
-          return { ...defense, adp };
+          return { ...defense, adp, team: normalizedTeam };
         }
-        return defense;
+        return { ...defense, team: normalizedTeam };
       });
       
       // Do not persist defense ADP updates - RLS blocks anon update on players; in-memory is enough

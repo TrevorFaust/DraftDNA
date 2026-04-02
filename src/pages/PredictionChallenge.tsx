@@ -773,7 +773,7 @@ ${shareUrl}`;
 
         {/* Share Card Dialog - Centered trading-card style */}
         <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-          <DialogContent className="max-w-[560px] sm:max-w-[560px] max-h-[90vh] overflow-y-auto flex flex-col items-center p-0 rounded-2xl border-2 shadow-2xl">
+          <DialogContent className="max-w-[560px] sm:max-w-[560px] max-h-[90vh] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin flex flex-col items-center p-0 rounded-2xl border-2 shadow-2xl">
             <DialogHeader className="sr-only">
               <DialogTitle>Share your Top 6</DialogTitle>
             </DialogHeader>

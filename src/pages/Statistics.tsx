@@ -81,6 +81,8 @@ const Statistics = () => {
     leastDraftedByRound: Map<number, Array<{ player: Player; count: number }>>;
     avoidedPlayers: Array<{ player: Player; fadeScore: number; opportunityCount: number; selectionCount: number; intensitySum: number }>;
     avoidedPlayersByRound: Map<number, Array<{ player: Player; fadeScore: number; opportunityCount: number; selectionCount: number; intensitySum: number }>>;
+    avoidedPlayersRaw: Array<{ player: Player; fadeScore: number; opportunityCount: number; selectionCount: number; intensitySum: number }>;
+    avoidedPlayersByRoundRaw: Map<number, Array<{ player: Player; fadeScore: number; opportunityCount: number; selectionCount: number; intensitySum: number }>>;
     studs: Array<{ player: RankedPlayer; myRank: number; communityRank: number; diff: number }>;
     duds: Array<{ player: RankedPlayer; myRank: number; communityRank: number; diff: number }>;
     maxRound: number;
@@ -93,6 +95,8 @@ const Statistics = () => {
     leastDraftedByRound: new Map(),
     avoidedPlayers: [],
     avoidedPlayersByRound: new Map(),
+    avoidedPlayersRaw: [],
+    avoidedPlayersByRoundRaw: new Map(),
     studs: [],
     duds: [],
     maxRound: 0,
@@ -401,7 +405,13 @@ const Statistics = () => {
     setStatsLoading(true);
 
     try {
-      let drafts: Array<{ id: string; user_pick_position: number; num_teams: number }> = [];
+      let drafts: Array<{
+        id: string;
+        user_pick_position: number;
+        num_teams: number;
+        league_id?: string | null;
+        is_superflex?: boolean | null;
+      }> = [];
       let picksData: any[] = [];
       let playersMap = new Map<string, Player>();
 
@@ -418,6 +428,8 @@ const Statistics = () => {
             leastDraftedByRound: new Map(),
             avoidedPlayers: [],
             avoidedPlayersByRound: new Map(),
+            avoidedPlayersRaw: [],
+            avoidedPlayersByRoundRaw: new Map(),
             studs: [], 
             duds: [],
             maxRound: 0,
@@ -436,6 +448,8 @@ const Statistics = () => {
               id: tempData.draft.id,
               user_pick_position: tempData.draft.user_pick_position,
               num_teams: tempData.draft.num_teams,
+              league_id: (tempData.draft as any).league_id ?? null,
+              is_superflex: (tempData.draft as any).is_superflex ?? null,
             });
             if (tempData.picks) {
               tempData.picks.forEach((pick: DraftPick) => {
@@ -508,7 +522,31 @@ const Statistics = () => {
           id: d.id,
           user_pick_position: d.user_pick_position,
           num_teams: d.num_teams,
+          league_id: d.league_id ?? null,
+          is_superflex: null,
         }));
+
+        // Enrich drafts with league superflex settings so QB fade capping is accurate.
+        const leagueIds = Array.from(
+          new Set(
+            drafts
+              .map((d) => d.league_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+        if (leagueIds.length > 0) {
+          const { data: leagueMeta } = await supabase
+            .from('leagues')
+            .select('id, is_superflex')
+            .in('id', leagueIds);
+          const superflexByLeagueId = new Map<string, boolean>(
+            (leagueMeta || []).map((l) => [l.id, !!l.is_superflex])
+          );
+          drafts = drafts.map((d) => ({
+            ...d,
+            is_superflex: d.league_id ? (superflexByLeagueId.get(d.league_id) ?? false) : false,
+          }));
+        }
 
         if (drafts.length === 0) {
           setDraftStats({ 
@@ -519,6 +557,8 @@ const Statistics = () => {
             leastDraftedByRound: new Map(),
             avoidedPlayers: [],
             avoidedPlayersByRound: new Map(),
+            avoidedPlayersRaw: [],
+            avoidedPlayersByRoundRaw: new Map(),
             studs: [], 
             duds: [],
             maxRound: 0,
@@ -580,6 +620,7 @@ const Statistics = () => {
       }
 
       const draftMap = new Map(drafts.map(d => [d.id, d.user_pick_position]));
+      const draftMetaMap = new Map(drafts.map(d => [d.id, d]));
 
 
       const userPicks = (picksData || []).filter((pick: any) => {
@@ -675,12 +716,16 @@ const Statistics = () => {
       // Track opportunities and intensity by round
       const opportunityCountsByRound = new Map<number, Map<string, number>>(); // Round -> Player ID -> Count
       const opportunityCounts = new Map<string, number>(); // Total opportunities across all rounds
+      const rawOpportunityCountsByRound = new Map<number, Map<string, number>>(); // Round -> Player ID -> Count (no slot caps)
+      const rawOpportunityCounts = new Map<string, number>(); // Total opportunities across all rounds (no slot caps)
       const selectionCounts = new Map<string, number>(); // How many times player was actually drafted
       const selectionCountsByRound = new Map<number, Map<string, number>>(); // Round -> Player ID -> Count
       
       // Track intensity sum (weighted by fade type)
       const intensitySumsByRound = new Map<number, Map<string, number>>(); // Round -> Player ID -> Intensity Sum
       const intensitySums = new Map<string, number>(); // Player ID -> Total Intensity Sum
+      const rawIntensitySumsByRound = new Map<number, Map<string, number>>(); // Round -> Player ID -> Intensity Sum (no slot caps)
+      const rawIntensitySums = new Map<string, number>(); // Player ID -> Total Intensity Sum (no slot caps)
       
       // Process each draft separately to track availability at each pick
       // Wrap fade calculation in try-catch so errors don't break entire stats
@@ -727,8 +772,15 @@ const Statistics = () => {
               continue;
             }
             
+            const normalizePosition = (position?: string): string => {
+              const p = (position || '').toUpperCase().trim();
+              if (p === 'D/ST' || p === 'DST') return 'DEF';
+              return p;
+            };
+
             // Use COMMUNITY ADP for selected player (what the community thinks)
             const selectedPlayerCommunityADP = communityAdpMap.get(selectedPlayer.id) || Number(selectedPlayer.adp) || 999;
+            const selectedPlayerPosition = normalizePosition(selectedPlayer.position);
             
             // Find all players drafted BEFORE this pick
             const draftedBeforeThisPick = new Set<string>();
@@ -736,6 +788,36 @@ const Statistics = () => {
               if (pick.pick_number < pickNumber) {
                 draftedBeforeThisPick.add(pick.player_id);
               }
+            }
+
+            // Track the user's prior non-autodraft picks by position so we can stop
+            // counting fades for positions that are already filled.
+            const positionCaps = (() => {
+              const draftMeta = draftMetaMap.get(draft.id);
+              const qbCap = draftMeta?.is_superflex ? 2 : 1;
+              return {
+                QB: qbCap,
+                TE: 1,
+                K: 1,
+                DEF: 1,
+              } as Record<string, number>;
+            })();
+            const userPositionCounts = new Map<string, number>();
+            for (const priorPick of userDraftPicks) {
+              if (priorPick.pick_number >= pickNumber) continue;
+              const priorIsAutodrafted = priorPick.is_autodraft === true ||
+                priorPick.autodraft === true ||
+                priorPick.auto_draft === true ||
+                priorPick.is_autodrafted === true;
+              if (priorIsAutodrafted) continue;
+              let priorPlayer = priorPick.players;
+              if (!priorPlayer && priorPick.player_id) {
+                priorPlayer = playersMap.get(priorPick.player_id);
+              }
+              if (!priorPlayer?.id) continue;
+              const pos = normalizePosition(priorPlayer.position);
+              if (!pos) continue;
+              userPositionCounts.set(pos, (userPositionCounts.get(pos) || 0) + 1);
             }
             
             // Identify faded players: available players that meet fade criteria
@@ -745,33 +827,50 @@ const Statistics = () => {
               if (draftedBeforeThisPick.has(player.id)) {
                 return;
               }
-              
+
               // Use COMMUNITY ADP for fade detection (community consensus)
               const playerCommunityADP = communityAdpMap.get(player.id) || Number(player.adp) || 999;
+              const candidatePosition = normalizePosition(player.position);
               let intensity = 0;
               let isFaded = false;
-              let fadeType = '';
-              let fadeReason = '';
               
               // Value Fade: Community ADP < CurrentPick (High Intensity 1.5x)
               // You passed on a "Value Steal" according to community consensus
               if (playerCommunityADP < pickNumber) {
                 intensity = 1.5;
                 isFaded = true;
-                fadeType = 'Value';
-                fadeReason = `ADP ${playerCommunityADP} < Pick ${pickNumber}`;
               }
               // Preference Fade: CurrentPick < Community ADP < SelectedPlayerCommunityADP (Medium Intensity 1.0x)
-              // You "Leapfrogged" them to reach for your guy (community thinks they're better than your pick)
-              else if (pickNumber < playerCommunityADP && playerCommunityADP < selectedPlayerCommunityADP) {
+              // You "Leapfrogged" a same-position player to reach for your guy.
+              else if (
+                candidatePosition === selectedPlayerPosition &&
+                pickNumber < playerCommunityADP &&
+                playerCommunityADP < selectedPlayerCommunityADP
+              ) {
                 intensity = 1.0;
                 isFaded = true;
-                fadeType = 'Preference';
-                fadeReason = `Pick ${pickNumber} < ADP ${playerCommunityADP} < Selected ADP ${selectedPlayerCommunityADP}`;
               }
               
               // Track opportunities and intensity if player was faded
               if (isFaded) {
+                // Track raw opportunities (no slot cap) for position-filtered fades.
+                if (!rawOpportunityCountsByRound.has(roundNumber)) {
+                  rawOpportunityCountsByRound.set(roundNumber, new Map());
+                  rawIntensitySumsByRound.set(roundNumber, new Map());
+                }
+                const rawRoundCounts = rawOpportunityCountsByRound.get(roundNumber)!;
+                const rawRoundIntensities = rawIntensitySumsByRound.get(roundNumber)!;
+                rawRoundCounts.set(player.id, (rawRoundCounts.get(player.id) || 0) + 1);
+                rawRoundIntensities.set(player.id, (rawRoundIntensities.get(player.id) || 0) + intensity);
+                rawOpportunityCounts.set(player.id, (rawOpportunityCounts.get(player.id) || 0) + 1);
+                rawIntensitySums.set(player.id, (rawIntensitySums.get(player.id) || 0) + intensity);
+
+                // Exclude positions already filled on your roster for the slot-aware
+                // "all positions" view so extra QB/K/DEF/TE do not dominate it.
+                const capForPosition = positionCaps[candidatePosition];
+                if (capForPosition !== undefined && (userPositionCounts.get(candidatePosition) || 0) >= capForPosition) {
+                  return;
+                }
                 
                 // Track by round
                 if (!opportunityCountsByRound.has(roundNumber)) {
@@ -835,8 +934,17 @@ const Statistics = () => {
         // Continue with empty fade data rather than breaking entire stats
       }
       
-      // Calculate fade scores: (Intensity Sum) x [(O - S)/O]
+      // Calculate fade scores using a non-percentage model:
+      // Score = IntensitySum * log2(1 + missedCount), where missedCount = opportunities - selections.
+      // This rewards repeated fades while avoiding a pure percentage-based metric.
       const fadeCandidates: Array<{ 
+        player: Player; 
+        fadeScore: number; 
+        opportunityCount: number; 
+        selectionCount: number;
+        intensitySum: number;
+      }> = [];
+      const rawFadeCandidates: Array<{ 
         player: Player; 
         fadeScore: number; 
         opportunityCount: number; 
@@ -847,10 +955,8 @@ const Statistics = () => {
       opportunityCounts.forEach((opportunityCount, playerId) => {
         const selectionCount = selectionCounts.get(playerId) || 0;
         const intensitySum = intensitySums.get(playerId) || 0;
-        
-        // Fade Score = (Intensity Sum) x [(O - S)/O]
-        const fadeRate = opportunityCount > 0 ? (opportunityCount - selectionCount) / opportunityCount : 0;
-        const fadeScore = intensitySum * fadeRate;
+        const missedCount = Math.max(0, opportunityCount - selectionCount);
+        const fadeScore = intensitySum * Math.log2(1 + missedCount);
         
         const player = playersMap.get(playerId);
         if (player) {
@@ -863,35 +969,58 @@ const Statistics = () => {
           });
         }
       });
+      rawOpportunityCounts.forEach((opportunityCount, playerId) => {
+        const selectionCount = selectionCounts.get(playerId) || 0;
+        const intensitySum = rawIntensitySums.get(playerId) || 0;
+        const missedCount = Math.max(0, opportunityCount - selectionCount);
+        const fadeScore = intensitySum * Math.log2(1 + missedCount);
+        const player = playersMap.get(playerId);
+        if (player) {
+          rawFadeCandidates.push({
+            player,
+            fadeScore,
+            opportunityCount,
+            selectionCount,
+            intensitySum,
+          });
+        }
+      });
       
       // Global List: Show top 10 players who have at least 2 "Opportunities" across all drafts
       // IMPORTANT: Only show players with positive fade scores (you fade them more than you pick them)
-      // Exclude defenses and kickers - they're typically late-round picks and not meaningful fades
       const avoidedPlayers = fadeCandidates
         .filter((c) => {
-          // Exclude defenses and kickers - focus on skill position players
-          if (c.player.position === 'D/ST' || c.player.position === 'K') {
-            return false;
-          }
-          
           // Must have at least 2 opportunities
           if (c.opportunityCount < 2) {
             return false;
           }
-          
-          // Calculate fade rate
-          const fadeRate = c.opportunityCount > 0 ? (c.opportunityCount - c.selectionCount) / c.opportunityCount : 0;
-          
-          // Only show if fade rate > 0 (you fade them more than you pick them)
-          // AND fade score > 0 (positive fade signal)
-          return fadeRate > 0 && c.fadeScore > 0;
+          const missedCount = c.opportunityCount - c.selectionCount;
+          return missedCount >= 1 && c.fadeScore > 0;
         })
         .sort((a, b) => b.fadeScore - a.fadeScore)
         .slice(0, 10);
+
+      const avoidedPlayersRaw = rawFadeCandidates
+        .filter((c) => {
+          if (c.opportunityCount < 2) {
+            return false;
+          }
+          const missedCount = c.opportunityCount - c.selectionCount;
+          return missedCount >= 1 && c.fadeScore > 0;
+        })
+        .sort((a, b) => b.fadeScore - a.fadeScore)
+        .slice(0, 25);
       
       // Calculate avoided players by round
       // Round Specific: Show players who have at least 1 "Opportunity" in that specific round
       const avoidedPlayersByRound = new Map<number, Array<{
+        player: Player;
+        fadeScore: number;
+        opportunityCount: number;
+        selectionCount: number;
+        intensitySum: number;
+      }>>();
+      const avoidedPlayersByRoundRaw = new Map<number, Array<{
         player: Player;
         fadeScore: number;
         opportunityCount: number;
@@ -917,16 +1046,12 @@ const Statistics = () => {
           const roundIntensitySum = intensitySumsByRound.get(round)?.get(playerId) || 0;
           
           // Calculate fade score for this round
-          const fadeRate = opportunityCount > 0 ? (opportunityCount - roundSelectionCount) / opportunityCount : 0;
-          const fadeScore = roundIntensitySum * fadeRate;
+          const missedCount = Math.max(0, opportunityCount - roundSelectionCount);
+          const fadeScore = roundIntensitySum * Math.log2(1 + missedCount);
+          if (missedCount <= 0 || fadeScore <= 0) return;
           
           const player = playersMap.get(playerId);
           if (player) {
-            // Exclude defenses and kickers from round-specific fades too
-            if (player.position === 'D/ST' || player.position === 'K') {
-              return;
-            }
-            
             roundAvoided.push({
               player,
               fadeScore,
@@ -941,6 +1066,40 @@ const Statistics = () => {
         roundAvoided.sort((a, b) => b.fadeScore - a.fadeScore);
         if (roundAvoided.length > 0) {
           avoidedPlayersByRound.set(round, roundAvoided);
+        }
+      });
+      rawOpportunityCountsByRound.forEach((roundOpportunities, round) => {
+        const roundAvoided: Array<{
+          player: Player;
+          fadeScore: number;
+          opportunityCount: number;
+          selectionCount: number;
+          intensitySum: number;
+        }> = [];
+
+        roundOpportunities.forEach((opportunityCount, playerId) => {
+          if (opportunityCount < 1) return;
+          const roundSelections = selectionCountsByRound.get(round) || new Map();
+          const roundSelectionCount = roundSelections.get(playerId) || 0;
+          const roundIntensitySum = rawIntensitySumsByRound.get(round)?.get(playerId) || 0;
+          const missedCount = Math.max(0, opportunityCount - roundSelectionCount);
+          const fadeScore = roundIntensitySum * Math.log2(1 + missedCount);
+          if (missedCount <= 0 || fadeScore <= 0) return;
+          const player = playersMap.get(playerId);
+          if (player) {
+            roundAvoided.push({
+              player,
+              fadeScore,
+              opportunityCount,
+              selectionCount: roundSelectionCount,
+              intensitySum: roundIntensitySum,
+            });
+          }
+        });
+
+        roundAvoided.sort((a, b) => b.fadeScore - a.fadeScore);
+        if (roundAvoided.length > 0) {
+          avoidedPlayersByRoundRaw.set(round, roundAvoided);
         }
       });
 
@@ -966,7 +1125,21 @@ const Statistics = () => {
 
       const numDrafts = drafts.length;
 
-      setDraftStats({ mostDrafted, allPlayersSorted, mostDraftedByRound, leastDrafted, leastDraftedByRound, avoidedPlayers, avoidedPlayersByRound, studs, duds, maxRound, numDrafts });
+      setDraftStats({
+        mostDrafted,
+        allPlayersSorted,
+        mostDraftedByRound,
+        leastDrafted,
+        leastDraftedByRound,
+        avoidedPlayers,
+        avoidedPlayersByRound,
+        avoidedPlayersRaw,
+        avoidedPlayersByRoundRaw,
+        studs,
+        duds,
+        maxRound,
+        numDrafts,
+      });
     } catch (error) {
       console.error('Error fetching draft stats:', error);
     } finally {
@@ -1320,9 +1493,24 @@ const Statistics = () => {
               </div>
             ) : (() => {
               if (selectedAvoidedRound === 'all') {
-                const avoidedPlayers = draftStats.avoidedPlayers.filter(
-                  (item) => matchesPosition(item.player.position, selectedFadesPosition)
+                const avoidedPlayersSource =
+                  selectedFadesPosition === 'all'
+                    ? draftStats.avoidedPlayers
+                    : draftStats.avoidedPlayersRaw;
+                // Exclude players that are currently in the "faves" set for the same scope.
+                const faveIdsForScope = new Set(
+                  draftStats.allPlayersSorted
+                    .filter((item) => matchesPosition(item.player.position, selectedFadesPosition))
+                    .slice(0, 10)
+                    .map((item) => item.player.id)
                 );
+                const avoidedPlayers = avoidedPlayersSource.filter((item) => {
+                  if (!matchesPosition(item.player.position, selectedFadesPosition)) return false;
+                  // Safety guard: never show players drafted every opportunity.
+                  if (!(item.opportunityCount > item.selectionCount && item.fadeScore > 0)) return false;
+                  // Never show players that are in faves for this scope.
+                  return !faveIdsForScope.has(item.player.id);
+                });
 
                 if (avoidedPlayers.length === 0) {
                   return (
@@ -1359,17 +1547,12 @@ const Statistics = () => {
                     <TooltipProvider>
                       <div className={`flex items-end gap-3 sm:gap-4 h-[500px] overflow-x-auto ${topAvoided.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
                         {topAvoided.map((item, index) => {
-                        // Calculate fade rate percentage
-                        const fadeRate = item.opportunityCount > 0 
-                          ? (item.opportunityCount - item.selectionCount) / item.opportunityCount 
-                          : 0;
-                        const fadePercentage = fadeRate * 100;
+                        const missedCount = Math.max(0, item.opportunityCount - item.selectionCount);
+                        const fadeScore = item.fadeScore;
                         
-                        // Color scale based on fade percentage: 0% = light yellow, 100% = dark red
-                        // Interpolate between yellow (#fef08a) and red (#dc2626) with orange in the middle
-                        const getFadePercentageColor = (percentage: number): string => {
-                          // Clamp percentage between 0 and 100
-                          const clamped = Math.max(0, Math.min(100, percentage));
+                        // Color scale based on fade score intensity.
+                        const getFadeScoreColor = (scorePct: number): string => {
+                          const clamped = Math.max(0, Math.min(100, scorePct));
                           // Normalize to 0-1 range
                           const normalized = clamped / 100;
                           
@@ -1397,7 +1580,11 @@ const Statistics = () => {
                           return `rgb(${r}, ${g}, ${b})`;
                         };
                         
-                        const fadeColor = getFadePercentageColor(fadePercentage);
+                        const maxFadeScore = topAvoided.length > 0
+                          ? Math.max(...topAvoided.map((i) => i.fadeScore))
+                          : 1;
+                        const normalizedScorePct = maxFadeScore > 0 ? (fadeScore / maxFadeScore) * 100 : 0;
+                        const fadeColor = getFadeScoreColor(normalizedScorePct);
                         
                         // Determine dominant fade type based on average intensity
                         // 1.0 = all Preference Fades, 1.5 = all Value Fades
@@ -1407,16 +1594,7 @@ const Statistics = () => {
                         // If avgIntensity >= 1.25, it's mostly Value Fades, otherwise Preference Fades
                         const fadeType = avgIntensity >= 1.25 ? 'Value Fade' : 'Preference Fade';
                         
-                        // Scale bar height based on fade percentage (instead of fade score)
-                        const maxFadePercentage = topAvoided.length > 0 
-                          ? Math.max(...topAvoided.map(i => {
-                              const fr = i.opportunityCount > 0 
-                                ? (i.opportunityCount - i.selectionCount) / i.opportunityCount 
-                                : 0;
-                              return fr * 100;
-                            }))
-                          : 100;
-                        const barHeight = (fadePercentage / maxFadePercentage) * 100;
+                        const barHeight = maxFadeScore > 0 ? (fadeScore / maxFadeScore) * 100 : 0;
 
                         return (
                           <div
@@ -1431,7 +1609,7 @@ const Statistics = () => {
                               handlePlayerClick(rankedPlayer);
                             }}
                           >
-                            {/* Top section: Card, Name, Fade Rate (fixed height ~25% of total) */}
+                            {/* Top section: Card, Name, Fade Score (fixed height ~25% of total) */}
                             <div className="w-full flex flex-col items-center mb-2 flex-shrink-0">
                               {/* Card placeholder */}
                               <div className="w-16 h-20 sm:w-20 sm:h-24 bg-secondary/40 border border-red-500/50 rounded-md flex items-center justify-center mb-2 group-hover:bg-secondary/60 transition-colors">
@@ -1439,15 +1617,15 @@ const Statistics = () => {
                               </div>
                               {/* Player name */}
                               <p className="font-medium text-xs text-center truncate w-full px-1 mb-1">{item.player.name}</p>
-                              {/* Fade Percentage with fade percentage-based color */}
+                              {/* Fade score with score-based color */}
                               <p 
                                 className="text-lg font-bold" 
                                 style={{ color: fadeColor }}
                               >
-                                {fadePercentage.toFixed(0)}%
+                                {fadeScore.toFixed(1)}
                               </p>
                               <p className="text-[10px] text-muted-foreground/70">
-                                {item.opportunityCount} opp, {item.selectionCount} picked
+                                {item.opportunityCount} opp, {item.selectionCount} picked, {missedCount} passed
                               </p>
                               {/* Fade Type */}
                               <p className="text-[10px] text-muted-foreground/60 mt-0.5">
@@ -1487,23 +1665,38 @@ const Statistics = () => {
               } else {
                 // Show avoided players for specific round, filtered by position
                 const round = parseInt(selectedAvoidedRound);
-                const roundAvoided = (draftStats.avoidedPlayersByRound.get(round) || []).filter(
-                  (item) => matchesPosition(item.player.position, selectedFadesPosition)
+                const roundAvoidedSource =
+                  selectedFadesPosition === 'all'
+                    ? (draftStats.avoidedPlayersByRound.get(round) || [])
+                    : (draftStats.avoidedPlayersByRoundRaw.get(round) || []);
+                // Exclude players that are currently in the round-specific "faves" set.
+                const faveIdsForRoundScope = new Set(
+                  (draftStats.mostDraftedByRound.get(round) || [])
+                    .filter((item) => matchesPosition(item.player.position, selectedFadesPosition))
+                    .slice(0, 10)
+                    .map((item) => item.player.id)
                 );
+                const roundAvoided = roundAvoidedSource.filter((item) => {
+                  if (!matchesPosition(item.player.position, selectedFadesPosition)) return false;
+                  // Safety guard: never show players drafted every opportunity.
+                  if (!(item.opportunityCount > item.selectionCount && item.fadeScore > 0)) return false;
+                  // Never show players that are in faves for this round scope.
+                  return !faveIdsForRoundScope.has(item.player.id);
+                });
                 
                 if (roundAvoided.length === 0) {
                   const numDrafts = draftStats.numDrafts;
                   let criteriaText = '';
                   if (numDrafts <= 3) {
-                    criteriaText = 'fade rate > 30% and were available 1+ times';
+                    criteriaText = 'at least 1 pass and 1+ opportunity';
                   } else if (numDrafts <= 6) {
-                    criteriaText = 'fade rate > 35% and were available 1+ times';
+                    criteriaText = 'at least 1 pass and 1+ opportunity';
                   } else if (numDrafts <= 10) {
-                    criteriaText = 'fade rate > 40% and were available 2+ times';
+                    criteriaText = 'at least 1 pass and 2+ opportunities';
                   } else if (numDrafts <= 15) {
-                    criteriaText = 'fade rate > 45% and were available 2+ times';
+                    criteriaText = 'at least 1 pass and 2+ opportunities';
                   } else {
-                    criteriaText = 'fade rate > 50% and were available 2+ times';
+                    criteriaText = 'at least 1 pass and 2+ opportunities';
                   }
                   
                   return (
@@ -1555,17 +1748,11 @@ const Statistics = () => {
                       <TooltipProvider>
                         <div className={`flex items-end gap-3 sm:gap-4 h-[500px] overflow-x-auto ${topAvoided.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
                           {topAvoided.map((item, index) => {
-                            // Calculate fade rate percentage
-                            const fadeRate = item.opportunityCount > 0 
-                              ? (item.opportunityCount - item.selectionCount) / item.opportunityCount 
-                              : 0;
-                            const fadePercentage = fadeRate * 100;
+                            const missedCount = Math.max(0, item.opportunityCount - item.selectionCount);
+                            const fadeScore = item.fadeScore;
                           
-                          // Color scale based on fade percentage: 0% = light yellow, 100% = dark red
-                          // Interpolate between yellow (#fef08a) and red (#dc2626) with orange in the middle
-                          const getFadePercentageColor = (percentage: number): string => {
-                            // Clamp percentage between 0 and 100
-                            const clamped = Math.max(0, Math.min(100, percentage));
+                          const getFadeScoreColor = (scorePct: number): string => {
+                            const clamped = Math.max(0, Math.min(100, scorePct));
                             // Normalize to 0-1 range
                             const normalized = clamped / 100;
                             
@@ -1593,7 +1780,11 @@ const Statistics = () => {
                             return `rgb(${r}, ${g}, ${b})`;
                           };
                           
-                          const fadeColor = getFadePercentageColor(fadePercentage);
+                          const maxFadeScore = topAvoided.length > 0
+                            ? Math.max(...topAvoided.map((i) => i.fadeScore))
+                            : 1;
+                          const normalizedScorePct = maxFadeScore > 0 ? (fadeScore / maxFadeScore) * 100 : 0;
+                          const fadeColor = getFadeScoreColor(normalizedScorePct);
                           
                           // Determine dominant fade type based on average intensity
                           // 1.0 = all Preference Fades, 1.5 = all Value Fades
@@ -1603,16 +1794,7 @@ const Statistics = () => {
                           // If avgIntensity >= 1.25, it's mostly Value Fades, otherwise Preference Fades
                           const fadeType = avgIntensity >= 1.25 ? 'Value Fade' : 'Preference Fade';
                           
-                          // Scale bar height based on fade percentage (instead of fade score)
-                          const maxFadePercentage = topAvoided.length > 0 
-                            ? Math.max(...topAvoided.map(i => {
-                                const fr = i.opportunityCount > 0 
-                                  ? (i.opportunityCount - i.selectionCount) / i.opportunityCount 
-                                  : 0;
-                                return fr * 100;
-                              }))
-                            : 100;
-                          const barHeight = (fadePercentage / maxFadePercentage) * 100;
+                          const barHeight = maxFadeScore > 0 ? (fadeScore / maxFadeScore) * 100 : 0;
 
                           return (
                             <div
@@ -1627,7 +1809,7 @@ const Statistics = () => {
                                 handlePlayerClick(rankedPlayer);
                               }}
                             >
-                              {/* Top section: Card, Name, Fade Rate (fixed height ~25% of total) */}
+                              {/* Top section: Card, Name, Fade Score (fixed height ~25% of total) */}
                               <div className="w-full flex flex-col items-center mb-2 flex-shrink-0">
                                 {/* Card placeholder */}
                                 <div className="w-16 h-20 sm:w-20 sm:h-24 bg-secondary/40 border border-red-500/50 rounded-md flex items-center justify-center mb-2 group-hover:bg-secondary/60 transition-colors">
@@ -1635,15 +1817,15 @@ const Statistics = () => {
                                 </div>
                                 {/* Player name */}
                                 <p className="font-medium text-xs text-center truncate w-full px-1 mb-1">{item.player.name}</p>
-                                {/* Fade Percentage with fade percentage-based color */}
+                                {/* Fade score with score-based color */}
                                 <p 
                                   className="text-lg font-bold" 
                                   style={{ color: fadeColor }}
                                 >
-                                  {fadePercentage.toFixed(0)}%
+                                  {fadeScore.toFixed(1)}
                                 </p>
                                 <p className="text-[10px] text-muted-foreground/70">
-                                  {item.opportunityCount} opp, {item.selectionCount} picked
+                                  {item.opportunityCount} opp, {item.selectionCount} picked, {missedCount} passed
                                 </p>
                                 {/* Fade Type */}
                                 <p className="text-[10px] text-muted-foreground/60 mt-0.5">

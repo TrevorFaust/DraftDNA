@@ -44,7 +44,7 @@ export const Footer = () => {
           <DialogHeader>
             <DialogTitle className="text-xl font-display">Privacy Policy</DialogTitle>
           </DialogHeader>
-          <div className="overflow-y-auto pr-2 text-sm text-muted-foreground space-y-4 flex-1 min-h-0">
+          <div className="overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin text-sm text-muted-foreground space-y-4 flex-1 min-h-0">
             <p>Last Updated: February 26, 2026</p>
             <p>This Privacy Policy describes how Pick Six Challenge (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) collects, uses, and protects your information when you participate in our contest.</p>
             <section>

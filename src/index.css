@@ -271,9 +271,15 @@
     animation: crown-spin-y 2.5s linear infinite;
   }
 
-  /* Custom scrollbar for ranking boxes */
+  /* Custom scrollbar (Rankings / Badges / site-wide via .scrollbar-thin) — dark-theme friendly */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.5) transparent;
+  }
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-track {

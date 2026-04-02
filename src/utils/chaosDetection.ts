@@ -64,6 +64,14 @@ function lastName(name: string | null | undefined): string {
   return t.length > 0 ? t[t.length - 1].toLowerCase() : '';
 }
 
+/** Team tag for team-based chaos rules; ignores free agents/empty tags. */
+function teamTag(p: ChaosPick): string | null {
+  const raw = (p.team || '').trim();
+  if (!raw) return null;
+  if (raw.toUpperCase() === 'FA') return null;
+  return raw;
+}
+
 /** Check if a single chaos trigger fires. Returns chaos name or null. */
 function checkTrigger(chaosName: string, picks: ChaosPick[], config: ChaosDetectionConfig, sorted: ChaosPick[]): boolean {
   const { totalRounds, leagueSize, isSuperflex } = config;
@@ -97,7 +105,8 @@ function checkTrigger(chaosName: string, picks: ChaosPick[], config: ChaosDetect
     case 'The One Trick Pony': {
       const teamCounts = new Map<string, number>();
       for (const p of sorted) {
-        const t = (p.team && p.team.trim()) || 'FA';
+        const t = teamTag(p);
+        if (!t) continue;
         teamCounts.set(t, (teamCounts.get(t) ?? 0) + 1);
       }
       return Math.max(...teamCounts.values(), 0) >= 7;
@@ -105,7 +114,8 @@ function checkTrigger(chaosName: string, picks: ChaosPick[], config: ChaosDetect
     case 'The Homer': {
       const teamCounts = new Map<string, number>();
       for (const p of sorted) {
-        const t = (p.team && p.team.trim()) || 'FA';
+        const t = teamTag(p);
+        if (!t) continue;
         teamCounts.set(t, (teamCounts.get(t) ?? 0) + 1);
       }
       const maxSame = Math.max(...teamCounts.values(), 0);
@@ -156,13 +166,17 @@ function checkTrigger(chaosName: string, picks: ChaosPick[], config: ChaosDetect
     }
     case 'The Hometown Hero': {
       const byDivision = new Map<string, number>();
+      let picksWithTeam = 0;
       for (const p of sorted) {
-        const div = getDivisionForTeam(p.team ?? '');
+        const t = teamTag(p);
+        if (!t) continue;
+        picksWithTeam += 1;
+        const div = getDivisionForTeam(t);
         if (div) byDivision.set(div, (byDivision.get(div) ?? 0) + 1);
       }
-      if (sorted.length === 0) return false;
+      if (picksWithTeam === 0) return false;
       const maxInOneDivision = Math.max(...byDivision.values(), 0);
-      return maxInOneDivision / sorted.length >= 0.75;
+      return maxInOneDivision / picksWithTeam >= 0.75;
     }
     default:
       return false;
