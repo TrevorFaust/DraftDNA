@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,7 +70,16 @@ const DraftRoom = () => {
     BENCH?: number;
   }>({ BENCH: 6 });
   const [isSuperflex, setIsSuperflex] = useState(false);
-  const { teamNames: defenseTeamNames } = useNflTeams();
+  const { teamNames: defenseTeamNames, teams: nflTeams } = useNflTeams();
+  const defenseTeamAbbrByName = useMemo(
+    () =>
+      new Map(
+        (nflTeams || [])
+          .filter((t) => t.team_name && t.team_abbr)
+          .map((t) => [t.team_name as string, t.team_abbr as string])
+      ),
+    [nflTeams]
+  );
   const [teamNames, setTeamNames] = useState<Map<number, string>>(new Map());
   const [keepers, setKeepers] = useState<Array<{ team_number: number; player_id: string; round_number: number }>>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -288,7 +297,7 @@ const DraftRoom = () => {
           return {
             name: teamName,
             position: 'D/ST',
-            team: null,
+            team: defenseTeamAbbrByName.get(teamName) ?? null,
             adp: adp,
             bye_week: null,
           };
@@ -382,12 +391,15 @@ const DraftRoom = () => {
       const defensesToUpdate: { id: string; adp: number }[] = [];
       defensePlayers = defensePlayers.map((defense, index) => {
         const adp = 150 + Math.floor((index / defensePlayers.length) * 50);
+        const normalizedTeam = defense.team && defense.team !== 'FA'
+          ? defense.team
+          : (defenseTeamAbbrByName.get(defense.name) ?? defense.team);
         // Only update if ADP is outside the desired range (e.g., still 999 or old range)
         if (Number(defense.adp) >= 200 || Number(defense.adp) < 150) {
           defensesToUpdate.push({ id: defense.id, adp });
-          return { ...defense, adp };
+          return { ...defense, adp, team: normalizedTeam };
         }
-        return defense;
+        return { ...defense, team: normalizedTeam };
       });
       
       // Update defenses in database if needed
@@ -1587,7 +1599,7 @@ const DraftRoom = () => {
     return () => clearTimeout(t);
   }, [picks.length, handleDraftBoardScroll]);
 
-  // Bucket-based archetype assignment: prefer unearned badges in the same strategy bucket, then rotate so The Improviser and all 361 are attainable.
+  // Bucket-based archetype assignment: prefer unearned badges in the same strategy bucket, then rotate when the bucket is fully earned.
   const resolveArchetypeForCompletion = useCallback(
     async (
       draftVal: MockDraft,
@@ -1895,7 +1907,7 @@ const DraftRoom = () => {
             <Trophy className="w-16 h-16 text-accent mx-auto mb-4" />
             <h1 className="font-display text-4xl mb-4">DRAFT COMPLETE!</h1>
             <p className="text-xl font-medium text-accent mb-1">You&apos;re {displayName}</p>
-            <div className="flex flex-col items-center gap-2 mb-4">
+            <div className="flex flex-col items-center gap-4 mb-4 w-full max-w-5xl mx-auto">
               {isReplaceChaos && chaosMeta ? (
                 <>
                   <ArchetypeBadge
@@ -1907,9 +1919,38 @@ const DraftRoom = () => {
                     className="shrink-0"
                   />
                   {chaosMeta.flavorText && (
-                    <p className="text-muted-foreground text-sm max-w-xl">{chaosMeta.flavorText}</p>
+                    <p className="text-muted-foreground text-sm max-w-xl text-center">{chaosMeta.flavorText}</p>
                   )}
                 </>
+              ) : !isReplaceChaos && chaosName && chaosMeta ? (
+                <div className="flex flex-col sm:flex-row items-start justify-center gap-8 md:gap-12 w-full">
+                  <div className="flex flex-col items-center gap-2 flex-1 min-w-0 max-w-sm">
+                    <ArchetypeBadge
+                      archetypeName={detectedArchetype}
+                      archetypeIndex={typeof draft?.user_detected_archetype_index === 'number' ? draft.user_detected_archetype_index : undefined}
+                      iconOnly={false}
+                      size="md"
+                      locked={false}
+                      className="shrink-0"
+                    />
+                    {mainFlavor && (
+                      <p className="text-muted-foreground text-sm text-center max-w-sm">{mainFlavor}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-center gap-2 flex-1 min-w-0 max-w-sm">
+                    <ArchetypeBadge
+                      archetypeName={chaosName}
+                      iconOnly={false}
+                      size="md"
+                      flavorText={chaosMeta.flavorText}
+                      locked={false}
+                      className="shrink-0"
+                    />
+                    {chaosMeta.flavorText && (
+                      <p className="text-muted-foreground text-xs text-center max-w-sm">{chaosMeta.flavorText}</p>
+                    )}
+                  </div>
+                </div>
               ) : (
                 <>
                   <ArchetypeBadge
@@ -1921,29 +1962,11 @@ const DraftRoom = () => {
                     className="shrink-0"
                   />
                   {flavorText && (
-                    <p className="text-muted-foreground text-sm max-w-xl">{flavorText}</p>
+                    <p className="text-muted-foreground text-sm max-w-xl text-center">{flavorText}</p>
                   )}
                 </>
               )}
             </div>
-            {!isReplaceChaos && chaosName && chaosMeta && (
-              <div className="mt-6 pt-6 border-t border-border/50 max-w-xl mx-auto">
-                <p className="text-sm font-medium text-accent mb-2">You&apos;re also</p>
-                <div className="flex flex-col items-center gap-2">
-                  <ArchetypeBadge
-                    archetypeName={chaosName}
-                    iconOnly={false}
-                    size="md"
-                    flavorText={chaosMeta.flavorText}
-                    locked={false}
-                    className="shrink-0"
-                  />
-                  {chaosMeta.flavorText && (
-                    <p className="text-muted-foreground text-xs max-w-lg">{chaosMeta.flavorText}</p>
-                  )}
-                </div>
-              </div>
-            )}
             <p className="text-muted-foreground mb-6 mt-6">
               {draft?.name} has been completed and saved to your history.
             </p>

@@ -3,7 +3,7 @@ type Props = { siteName: string; season: number };
 
 export function OfficialRulesContent({ siteName, season }: Props) {
   return (
-    <div className="overflow-y-auto pr-2 text-sm text-muted-foreground space-y-4 flex-1 min-h-0">
+    <div className="overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin text-sm text-muted-foreground space-y-4 flex-1 min-h-0">
       <section>
         <h3 className="font-semibold text-foreground mb-1">1. NO PURCHASE NECESSARY</h3>
         <p>The Pick Six Challenge is a 100% free-to-play contest of skill. No purchase, payment, or entry fee of any kind is required to enter or win. A purchase will not improve your chances of winning.</p>

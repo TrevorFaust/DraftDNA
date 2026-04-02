@@ -181,8 +181,7 @@ function strategiesEqual(a: ArchetypeStrategies, b: ArchetypeStrategies): boolea
 
 /**
  * All archetype indices (into FULL_ARCHETYPE_LIST) that exactly match the given strategy profile.
- * Used for bucket-based assignment so The Improviser and other variants are attainable;
- * multiple named archetypes can share the same profile.
+ * Used for bucket-based assignment; multiple named archetypes can share the same profile.
  */
 export function getArchetypeBucketFromStrategies(strategies: ArchetypeStrategies): number[] {
   const bucket: number[] = [];

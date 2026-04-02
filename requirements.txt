@@ -1,0 +1,7 @@
+# Icon generation (generate_icons.py)
+google-genai>=1.0.0
+
+# Badge compositing (build_badges.py)
+Pillow>=10.0.0
+numpy>=1.24.0
+pymupdf>=1.24.0

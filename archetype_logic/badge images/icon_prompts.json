@@ -1,0 +1,2834 @@
+{
+  "style_prompt": "STYLE REQUIREMENTS (apply to every icon):\n- Semi-realistic with a slight cartoon/game aesthetic \u2014 think mobile game achievement badge art\n- Rich color, slight 3D depth and shading, clean transparent background\n- Centered in frame with consistent padding on all sides (roughly 15% padding from each edge)\n- No text of any kind in the image\n- Square format, 400x400 pixels\n- Consistent lighting: soft top-left light source across all icons\n- Consistent level of detail: detailed enough to be recognizable at 80x80px but not cluttered\n- Same color saturation and contrast level across all icons\n- Transparent background (PNG with alpha channel)",
+  "base_prompt_template": "Create a single icon image: {icon_description}. {style_prompt}",
+  "output_filename_template": "{name_slug}.png",
+  "archetypes": [
+    {
+      "id": "1",
+      "name": "The Captain",
+      "rb_strategy": "BPA",
+      "icon_description": "a navy captain's peaked hat with a gold anchor emblem on the front",
+      "filename": "001_the_captain.png"
+    },
+    {
+      "id": "2",
+      "name": "The Opportunist",
+      "rb_strategy": "BPA",
+      "icon_description": "an open hand catching a falling gold coin mid-air",
+      "filename": "002_the_opportunist.png"
+    },
+    {
+      "id": "3",
+      "name": "The Value GM",
+      "rb_strategy": "BPA",
+      "icon_description": "a clipboard with a star-rated player evaluation sheet",
+      "filename": "003_the_value_gm.png"
+    },
+    {
+      "id": "4",
+      "name": "The Calculated Risk",
+      "rb_strategy": "BPA",
+      "icon_description": "a set of old-fashioned balance scales with one side slightly lower",
+      "filename": "004_the_calculated_risk.png"
+    },
+    {
+      "id": "289",
+      "name": "The Cold Calculation",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a calculator display showing an ice-cold equation result",
+      "filename": "289_the_cold_calculation.png"
+    },
+    {
+      "id": "5",
+      "name": "The Free Agent",
+      "rb_strategy": "BPA",
+      "icon_description": "a broken chain link in a string of chains",
+      "filename": "005_the_free_agent.png"
+    },
+    {
+      "id": "6",
+      "name": "The Computer",
+      "rb_strategy": "BPA",
+      "icon_description": "a retro desktop computer with a glowing green screen",
+      "filename": "006_the_computer.png"
+    },
+    {
+      "id": "7",
+      "name": "The Scout Team",
+      "rb_strategy": "BPA",
+      "icon_description": "a hand doing the 3 finger scout salute",
+      "filename": "007_the_scout_team.png"
+    },
+    {
+      "id": "8",
+      "name": "The Opportunist's Gambit",
+      "rb_strategy": "BPA",
+      "icon_description": "a chess knight piece in gold over the pawns",
+      "filename": "008_the_opportunists_gambit.png"
+    },
+    {
+      "id": "9",
+      "name": "The Evaluator",
+      "rb_strategy": "BPA",
+      "icon_description": "a magnifying glass hovering over a ranked list",
+      "filename": "009_the_evaluator.png"
+    },
+    {
+      "id": "10",
+      "name": "The Disciplined",
+      "rb_strategy": "BPA",
+      "icon_description": "a single steel ruler",
+      "filename": "010_the_disciplined.png"
+    },
+    {
+      "id": "11",
+      "name": "The Pure Play",
+      "rb_strategy": "BPA",
+      "icon_description": "a single clean football with visible laces",
+      "filename": "011_the_pure_play.png"
+    },
+    {
+      "id": "12",
+      "name": "The Robot",
+      "rb_strategy": "BPA",
+      "icon_description": "a chrome humanoid robot head with glowing blue eyes",
+      "filename": "012_the_robot.png"
+    },
+    {
+      "id": "290",
+      "name": "The Automaton",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a fully mechanical figure with gears visible through a glass chest panel",
+      "filename": "290_the_automaton.png"
+    },
+    {
+      "id": "13",
+      "name": "The Stabilizer",
+      "rb_strategy": "BPA",
+      "icon_description": "a gyroscope spinning in perfect balance",
+      "filename": "013_the_stabilizer.png"
+    },
+    {
+      "id": "14",
+      "name": "The Ballast",
+      "rb_strategy": "BPA",
+      "icon_description": "a ship's anchor resting on the seafloor with chain trailing up",
+      "filename": "014_the_ballast.png"
+    },
+    {
+      "id": "15",
+      "name": "The Sleeper",
+      "rb_strategy": "BPA",
+      "icon_description": "a sleeping fox curled up on a pile of football cards",
+      "filename": "015_the_sleeper.png"
+    },
+    {
+      "id": "16",
+      "name": "The Formula",
+      "rb_strategy": "BPA",
+      "icon_description": "a chalkboard with a mathematical formula written in white chalk",
+      "filename": "016_the_formula.png"
+    },
+    {
+      "id": "291",
+      "name": "The Proof",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a completed mathematical proof written neatly on a clean whiteboard",
+      "filename": "291_the_proof.png"
+    },
+    {
+      "id": "17",
+      "name": "The Scout",
+      "rb_strategy": "BPA",
+      "icon_description": "a pair of binoculars resting on a folded map",
+      "filename": "017_the_scout.png"
+    },
+    {
+      "id": "73",
+      "name": "The Talent Evaluator",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a clipboard with player headshot ratings and star scores",
+      "filename": "073_the_talent_evaluator.png"
+    },
+    {
+      "id": "18",
+      "name": "The Value Hunter",
+      "rb_strategy": "BPA",
+      "icon_description": "a brass pirate telescope",
+      "filename": "018_the_value_hunter.png"
+    },
+    {
+      "id": "217",
+      "name": "The Prospector",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a gold prospector panning in a stream finding a nugget",
+      "filename": "217_the_prospector.png"
+    },
+    {
+      "id": "19",
+      "name": "The Analyst",
+      "rb_strategy": "BPA",
+      "icon_description": "an abacus",
+      "filename": "019_the_analyst.png"
+    },
+    {
+      "id": "74",
+      "name": "The Examiner",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a monocle resting on a detailed player scouting report",
+      "filename": "074_the_examiner.png"
+    },
+    {
+      "id": "20",
+      "name": "The Steady Hand",
+      "rb_strategy": "BPA",
+      "icon_description": "a single open palm held perfectly flat and still",
+      "filename": "020_the_steady_hand.png"
+    },
+    {
+      "id": "75",
+      "name": "The Ironhand",
+      "rb_strategy": "Hero RB",
+      "icon_description": "an iron gauntlet fist clenched firmly",
+      "filename": "075_the_ironhand.png"
+    },
+    {
+      "id": "21",
+      "name": "The Market Timer",
+      "rb_strategy": "BPA",
+      "icon_description": "a gold pocket watch open faced showing the clock face",
+      "filename": "021_the_market_timer.png"
+    },
+    {
+      "id": "76",
+      "name": "The Window Spotter",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a window frame with a draft board visible through the glass",
+      "filename": "076_the_window_spotter.png"
+    },
+    {
+      "id": "22",
+      "name": "The Accountant",
+      "rb_strategy": "BPA",
+      "icon_description": "a green ledger book open to a balanced financial page",
+      "filename": "022_the_accountant.png"
+    },
+    {
+      "id": "292",
+      "name": "The Ledger",
+      "rb_strategy": "Zero RB",
+      "icon_description": "an open financial ledger with a gold pen resting across it",
+      "filename": "292_the_ledger.png"
+    },
+    {
+      "id": "23",
+      "name": "The Even Keel",
+      "rb_strategy": "BPA",
+      "icon_description": "a sailing ship cutting through calm water perfectly level",
+      "filename": "023_the_even_keel.png"
+    },
+    {
+      "id": "24",
+      "name": "The Sleeper Agent",
+      "rb_strategy": "BPA",
+      "icon_description": "a pair of dark spy sunglasses and hat",
+      "filename": "024_the_sleeper_agent.png"
+    },
+    {
+      "id": "25",
+      "name": "The Neutral",
+      "rb_strategy": "BPA",
+      "icon_description": "a grey circle button with a flat horizontal line",
+      "filename": "025_the_neutral.png"
+    },
+    {
+      "id": "26",
+      "name": "The Indexer",
+      "rb_strategy": "BPA",
+      "icon_description": "a filing cabinet drawer open showing alphabetical tabs",
+      "filename": "026_the_indexer.png"
+    },
+    {
+      "id": "27",
+      "name": "The Pivot",
+      "rb_strategy": "BPA",
+      "icon_description": "a single continuous arrow that travels upward, loops over the top and crosses back behind itself like a cursive loop, then exits pointing left creating a pretzel or infinity style path",
+      "filename": "027_the_pivot.png"
+    },
+    {
+      "id": "28",
+      "name": "The Redirect",
+      "rb_strategy": "BPA",
+      "icon_description": "two arrows crossing each other and switching directions",
+      "filename": "028_the_redirect.png"
+    },
+    {
+      "id": "29",
+      "name": "The Spreadsheet Classic",
+      "rb_strategy": "BPA",
+      "icon_description": "a glowing green spreadsheet grid with cells filled with data",
+      "filename": "029_the_spreadsheet_classic.png"
+    },
+    {
+      "id": "30",
+      "name": "The Safe Harbor",
+      "rb_strategy": "BPA",
+      "icon_description": "a lighthouse standing on rocks with calm water around it",
+      "filename": "030_the_safe_harbor.png"
+    },
+    {
+      "id": "31",
+      "name": "The Chaos Agent",
+      "rb_strategy": "BPA",
+      "icon_description": "a continuous swirling spiral vortex",
+      "filename": "031_the_chaos_agent.png"
+    },
+    {
+      "id": "32",
+      "name": "The Actuarial",
+      "rb_strategy": "BPA",
+      "icon_description": "a calculator",
+      "filename": "032_the_actuarial.png"
+    },
+    {
+      "id": "218",
+      "name": "The Underwriter",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a fountain pen signing an insurance policy document",
+      "filename": "218_the_underwriter.png"
+    },
+    {
+      "id": "33",
+      "name": "The Minimalist",
+      "rb_strategy": "BPA",
+      "icon_description": "a single equilateral triangle outline, clean and geometric",
+      "filename": "033_the_minimalist.png"
+    },
+    {
+      "id": "293",
+      "name": "The Spartan Draft",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a bare Spartan shield with minimal markings",
+      "filename": "293_the_spartan_draft.png"
+    },
+    {
+      "id": "34",
+      "name": "The Pure Opportunist",
+      "rb_strategy": "BPA",
+      "icon_description": "a hand reaching up and grabbing a gold trophy",
+      "filename": "034_the_pure_opportunist.png"
+    },
+    {
+      "id": "35",
+      "name": "The Algorithm",
+      "rb_strategy": "BPA",
+      "icon_description": "a geometric network diagram with colored nodes connected by lines, similar to a graph theory visualization",
+      "filename": "035_the_algorithm.png"
+    },
+    {
+      "id": "294",
+      "name": "The Cipher",
+      "rb_strategy": "Zero RB",
+      "icon_description": "an encrypted code wheel with letters and symbols interlocked",
+      "filename": "294_the_cipher.png"
+    },
+    {
+      "id": "36",
+      "name": "The Monk",
+      "rb_strategy": "BPA",
+      "icon_description": "a monk's hood and rope belt with a simple wooden beads necklace",
+      "filename": "036_the_monk.png"
+    },
+    {
+      "id": "219",
+      "name": "The Ascetic",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a bare monk's cell with only a simple mat and a water bowl",
+      "filename": "219_the_ascetic.png"
+    },
+    {
+      "id": "37",
+      "name": "The Iconoclast",
+      "rb_strategy": "BPA",
+      "icon_description": "a hammer shattering a conventional trophy into pieces",
+      "filename": "037_the_iconoclast.png"
+    },
+    {
+      "id": "220",
+      "name": "The Heretic",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a torch burning a conventional draft rulebook from below",
+      "filename": "220_the_heretic.png"
+    },
+    {
+      "id": "38",
+      "name": "The Spartan Analyst",
+      "rb_strategy": "BPA",
+      "icon_description": "a Spartan helmet with a tiny analytical graph overlay on the visor",
+      "filename": "038_the_spartan_analyst.png"
+    },
+    {
+      "id": "39",
+      "name": "The Commander in Chief",
+      "rb_strategy": "BPA",
+      "icon_description": "a presidential podium with a football playbook open on it",
+      "filename": "039_the_commander_in_chief.png"
+    },
+    {
+      "id": "77",
+      "name": "The Dispatch",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a telegraph machine with a message tape rolling out",
+      "filename": "077_the_dispatch.png"
+    },
+    {
+      "id": "40",
+      "name": "The Field General",
+      "rb_strategy": "BPA",
+      "icon_description": "a military general peaked cap with gold stars on the brim",
+      "filename": "040_the_field_general.png"
+    },
+    {
+      "id": "78",
+      "name": "The Commanding Officer",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a military officer's uniform jacket with medals on the chest",
+      "filename": "078_the_commanding_officer.png"
+    },
+    {
+      "id": "41",
+      "name": "The Strategist",
+      "rb_strategy": "BPA",
+      "icon_description": "a compass rose",
+      "filename": "041_the_strategist.png"
+    },
+    {
+      "id": "79",
+      "name": "The Planner",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a calendar page with a few handwritten notes and marked dates",
+      "filename": "079_the_planner.png"
+    },
+    {
+      "id": "42",
+      "name": "The Even Hand",
+      "rb_strategy": "BPA",
+      "icon_description": "two hands held perfectly level like a scale",
+      "filename": "042_the_even_hand.png"
+    },
+    {
+      "id": "43",
+      "name": "The Opportunist's Mirror",
+      "rb_strategy": "BPA",
+      "icon_description": "a mirror reflecting a golden opportunity on the other side",
+      "filename": "043_the_opportunists_mirror.png"
+    },
+    {
+      "id": "44",
+      "name": "The Systems Thinker",
+      "rb_strategy": "BPA",
+      "icon_description": "a brain with interlocking cogs and gears growing out of it",
+      "filename": "044_the_systems_thinker.png"
+    },
+    {
+      "id": "45",
+      "name": "The Deliberate",
+      "rb_strategy": "BPA",
+      "icon_description": "an hourglass",
+      "filename": "045_the_deliberate.png"
+    },
+    {
+      "id": "46",
+      "name": "The Open Field",
+      "rb_strategy": "BPA",
+      "icon_description": "an open book with blank pages",
+      "filename": "046_the_open_field.png"
+    },
+    {
+      "id": "47",
+      "name": "The Draft Engine",
+      "rb_strategy": "BPA",
+      "icon_description": "a steam engine",
+      "filename": "047_the_draft_engine.png"
+    },
+    {
+      "id": "48",
+      "name": "The Quiet Storm",
+      "rb_strategy": "BPA",
+      "icon_description": "a swirling tornado",
+      "filename": "048_the_quiet_storm.png"
+    },
+    {
+      "id": "221",
+      "name": "The Grinding Stone",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a large millstone slowly grinding grain",
+      "filename": "221_the_grinding_stone.png"
+    },
+    {
+      "id": "49",
+      "name": "The Maverick's Twin",
+      "rb_strategy": "BPA",
+      "icon_description": "two identical cowboy boots side by side",
+      "filename": "049_the_mavericks_twin.png"
+    },
+    {
+      "id": "50",
+      "name": "The Logician",
+      "rb_strategy": "BPA",
+      "icon_description": "a glowing brain",
+      "filename": "050_the_logician.png"
+    },
+    {
+      "id": "295",
+      "name": "The Rationalist",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a brain split in half with one side pure geometric shapes",
+      "filename": "295_the_rationalist.png"
+    },
+    {
+      "id": "51",
+      "name": "The Pragmatist",
+      "rb_strategy": "BPA",
+      "icon_description": "a wrench and a screwdriver crossed over a simple blueprint",
+      "filename": "051_the_pragmatist.png"
+    },
+    {
+      "id": "296",
+      "name": "The Measured",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a measuring tape partially unrolled on a flat surface",
+      "filename": "296_the_measured.png"
+    },
+    {
+      "id": "52",
+      "name": "The Free Thinker",
+      "rb_strategy": "BPA",
+      "icon_description": "a lightbulb with gears and stars floating freely inside",
+      "filename": "052_the_free_thinker.png"
+    },
+    {
+      "id": "53",
+      "name": "The Cold Eye",
+      "rb_strategy": "BPA",
+      "icon_description": "a single eye made of ice with a frost crystal iris",
+      "filename": "053_the_cold_eye.png"
+    },
+    {
+      "id": "297",
+      "name": "The Dispassionate",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a stone face with no expression carved into grey granite",
+      "filename": "297_the_dispassionate.png"
+    },
+    {
+      "id": "54",
+      "name": "The Disciplined Pro",
+      "rb_strategy": "BPA",
+      "icon_description": "a geometric compass and protractor crossed together",
+      "filename": "054_the_disciplined_pro.png"
+    },
+    {
+      "id": "55",
+      "name": "The Stoic",
+      "rb_strategy": "BPA",
+      "icon_description": "a stone bust of a philosopher with a calm expressionless face",
+      "filename": "055_the_stoic.png"
+    },
+    {
+      "id": "298",
+      "name": "The Unflinching",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a face looking directly into a strong wind without blinking",
+      "filename": "298_the_unflinching.png"
+    },
+    {
+      "id": "56",
+      "name": "The Pure BPA",
+      "rb_strategy": "BPA",
+      "icon_description": "a clean podium with a single gold trophy and nothing else on it",
+      "filename": "056_the_pure_bpa.png"
+    },
+    {
+      "id": "57",
+      "name": "The Long Game",
+      "rb_strategy": "BPA",
+      "icon_description": "a chess board viewed from above with only two kings and one pawn remaining on the board, all other squares empty",
+      "filename": "057_the_long_game.png"
+    },
+    {
+      "id": "299",
+      "name": "The Marathon",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a single winged sandal in the style of Hermes with small white wings on the back of the ankle",
+      "filename": "299_the_marathon.png"
+    },
+    {
+      "id": "58",
+      "name": "The Contrarian's Cousin",
+      "rb_strategy": "BPA",
+      "icon_description": "a stick figure walking up stairs in the opposite direction from a line of other stick figures climbing the same stairs, the contrarian figure is highlighted in a different color",
+      "filename": "058_the_contrarians_cousin.png"
+    },
+    {
+      "id": "59",
+      "name": "The Underdog",
+      "rb_strategy": "BPA",
+      "icon_description": "a snarling wolf pup with fierce glowing eyes looking upward defiantly",
+      "filename": "059_the_underdog.png"
+    },
+    {
+      "id": "60",
+      "name": "The Arbitrage",
+      "rb_strategy": "BPA",
+      "icon_description": "two price tags with different values on the same item",
+      "filename": "060_the_arbitrage.png"
+    },
+    {
+      "id": "61",
+      "name": "The Workhorse's Cousin",
+      "rb_strategy": "BPA",
+      "icon_description": "a smaller workhorse standing beside a large draft horse",
+      "filename": "061_the_workhorses_cousin.png"
+    },
+    {
+      "id": "62",
+      "name": "The Dark Horse",
+      "rb_strategy": "BPA",
+      "icon_description": "a horse head silhouette with a flame mane",
+      "filename": "062_the_dark_horse.png"
+    },
+    {
+      "id": "222",
+      "name": "The Longshot Contender",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a horse far behind the pack starting to make its move",
+      "filename": "222_the_longshot_contender.png"
+    },
+    {
+      "id": "63",
+      "name": "The Smart Money",
+      "rb_strategy": "BPA",
+      "icon_description": "a stack of gold bars with a small brain on top",
+      "filename": "063_the_smart_money.png"
+    },
+    {
+      "id": "223",
+      "name": "The Informed Edge",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a folded newspaper with a bold headline visible on the front page",
+      "filename": "223_the_informed_edge.png"
+    },
+    {
+      "id": "64",
+      "name": "The Steady Maverick",
+      "rb_strategy": "BPA",
+      "icon_description": "a jet plane",
+      "filename": "064_the_steady_maverick.png"
+    },
+    {
+      "id": "65",
+      "name": "The Maverick",
+      "rb_strategy": "BPA",
+      "icon_description": "a cowboy riding a horse",
+      "filename": "065_the_maverick.png"
+    },
+    {
+      "id": "80",
+      "name": "The Outlier",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a red and white archery target standing upright on a small stand with three arrows hit cleanly in the center bullseye and one arrow stuck in the ground far to the left of the target having completely missed",
+      "filename": "080_the_outlier.png"
+    },
+    {
+      "id": "66",
+      "name": "The Data Driven",
+      "rb_strategy": "BPA",
+      "icon_description": "a sleek futuristic data microchip with circuit lines glowing on its surface",
+      "filename": "066_the_data_driven.png"
+    },
+    {
+      "id": "67",
+      "name": "The Controlled Burn",
+      "rb_strategy": "BPA",
+      "icon_description": "a small contained campfire inside a stone ring",
+      "filename": "067_the_controlled_burn.png"
+    },
+    {
+      "id": "68",
+      "name": "The Wildcard",
+      "rb_strategy": "BPA",
+      "icon_description": "a joker playing card with a football replacing the jester's hat",
+      "filename": "068_the_wildcard.png"
+    },
+    {
+      "id": "69",
+      "name": "The Quant",
+      "rb_strategy": "BPA",
+      "icon_description": "a chalkboard filled with quantitative financial equations",
+      "filename": "069_the_quant.png"
+    },
+    {
+      "id": "300",
+      "name": "The Modeler",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a 3D architectural model being constructed on a drafting table",
+      "filename": "300_the_modeler.png"
+    },
+    {
+      "id": "70",
+      "name": "The Minimalist Pro",
+      "rb_strategy": "BPA",
+      "icon_description": "a single equilateral triangle outline, thinner and more refined than a basic triangle",
+      "filename": "070_the_minimalist_pro.png"
+    },
+    {
+      "id": "71",
+      "name": "The Free Spirit",
+      "rb_strategy": "BPA",
+      "icon_description": "a kite flying freely in a bright open sky",
+      "filename": "071_the_free_spirit.png"
+    },
+    {
+      "id": "72",
+      "name": "The Pure Value",
+      "rb_strategy": "BPA",
+      "icon_description": "a raw diamond sitting in an open palm",
+      "filename": "072_the_pure_value.png"
+    },
+    {
+      "id": "81",
+      "name": "The Empire",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a grand stone castle with tall towers and a glowing window",
+      "filename": "081_the_empire.png"
+    },
+    {
+      "id": "82",
+      "name": "The Franchise",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a bold gold star emblem on a dark shield",
+      "filename": "082_the_franchise.png"
+    },
+    {
+      "id": "83",
+      "name": "The Dynasty",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a trophy case filled with multiple championship trophies",
+      "filename": "083_the_dynasty.png"
+    },
+    {
+      "id": "84",
+      "name": "The Ironclad Plan",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a rolled iron blueprint with a wax seal on it",
+      "filename": "084_the_ironclad_plan.png"
+    },
+    {
+      "id": "85",
+      "name": "The Power Broker",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a handshake between two suited figures with gold rings",
+      "filename": "085_the_power_broker.png"
+    },
+    {
+      "id": "224",
+      "name": "The Freight Train",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a massive freight locomotive at full speed with steam billowing",
+      "filename": "224_the_freight_train.png"
+    },
+    {
+      "id": "86",
+      "name": "The Executive Suite",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a corner office skyline view with a leather chair",
+      "filename": "086_the_executive_suite.png"
+    },
+    {
+      "id": "87",
+      "name": "The General",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a general's dress uniform with four stars on the shoulders",
+      "filename": "087_the_general.png"
+    },
+    {
+      "id": "88",
+      "name": "The Bold Franchise",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a franchise tag in bold red with a lightning bolt through it",
+      "filename": "088_the_bold_franchise.png"
+    },
+    {
+      "id": "89",
+      "name": "The War Room",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a large tactical situation table with holographic map displays and glowing strategy screens surrounding it",
+      "filename": "089_the_war_room.png"
+    },
+    {
+      "id": "90",
+      "name": "The Stronghold",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a thick stone castle keep with no doors visible",
+      "filename": "090_the_stronghold.png"
+    },
+    {
+      "id": "91",
+      "name": "The Librarian",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a stack of football scouting books with reading glasses on top",
+      "filename": "091_the_librarian.png"
+    },
+    {
+      "id": "92",
+      "name": "The Veteran",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a battered and weathered old helmet with multiple worn stickers and scratches covering the surface",
+      "filename": "092_the_veteran.png"
+    },
+    {
+      "id": "93",
+      "name": "The Upside Seeker",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a rocket aimed skyward with a football painted on its nose",
+      "filename": "093_the_upside_seeker.png"
+    },
+    {
+      "id": "94",
+      "name": "The Bold",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a bold exclamation point made of solid gold",
+      "filename": "094_the_bold.png"
+    },
+    {
+      "id": "95",
+      "name": "The Methodical",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a precision stopwatch next to a neatly organized to-do list",
+      "filename": "095_the_methodical.png"
+    },
+    {
+      "id": "96",
+      "name": "The TE Hoarder",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a treasure chest overflowing with TE jersey numbers",
+      "filename": "096_the_te_hoarder.png"
+    },
+    {
+      "id": "97",
+      "name": "The Hero",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a superhero cape draped over a football",
+      "filename": "097_the_hero.png"
+    },
+    {
+      "id": "98",
+      "name": "The Stack Master",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a perfectly stacked column of colored poker chips",
+      "filename": "098_the_stack_master.png"
+    },
+    {
+      "id": "99",
+      "name": "The Bulwark",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a classic heraldic shield, simple kite or heater shape, clean and bold with no background or wall behind it",
+      "filename": "099_the_bulwark.png"
+    },
+    {
+      "id": "100",
+      "name": "The Complete Package",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a gift box tied with a ribbon with every position icon on it",
+      "filename": "100_the_complete_package.png"
+    },
+    {
+      "id": "101",
+      "name": "The Fundamentalist",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a stone tablet with basic football rules carved into it",
+      "filename": "101_the_fundamentalist.png"
+    },
+    {
+      "id": "102",
+      "name": "The Conservative",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a button-up cardigan sweater neatly folded",
+      "filename": "102_the_conservative.png"
+    },
+    {
+      "id": "301",
+      "name": "The Cautious",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a figure carefully tiptoeing across a narrow bridge",
+      "filename": "301_the_cautious.png"
+    },
+    {
+      "id": "103",
+      "name": "The Air Raid Classic",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a vintage biplane with visible front landing wheels, clean side profile view, no contrails",
+      "filename": "103_the_air_raid_classic.png"
+    },
+    {
+      "id": "302",
+      "name": "The Air Raid Zero",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a stealth bomber dropping passes with zero RB silhouettes below",
+      "filename": "302_the_air_raid_zero.png"
+    },
+    {
+      "id": "104",
+      "name": "The Reliable",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a sturdy old pickup truck with a worn paint job and no cargo in the bed",
+      "filename": "104_the_reliable.png"
+    },
+    {
+      "id": "105",
+      "name": "The Wildcatter",
+      "rb_strategy": "Hero RB",
+      "icon_description": "an oil derrick with a gushing explosion of black oil erupting from the top",
+      "filename": "105_the_wildcatter.png"
+    },
+    {
+      "id": "106",
+      "name": "The Systematic",
+      "rb_strategy": "Hero RB",
+      "icon_description": "an open book at the top connected by a line to three circles below it in a horizontal row, each of those circles connected by lines to two more circles beneath them, forming a clean organizational hierarchy tree chart, no text, no scribbles, all shapes empty and clean",
+      "filename": "106_the_systematic.png"
+    },
+    {
+      "id": "107",
+      "name": "The Enduring",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a weathered stone statue still standing after a storm",
+      "filename": "107_the_enduring.png"
+    },
+    {
+      "id": "108",
+      "name": "The Gambit",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a chess pawn being deliberately sacrificed on an open board",
+      "filename": "108_the_gambit.png"
+    },
+    {
+      "id": "109",
+      "name": "The Methodist",
+      "rb_strategy": "Hero RB",
+      "icon_description": "an open hymnal with football plays written inside it",
+      "filename": "109_the_methodist.png"
+    },
+    {
+      "id": "110",
+      "name": "The Blue Collar",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a hard hat and a lunchbox sitting side by side",
+      "filename": "110_the_blue_collar.png"
+    },
+    {
+      "id": "111",
+      "name": "The Lone Wolf",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a single wolf silhouette howling at a full moon",
+      "filename": "111_the_lone_wolf.png"
+    },
+    {
+      "id": "112",
+      "name": "The Spartan General",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a Spartan general's crested battle helmet with a sword",
+      "filename": "112_the_spartan_general.png"
+    },
+    {
+      "id": "113",
+      "name": "The Sure Thing",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a safe with the door swung open revealing a gold trophy inside",
+      "filename": "113_the_sure_thing.png"
+    },
+    {
+      "id": "225",
+      "name": "The Certainty",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a gold combination lock with all dials aligned and a green checkmark above it",
+      "filename": "225_the_certainty.png"
+    },
+    {
+      "id": "114",
+      "name": "The Luxury Tax",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a large diamond gemstone with an ornate gold price tag hanging from it by a chain",
+      "filename": "114_the_luxury_tax.png"
+    },
+    {
+      "id": "115",
+      "name": "The Balance Sheet",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a perfectly balanced accounting ledger floating in the air",
+      "filename": "115_the_balance_sheet.png"
+    },
+    {
+      "id": "116",
+      "name": "The Blueprint",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a rolled out architectural building blueprint with floor plan lines and measurements",
+      "filename": "116_the_blueprint.png"
+    },
+    {
+      "id": "303",
+      "name": "The Schematic",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a precise technical engineering drawing with measurements, angles, and dimension lines on a clean drafting sheet",
+      "filename": "303_the_schematic.png"
+    },
+    {
+      "id": "117",
+      "name": "The Signal Caller",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a vintage radio transmitter with dials and an antenna emitting signal waves",
+      "filename": "117_the_signal_caller.png"
+    },
+    {
+      "id": "118",
+      "name": "The Franchise QB",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a bold number one jersey hanging on a display with a glowing gold star above it",
+      "filename": "118_the_franchise_qb.png"
+    },
+    {
+      "id": "119",
+      "name": "The Immovable Object",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a massive boulder with a football lodged against it going nowhere",
+      "filename": "119_the_immovable_object.png"
+    },
+    {
+      "id": "120",
+      "name": "The Cornerstone",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a cornerstone block being laid for a building foundation",
+      "filename": "120_the_cornerstone.png"
+    },
+    {
+      "id": "226",
+      "name": "The Load Bearing",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a structural I-beam holding up two heavy floors of a building",
+      "filename": "226_the_load_bearing.png"
+    },
+    {
+      "id": "121",
+      "name": "The Value Engineer",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a precision engineering caliper tool, the kind used to measure exact dimensions, clean metallic finish",
+      "filename": "121_the_value_engineer.png"
+    },
+    {
+      "id": "122",
+      "name": "The Reliable Duo",
+      "rb_strategy": "Hero RB",
+      "icon_description": "two oval chain links interlocked at ninety degrees to each other like a classic chain connection",
+      "filename": "122_the_reliable_duo.png"
+    },
+    {
+      "id": "227",
+      "name": "The Twin Pillars",
+      "rb_strategy": "Robust RB",
+      "icon_description": "two identical stone columns standing side by side",
+      "filename": "227_the_twin_pillars.png"
+    },
+    {
+      "id": "123",
+      "name": "The Late Bloomer",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a flower bud just beginning to open in late autumn",
+      "filename": "123_the_late_bloomer.png"
+    },
+    {
+      "id": "228",
+      "name": "The Second Wind",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a runner catching their breath then accelerating forward again",
+      "filename": "228_the_second_wind.png"
+    },
+    {
+      "id": "124",
+      "name": "The Hard Hat",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a yellow construction hard hat with a football logo on the front",
+      "filename": "124_the_hard_hat.png"
+    },
+    {
+      "id": "229",
+      "name": "The Steel Toed",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a steel-toed work boot with the toe cap exposed and gleaming",
+      "filename": "229_the_steel_toed.png"
+    },
+    {
+      "id": "125",
+      "name": "The Bet Hedger",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a two-sided coin being balanced on a fingertip",
+      "filename": "125_the_bet_hedger.png"
+    },
+    {
+      "id": "126",
+      "name": "The Mileage",
+      "rb_strategy": "Hero RB",
+      "icon_description": "an odometer rolling over to a high number on a vintage dashboard",
+      "filename": "126_the_mileage.png"
+    },
+    {
+      "id": "127",
+      "name": "The Fortress Wall",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a towering stone wall with battlements stretching across the horizon",
+      "filename": "127_the_fortress_wall.png"
+    },
+    {
+      "id": "128",
+      "name": "The Thunder",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a dark storm cloud with a massive lightning bolt striking down",
+      "filename": "128_the_thunder.png"
+    },
+    {
+      "id": "129",
+      "name": "The Return on Investment",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a dollar bill growing out of soil like a plant",
+      "filename": "129_the_return_on_investment.png"
+    },
+    {
+      "id": "130",
+      "name": "The Old School",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a vintage leather aviator style helmet from the early 1900s with a worn cracked surface",
+      "filename": "130_the_old_school.png"
+    },
+    {
+      "id": "131",
+      "name": "The Backfield Boss",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a massive imposing armored figure seen from below looking up, boss battle energy, single dominant silhouette",
+      "filename": "131_the_backfield_boss.png"
+    },
+    {
+      "id": "132",
+      "name": "The Classicist",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a single Ionic Roman column with a capital top, clean stone texture, standing alone with a gem on top",
+      "filename": "132_the_classicist.png"
+    },
+    {
+      "id": "133",
+      "name": "The Traditionalist",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a vintage jukebox with glowing colored lights",
+      "filename": "133_the_traditionalist.png"
+    },
+    {
+      "id": "134",
+      "name": "The Ground & Pound",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a fist coming down hard onto a football field turf",
+      "filename": "134_the_ground_and_pound.png"
+    },
+    {
+      "id": "135",
+      "name": "The Arbitrageur",
+      "rb_strategy": "Hero RB",
+      "icon_description": "two stock tickers showing different prices for the same player",
+      "filename": "135_the_arbitrageur.png"
+    },
+    {
+      "id": "136",
+      "name": "The Iron Curtain",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a heavy iron stage curtain being drawn closed",
+      "filename": "136_the_iron_curtain.png"
+    },
+    {
+      "id": "137",
+      "name": "The Brute Force",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a battering ram with an angry snarling ram head carved into the front end",
+      "filename": "137_the_brute_force.png"
+    },
+    {
+      "id": "138",
+      "name": "The Sledgehammer",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a sledgehammer mid-swing with impact lines radiating outward",
+      "filename": "138_the_sledgehammer.png"
+    },
+    {
+      "id": "139",
+      "name": "The Workhorse",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a massive powerful draft horse in full harness pulling a heavy wooden sleigh",
+      "filename": "139_the_workhorse.png"
+    },
+    {
+      "id": "140",
+      "name": "The Ground Game",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a pair of heavy muddy boots with deep tread stomping forward",
+      "filename": "140_the_ground_game.png"
+    },
+    {
+      "id": "141",
+      "name": "The Run First",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a running back footprint trail leading straight downfield",
+      "filename": "141_the_run_first.png"
+    },
+    {
+      "id": "142",
+      "name": "The Bruiser",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a heavily padded shoulder pad with dents and scuff marks",
+      "filename": "142_the_bruiser.png"
+    },
+    {
+      "id": "230",
+      "name": "The Battering Ram",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a medieval battering ram suspended on chains mid-swing",
+      "filename": "230_the_battering_ram.png"
+    },
+    {
+      "id": "143",
+      "name": "The Lone Ranger",
+      "rb_strategy": "Hero RB",
+      "icon_description": "a lone masked rider silhouette on horseback in open terrain",
+      "filename": "143_the_lone_ranger.png"
+    },
+    {
+      "id": "144",
+      "name": "The Run Committee",
+      "rb_strategy": "Hero RB",
+      "icon_description": "three agile armored knights in dynamic running poses arranged in a triangle formation",
+      "filename": "144_the_run_committee.png"
+    },
+    {
+      "id": "231",
+      "name": "The Blue Chip",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a large blue poker chip with a star stamped in the center",
+      "filename": "231_the_blue_chip.png"
+    },
+    {
+      "id": "232",
+      "name": "The Big Four",
+      "rb_strategy": "Robust RB",
+      "icon_description": "four interlocking gears of equal size arranged in a square formation all connected",
+      "filename": "232_the_big_four.png"
+    },
+    {
+      "id": "233",
+      "name": "The Asset Manager",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a briefcase opening to reveal a glowing portfolio of assets",
+      "filename": "233_the_asset_manager.png"
+    },
+    {
+      "id": "234",
+      "name": "The Grand Slam",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a baseball bat with a ball making contact at the sweet spot of the barrel",
+      "filename": "234_the_grand_slam.png"
+    },
+    {
+      "id": "235",
+      "name": "The Big Three",
+      "rb_strategy": "Robust RB",
+      "icon_description": "three rings interlinked in a triangular formation",
+      "filename": "235_the_big_three.png"
+    },
+    {
+      "id": "236",
+      "name": "The GM",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a powerful suited businessman silhouette seen from below looking up, imposing and authoritative",
+      "filename": "236_the_gm.png"
+    },
+    {
+      "id": "237",
+      "name": "The Power Play",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a hockey power play diagram adapted for football positions",
+      "filename": "237_the_power_play.png"
+    },
+    {
+      "id": "238",
+      "name": "The Triple Header",
+      "rb_strategy": "Robust RB",
+      "icon_description": "triple headed dog frothing at the mouth",
+      "filename": "238_the_triple_header.png"
+    },
+    {
+      "id": "239",
+      "name": "The Brass Tacks",
+      "rb_strategy": "Robust RB",
+      "icon_description": "two brass tacks being pressed into a corkboard with purpose",
+      "filename": "239_the_brass_tacks.png"
+    },
+    {
+      "id": "240",
+      "name": "The Long Shot",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a cannon aimed at a very distant target on the horizon",
+      "filename": "240_the_long_shot.png"
+    },
+    {
+      "id": "241",
+      "name": "The Underdog Play",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a small scrappy underdog figure mid-leap clearing over a much larger obstacle",
+      "filename": "241_the_underdog_play.png"
+    },
+    {
+      "id": "242",
+      "name": "The Reliable Roster",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a depth chart with all green checkmarks beside every name",
+      "filename": "242_the_reliable_roster.png"
+    },
+    {
+      "id": "243",
+      "name": "The Late Surge",
+      "rb_strategy": "Robust RB",
+      "icon_description": "an exhausted runner leaning forward pushing through the finish line tape with everything left",
+      "filename": "243_the_late_surge.png"
+    },
+    {
+      "id": "244",
+      "name": "The Loaded Roster",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a thick heavy roster clipboard bursting at the seams with pages overflowing, a gold star badge pinned to the top corner",
+      "filename": "244_the_loaded_roster.png"
+    },
+    {
+      "id": "245",
+      "name": "The Complete Roster",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a depth chart with every single position slot filled with a green checkmark",
+      "filename": "245_the_complete_roster.png"
+    },
+    {
+      "id": "246",
+      "name": "The Balanced Attack",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a double bladed pocket knife with a blade extending from both ends of the handle, balanced horizontally on the tip of a single upright index finger, the hand is palm-up facing the sky with only the index finger extended supporting the knife at its center point, the hand and finger should be rendered in dark cast iron and obsidian material with hammered metal texture and mossy green glowing accents on the knuckles and fingertip matching the Robust RB color scheme, not a realistic human hand but a stylized armored gauntlet hand",
+      "filename": "246_the_balanced_attack.png"
+    },
+    {
+      "id": "247",
+      "name": "The Dual Threat",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a warrior holding a bow in one hand and a sword in the other ready for battle",
+      "filename": "247_the_dual_threat.png"
+    },
+    {
+      "id": "248",
+      "name": "The Diversified",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a diversified investment pie chart with many distinct equal slices",
+      "filename": "248_the_diversified.png"
+    },
+    {
+      "id": "249",
+      "name": "The Coalition",
+      "rb_strategy": "Robust RB",
+      "icon_description": "three shields locked together side by side forming a unified wall",
+      "filename": "249_the_coalition.png"
+    },
+    {
+      "id": "304",
+      "name": "The Alliance",
+      "rb_strategy": "Zero RB",
+      "icon_description": "multiple shields joined edge to edge forming a unified defensive wall",
+      "filename": "304_the_alliance.png"
+    },
+    {
+      "id": "250",
+      "name": "The Contrarian",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a single arrow pointing left while all others point right",
+      "filename": "250_the_contrarian.png"
+    },
+    {
+      "id": "305",
+      "name": "The Dissenter",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a single raised hand against a sea of lowered ones",
+      "filename": "305_the_dissenter.png"
+    },
+    {
+      "id": "251",
+      "name": "The Diversified Portfolio",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a brown grocery bag overflowing with many small different icons and objects spilling out",
+      "filename": "251_the_diversified_portfolio.png"
+    },
+    {
+      "id": "252",
+      "name": "The Chaos Theory",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a butterfly with a storm forming in its wing pattern",
+      "filename": "252_the_chaos_theory.png"
+    },
+    {
+      "id": "253",
+      "name": "The Spartan",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a minimalist Spartan shield and spear crossed",
+      "filename": "253_the_spartan.png"
+    },
+    {
+      "id": "306",
+      "name": "The Stripped Down",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a bare metal chassis with everything non-essential removed",
+      "filename": "306_the_stripped_down.png"
+    },
+    {
+      "id": "254",
+      "name": "The Iron Will",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a single iron chain link being bent and strained but not breaking",
+      "filename": "254_the_iron_will.png"
+    },
+    {
+      "id": "255",
+      "name": "The Maverick's Mirror",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a cowboy hat reflected upside down in a still pond",
+      "filename": "255_the_mavericks_mirror.png"
+    },
+    {
+      "id": "256",
+      "name": "The Stoic's Formula",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a stone tablet with a simple equation carved into it",
+      "filename": "256_the_stoics_formula.png"
+    },
+    {
+      "id": "257",
+      "name": "The Power Formation",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a football formation diagram with arrows showing a power run",
+      "filename": "257_the_power_formation.png"
+    },
+    {
+      "id": "258",
+      "name": "The Triple Crown",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a golden crown with three prominent jeweled points",
+      "filename": "258_the_triple_crown.png"
+    },
+    {
+      "id": "259",
+      "name": "The War Room General",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a large tactical map table with a general's baton resting on it",
+      "filename": "259_the_war_room_general.png"
+    },
+    {
+      "id": "260",
+      "name": "The Triple Threat",
+      "rb_strategy": "Robust RB",
+      "icon_description": "three lightning bolts arranged in a triangle",
+      "filename": "260_the_triple_threat.png"
+    },
+    {
+      "id": "261",
+      "name": "The Draft Board",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a large physical draft board with names in rows and tiers",
+      "filename": "261_the_draft_board.png"
+    },
+    {
+      "id": "262",
+      "name": "The Formation",
+      "rb_strategy": "Robust RB",
+      "icon_description": "three armored figures in a tight defensive shield wall formation viewed from the front",
+      "filename": "262_the_formation.png"
+    },
+    {
+      "id": "263",
+      "name": "The Gambler's Gambit",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a poker hand of five cards being slammed face up on a table with poker chips scattered",
+      "filename": "263_the_gamblers_gambit.png"
+    },
+    {
+      "id": "264",
+      "name": "The Draft Room",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a long conference table with draft boards and laptops open",
+      "filename": "264_the_draft_room.png"
+    },
+    {
+      "id": "265",
+      "name": "The Trenches",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a line of offensive linemen in a three-point stance",
+      "filename": "265_the_trenches.png"
+    },
+    {
+      "id": "266",
+      "name": "The Return on Rushes",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a running back breaking through the line with a dollar sign trail",
+      "filename": "266_the_return_on_rushes.png"
+    },
+    {
+      "id": "267",
+      "name": "The Lottery Ticket",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a scratch off lottery ticket with three matching gold symbols revealed under the scratch surface",
+      "filename": "267_the_lottery_ticket.png"
+    },
+    {
+      "id": "268",
+      "name": "The Value Play",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a price tag showing a steep markdown on a premium item",
+      "filename": "268_the_value_play.png"
+    },
+    {
+      "id": "269",
+      "name": "The Workhorse Classic",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a classic workhorse in full harness pulling steadily forward",
+      "filename": "269_the_workhorse_classic.png"
+    },
+    {
+      "id": "270",
+      "name": "The Hammer Drop",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a judge's gavel dropping with dramatic impact lines",
+      "filename": "270_the_hammer_drop.png"
+    },
+    {
+      "id": "271",
+      "name": "The Mileage Counter",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a mechanical odometer counting upward rapidly",
+      "filename": "271_the_mileage_counter.png"
+    },
+    {
+      "id": "272",
+      "name": "The Portfolio",
+      "rb_strategy": "Robust RB",
+      "icon_description": "an open leather portfolio with diverse assets listed inside",
+      "filename": "272_the_portfolio.png"
+    },
+    {
+      "id": "273",
+      "name": "The Full House",
+      "rb_strategy": "Robust RB",
+      "icon_description": "five playing cards fanned out showing three aces and two kings, a classic full house poker hand",
+      "filename": "273_the_full_house.png"
+    },
+    {
+      "id": "274",
+      "name": "The Machine",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a sleek futuristic armored war machine with glowing energy cores and mechanical limbs",
+      "filename": "274_the_machine.png"
+    },
+    {
+      "id": "275",
+      "name": "The Trench Worker",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a construction worker in a deep trench laying foundation stones",
+      "filename": "275_the_trench_worker.png"
+    },
+    {
+      "id": "276",
+      "name": "The Gridiron",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a close-up of a football field's yard lines and hash marks",
+      "filename": "276_the_gridiron.png"
+    },
+    {
+      "id": "277",
+      "name": "The Meat and Potatoes",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a simple plate with steak and potatoes, nothing else",
+      "filename": "277_the_meat_and_potatoes.png"
+    },
+    {
+      "id": "278",
+      "name": "The Powerhouse",
+      "rb_strategy": "Robust RB",
+      "icon_description": "an industrial power plant with energy surging from it",
+      "filename": "278_the_powerhouse.png"
+    },
+    {
+      "id": "279",
+      "name": "The Hammer",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a blacksmith's hammer resting on an anvil",
+      "filename": "279_the_hammer.png"
+    },
+    {
+      "id": "280",
+      "name": "The Strongman",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a strongman competitor lifting a massive barbell overhead",
+      "filename": "280_the_strongman.png"
+    },
+    {
+      "id": "281",
+      "name": "The Behemoth",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a single massive empty beast pawprint pressed deep into the ground",
+      "filename": "281_the_behemoth.png"
+    },
+    {
+      "id": "282",
+      "name": "The Tank",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a military tank rolling forward with a football-shaped barrel",
+      "filename": "282_the_tank.png"
+    },
+    {
+      "id": "283",
+      "name": "The Juggernaut",
+      "rb_strategy": "Robust RB",
+      "icon_description": "an unstoppable boulder rolling downhill crushing everything in its path",
+      "filename": "283_the_juggernaut.png"
+    },
+    {
+      "id": "284",
+      "name": "The Steel Curtain",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a thick steel curtain being drawn across a stage",
+      "filename": "284_the_steel_curtain.png"
+    },
+    {
+      "id": "285",
+      "name": "The Bulldozer",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a bright yellow construction bulldozer with its blade raised ready to push",
+      "filename": "285_the_bulldozer.png"
+    },
+    {
+      "id": "286",
+      "name": "The No-QB Club",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a QB jersey with a large red X through it",
+      "filename": "286_the_no_qb_club.png"
+    },
+    {
+      "id": "287",
+      "name": "The Gunslinger's Nemesis",
+      "rb_strategy": "Robust RB",
+      "icon_description": "two revolvers crossed over each other with smoke rising from the barrels",
+      "filename": "287_the_gunslingers_nemesis.png"
+    },
+    {
+      "id": "288",
+      "name": "The Old Faithful",
+      "rb_strategy": "Robust RB",
+      "icon_description": "a geyser erupting on a perfectly predictable schedule",
+      "filename": "288_the_old_faithful.png"
+    },
+    {
+      "id": "145",
+      "name": "The Lock In",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a padlock snapped firmly shut with a key broken off inside",
+      "filename": "145_the_lock_in.png"
+    },
+    {
+      "id": "146",
+      "name": "The Two Premium",
+      "rb_strategy": "Hybrid",
+      "icon_description": "two large gemstones side by side on a velvet display",
+      "filename": "146_the_two_premium.png"
+    },
+    {
+      "id": "147",
+      "name": "The Premium Purist",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a single flawless diamond under a jeweler's loupe",
+      "filename": "147_the_premium_purist.png"
+    },
+    {
+      "id": "148",
+      "name": "The Methodical Premium",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a premium watch being set precisely to the second",
+      "filename": "148_the_methodical_premium.png"
+    },
+    {
+      "id": "149",
+      "name": "The Early Adopter",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a hand reaching out to grab a new product before others arrive",
+      "filename": "149_the_early_adopter.png"
+    },
+    {
+      "id": "150",
+      "name": "The Structured Gamble",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a calculated bet slip with neatly organized selections",
+      "filename": "150_the_structured_gamble.png"
+    },
+    {
+      "id": "151",
+      "name": "The Signal First",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a satellite dish sending a signal upward into a clear sky",
+      "filename": "151_the_signal_first.png"
+    },
+    {
+      "id": "152",
+      "name": "The Bold Departure",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a plane taking off in an unexpected direction away from the terminal",
+      "filename": "152_the_bold_departure.png"
+    },
+    {
+      "id": "153",
+      "name": "The QB Truther",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a quarterback's hand gripping a football with absolute conviction",
+      "filename": "153_the_qb_truther.png"
+    },
+    {
+      "id": "154",
+      "name": "The Locked In",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a combination lock with all dials perfectly aligned",
+      "filename": "154_the_locked_in.png"
+    },
+    {
+      "id": "155",
+      "name": "The Last Resort Premium",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a glass case with a break-glass-in-emergency lever inside",
+      "filename": "155_the_last_resort_premium.png"
+    },
+    {
+      "id": "156",
+      "name": "The Late Value",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a clearance tag on a premium item on the final day of sale",
+      "filename": "156_the_late_value.png"
+    },
+    {
+      "id": "157",
+      "name": "The Deep Value",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a scuba diver descending toward a glowing treasure chest at the bottom, bubbles rising upward",
+      "filename": "157_the_deep_value.png"
+    },
+    {
+      "id": "158",
+      "name": "The Longshot",
+      "rb_strategy": "Hybrid",
+      "icon_description": "an arrow fired from extreme range arcing toward a distant target",
+      "filename": "158_the_longshot.png"
+    },
+    {
+      "id": "159",
+      "name": "The Waiver Wire Maestro",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a conductor's baton directing a fantasy waiver wire orchestra",
+      "filename": "159_the_waiver_wire_maestro.png"
+    },
+    {
+      "id": "160",
+      "name": "The Steady Builder",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a sturdy wooden handled shovel stuck upright in a mound of dirt with a single sparkling gem sitting on the ground beside it",
+      "filename": "160_the_steady_builder.png"
+    },
+    {
+      "id": "161",
+      "name": "The Hail Mary Classic",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a football spiraling upward in a long arc toward the top of the frame, no background, no gates, no field, just the ball on transparency",
+      "filename": "161_the_hail_mary_classic.png"
+    },
+    {
+      "id": "162",
+      "name": "The Process Builder",
+      "rb_strategy": "Hybrid",
+      "icon_description": "an assembly line building something piece by piece methodically",
+      "filename": "162_the_process_builder.png"
+    },
+    {
+      "id": "163",
+      "name": "The Safe Inversion",
+      "rb_strategy": "Hybrid",
+      "icon_description": "an hourglass flipped upside down with gold sand flowing",
+      "filename": "163_the_safe_inversion.png"
+    },
+    {
+      "id": "164",
+      "name": "The Inverted Draft",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a draft board hung upside down with picks going bottom to top",
+      "filename": "164_the_inverted_draft.png"
+    },
+    {
+      "id": "165",
+      "name": "The Value Inversion",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a price tag flipped to reveal a much better value underneath",
+      "filename": "165_the_value_inversion.png"
+    },
+    {
+      "id": "166",
+      "name": "The Patient Investor",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a growing plant in a pot on a window sill with sunlight",
+      "filename": "166_the_patient_investor.png"
+    },
+    {
+      "id": "167",
+      "name": "The Late Bloomer Special",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a flower blooming dramatically in the last moments of autumn",
+      "filename": "167_the_late_bloomer_special.png"
+    },
+    {
+      "id": "168",
+      "name": "The Efficiency Play",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a fuel gauge showing maximum miles per gallon",
+      "filename": "168_the_efficiency_play.png"
+    },
+    {
+      "id": "169",
+      "name": "The Deep Sleeper",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a figure sleeping very deeply far underground surrounded by gems",
+      "filename": "169_the_deep_sleeper.png"
+    },
+    {
+      "id": "170",
+      "name": "The Waiver King",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a crown sitting on top of a waiver wire claim document",
+      "filename": "170_the_waiver_king.png"
+    },
+    {
+      "id": "171",
+      "name": "The Wire to Wire",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a runner leading a race from the first step to the finish line",
+      "filename": "171_the_wire_to_wire.png"
+    },
+    {
+      "id": "172",
+      "name": "The Safe Chaos",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a tiny controlled explosion inside a clear reinforced safety box",
+      "filename": "172_the_safe_chaos.png"
+    },
+    {
+      "id": "173",
+      "name": "The Chaos Premium",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a chaotic swirl with a gemstone perfectly preserved at the center",
+      "filename": "173_the_chaos_premium.png"
+    },
+    {
+      "id": "174",
+      "name": "The Value Chaos",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a chaotic explosion with dollar signs flying outward from the center",
+      "filename": "174_the_value_chaos.png"
+    },
+    {
+      "id": "175",
+      "name": "The Survivalist",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a survival kit with a compass, knife, and map in the wilderness",
+      "filename": "175_the_survivalist.png"
+    },
+    {
+      "id": "176",
+      "name": "The Dumpster Fire Chic",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a stylish small fire burning inside a designer trash can",
+      "filename": "176_the_dumpster_fire_chic.png"
+    },
+    {
+      "id": "177",
+      "name": "The Spartan Builder",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a Spartan soldier carefully laying a foundation stone",
+      "filename": "177_the_spartan_builder.png"
+    },
+    {
+      "id": "178",
+      "name": "The Minimalist Extreme",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a completely blank surface with a single tiny dot in the center",
+      "filename": "178_the_minimalist_extreme.png"
+    },
+    {
+      "id": "179",
+      "name": "The Total Chaos",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a full vortex explosion with everything flying outward in all directions",
+      "filename": "179_the_total_chaos.png"
+    },
+    {
+      "id": "180",
+      "name": "The Pure Contrarian",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a lone salmon swimming upstream against a massive current",
+      "filename": "180_the_pure_contrarian.png"
+    },
+    {
+      "id": "181",
+      "name": "The Premium Build",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a construction crane lifting a gleaming premium steel beam into place",
+      "filename": "181_the_premium_build.png"
+    },
+    {
+      "id": "182",
+      "name": "The Kelce-Allen Special",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a tight end and quarterback connected by a glowing spiral pass",
+      "filename": "182_the_kelce_allen_special.png"
+    },
+    {
+      "id": "183",
+      "name": "The Non-Conformist",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a figure stepping off the beaten path into open wilderness",
+      "filename": "183_the_non_conformist.png"
+    },
+    {
+      "id": "184",
+      "name": "The Unorthodox",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a swiss army knife opened in an unexpected and unusual configuration",
+      "filename": "184_the_unorthodox.png"
+    },
+    {
+      "id": "185",
+      "name": "The Upside Down",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a vintage hourglass flipped upside down with the sand falling in the wrong direction, the wider decorative end is at the bottom and the narrow waist is in the middle, rendered in iridescent titanium with purple and gold glowing accents on the frame",
+      "filename": "185_the_upside_down.png"
+    },
+    {
+      "id": "186",
+      "name": "The Contrarian Formula",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a formula written backwards on a chalkboard that still solves correctly",
+      "filename": "186_the_contrarian_formula.png"
+    },
+    {
+      "id": "187",
+      "name": "The Steady Signal",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a strong radio signal with all bars fully illuminated",
+      "filename": "187_the_steady_signal.png"
+    },
+    {
+      "id": "188",
+      "name": "The Air Strike",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a fighter jet banking in a steep dive with contrails behind it",
+      "filename": "188_the_air_strike.png"
+    },
+    {
+      "id": "189",
+      "name": "The Quarterback First",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a quarterback helmet placed front and center on a pedestal",
+      "filename": "189_the_quarterback_first.png"
+    },
+    {
+      "id": "190",
+      "name": "The Safe Premium",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a premium item safely locked in a glass display case",
+      "filename": "190_the_safe_premium.png"
+    },
+    {
+      "id": "191",
+      "name": "The Premium TE Play",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a tight end silhouette catching a pass in the corner of the end zone",
+      "filename": "191_the_premium_te_play.png"
+    },
+    {
+      "id": "192",
+      "name": "The TE Premium Value",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a TE jersey with a value price tag attached to the number",
+      "filename": "192_the_te_premium_value.png"
+    },
+    {
+      "id": "193",
+      "name": "The Patient",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a calm figure sitting in a waiting room with no visible anxiety",
+      "filename": "193_the_patient.png"
+    },
+    {
+      "id": "194",
+      "name": "The Gambler's Process",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a poker chip being methodically stacked beside a process guide",
+      "filename": "194_the_gamblers_process.png"
+    },
+    {
+      "id": "195",
+      "name": "The Efficiency Expert",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a time-motion study stopwatch over an optimized assembly line",
+      "filename": "195_the_efficiency_expert.png"
+    },
+    {
+      "id": "196",
+      "name": "The Patient Builder",
+      "rb_strategy": "Hybrid",
+      "icon_description": "hands carefully assembling a complex puzzle one piece at a time",
+      "filename": "196_the_patient_builder.png"
+    },
+    {
+      "id": "197",
+      "name": "The Late Skill Surge",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a sprinter exploding with a burst of speed in the final stretch",
+      "filename": "197_the_late_skill_surge.png"
+    },
+    {
+      "id": "198",
+      "name": "The Optimizer's Path",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a GPS route with the optimal path highlighted through obstacles",
+      "filename": "198_the_optimizers_path.png"
+    },
+    {
+      "id": "199",
+      "name": "The Cautious Premium",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a premium gem being handled with extra care in padded gloves",
+      "filename": "199_the_cautious_premium.png"
+    },
+    {
+      "id": "200",
+      "name": "The TE Believer",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a tight end jersey with a cross of faith glowing behind it",
+      "filename": "200_the_te_believer.png"
+    },
+    {
+      "id": "201",
+      "name": "The Balanced Premium",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a scale perfectly balanced with premium items on both sides",
+      "filename": "201_the_balanced_premium.png"
+    },
+    {
+      "id": "202",
+      "name": "The Patient Drafter",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a patient figure at a draft table waiting calmly for their turn",
+      "filename": "202_the_patient_drafter.png"
+    },
+    {
+      "id": "203",
+      "name": "The Slow Burn",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a long candle burning slowly with a steady low flame",
+      "filename": "203_the_slow_burn.png"
+    },
+    {
+      "id": "204",
+      "name": "The Contrarian BPA",
+      "rb_strategy": "Hybrid",
+      "icon_description": "viewed from above looking down, one lone figure walking north while dozens of crowd silhouettes all walk south, the lone figure is a different bright color than the grey crowd, arrow above the lone figure pointing in their direction",
+      "filename": "204_the_contrarian_bpa.png"
+    },
+    {
+      "id": "205",
+      "name": "The Deliberate Builder",
+      "rb_strategy": "Hybrid",
+      "icon_description": "an architect's careful hand drawing precise lines on a blueprint",
+      "filename": "205_the_deliberate_builder.png"
+    },
+    {
+      "id": "206",
+      "name": "The Delayed Attack",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a coiled spring held back and ready to release with full force",
+      "filename": "206_the_delayed_attack.png"
+    },
+    {
+      "id": "207",
+      "name": "The Process",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a clean straight conveyor belt moving items steadily from left to right",
+      "filename": "207_the_process.png"
+    },
+    {
+      "id": "208",
+      "name": "The TE Anchor",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a ship anchor with a TE jersey number stamped on it",
+      "filename": "208_the_te_anchor.png"
+    },
+    {
+      "id": "209",
+      "name": "The TE Truther",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a magnifying glass revealing a hidden TE gem in a draft board",
+      "filename": "209_the_te_truther.png"
+    },
+    {
+      "id": "210",
+      "name": "The TE Value Hunter",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a treasure map with X marking a TE position in the mid rounds",
+      "filename": "210_the_te_value_hunter.png"
+    },
+    {
+      "id": "211",
+      "name": "The Grinder's Path",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a long winding dirt road worn down by steady determined foot traffic",
+      "filename": "211_the_grinders_path.png"
+    },
+    {
+      "id": "212",
+      "name": "The Hail Mary",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a single object spiraling upward toward a bright light at the top of the frame, motion blur trailing behind it",
+      "filename": "212_the_hail_mary.png"
+    },
+    {
+      "id": "213",
+      "name": "The Uncommon Value",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a rare coin being found in a pile of ordinary change",
+      "filename": "213_the_uncommon_value.png"
+    },
+    {
+      "id": "214",
+      "name": "The Minimalist Builder",
+      "rb_strategy": "Hybrid",
+      "icon_description": "bare essential construction tools laid out in a sparse clean line",
+      "filename": "214_the_minimalist_builder.png"
+    },
+    {
+      "id": "215",
+      "name": "The Chaos Builder",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a construction site where controlled explosions clear the way forward",
+      "filename": "215_the_chaos_builder.png"
+    },
+    {
+      "id": "216",
+      "name": "The Robot Builder",
+      "rb_strategy": "Hybrid",
+      "icon_description": "a robotic arm precisely assembling a roster on a digital screen",
+      "filename": "216_the_robot_builder.png"
+    },
+    {
+      "id": "307",
+      "name": "The Fortress",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a complete medieval fortress seen from above with walls and towers",
+      "filename": "307_the_fortress.png"
+    },
+    {
+      "id": "308",
+      "name": "The Two Towers",
+      "rb_strategy": "Zero RB",
+      "icon_description": "two tall identical towers connected at their base by a short wide bridge structure",
+      "filename": "308_the_two_towers.png"
+    },
+    {
+      "id": "309",
+      "name": "The Dual Anchor",
+      "rb_strategy": "Zero RB",
+      "icon_description": "two anchors crossed and chained together",
+      "filename": "309_the_dual_anchor.png"
+    },
+    {
+      "id": "310",
+      "name": "The Star Collector",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a glass jar with multiple glowing stars being collected inside",
+      "filename": "310_the_star_collector.png"
+    },
+    {
+      "id": "311",
+      "name": "The Synergist",
+      "rb_strategy": "Zero RB",
+      "icon_description": "exactly two jigsaw puzzle pieces interlocked together, the tab nub of the left piece is inserted fully into the blank socket of the right piece, viewed straight on, the pieces are connected and cannot be pulled apart, like the reference image of two green puzzle pieces joined at one connection point",
+      "filename": "311_the_synergist.png"
+    },
+    {
+      "id": "312",
+      "name": "The Ironclad",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a fully iron-plated Civil War era warship on the water",
+      "filename": "312_the_ironclad.png"
+    },
+    {
+      "id": "313",
+      "name": "The Big Play",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a wide receiver stretching for a catch in open space downfield",
+      "filename": "313_the_big_play.png"
+    },
+    {
+      "id": "314",
+      "name": "The Executive",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a monogrammed leather briefcase with a gold clasp",
+      "filename": "314_the_executive.png"
+    },
+    {
+      "id": "315",
+      "name": "The Rock",
+      "rb_strategy": "Zero RB",
+      "icon_description": "an enormous solid granite boulder immovable on a cliff edge",
+      "filename": "315_the_rock.png"
+    },
+    {
+      "id": "316",
+      "name": "The High Roller",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a tall stack of casino poker chips with a single die resting against the base of the stack",
+      "filename": "316_the_high_roller.png"
+    },
+    {
+      "id": "317",
+      "name": "The Purist",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a single perfectly smooth white marble sphere on its own with a subtle polish sheen",
+      "filename": "317_the_purist.png"
+    },
+    {
+      "id": "318",
+      "name": "The Steady Anchor",
+      "rb_strategy": "Zero RB",
+      "icon_description": "an anchor resting motionless on a perfectly calm ocean floor",
+      "filename": "318_the_steady_anchor.png"
+    },
+    {
+      "id": "319",
+      "name": "The Boom or Bust",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a split image with an explosion on one side and a broken bust on the other",
+      "filename": "319_the_boom_or_bust.png"
+    },
+    {
+      "id": "320",
+      "name": "The Daredevil",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a motorcycle in mid-air jumping with the rider leaning forward, no circle or frame around it",
+      "filename": "320_the_daredevil.png"
+    },
+    {
+      "id": "321",
+      "name": "The Troika",
+      "rb_strategy": "Zero RB",
+      "icon_description": "three horses side by side pulling a traditional Russian troika sleigh from behind",
+      "filename": "321_the_troika.png"
+    },
+    {
+      "id": "322",
+      "name": "The Professor",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a pair of academic spectacles resting on an open scouting tome",
+      "filename": "322_the_professor.png"
+    },
+    {
+      "id": "323",
+      "name": "The Pairing",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a glass of red wine next to a small wedge of cheese on a wooden board",
+      "filename": "323_the_pairing.png"
+    },
+    {
+      "id": "324",
+      "name": "The Dynamic Duo",
+      "rb_strategy": "Zero RB",
+      "icon_description": "two sleek futuristic robots standing back to back in a James Bond poster style pose, arms crossed, each with a small crest on their chest, one with a T crest and one with an F crest",
+      "filename": "324_the_dynamic_duo.png"
+    },
+    {
+      "id": "325",
+      "name": "The Veteran Move",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a veteran player's taped wrists and experienced hands on a ball",
+      "filename": "325_the_veteran_move.png"
+    },
+    {
+      "id": "326",
+      "name": "The Showstopper",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a spotlight illuminating a lone performer on center stage",
+      "filename": "326_the_showstopper.png"
+    },
+    {
+      "id": "327",
+      "name": "The Anchor",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a classic ship anchor with rope coiled neatly around it",
+      "filename": "327_the_anchor.png"
+    },
+    {
+      "id": "328",
+      "name": "The All-In",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a poker player pushing every chip to the center of the table",
+      "filename": "328_the_all_in.png"
+    },
+    {
+      "id": "329",
+      "name": "The Pragmatic Renegade",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a wrench spray-painted with rebellious markings",
+      "filename": "329_the_pragmatic_renegade.png"
+    },
+    {
+      "id": "330",
+      "name": "The Renegade",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a lone rider on a motorcycle blazing a new trail through dirt",
+      "filename": "330_the_renegade.png"
+    },
+    {
+      "id": "331",
+      "name": "The Moonshot",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a rocket ship launching upward toward a large full moon in the upper corner, no background scene just the rocket and moon on transparency",
+      "filename": "331_the_moonshot.png"
+    },
+    {
+      "id": "332",
+      "name": "The Logician's Ghost",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a translucent logic tree floating like a ghost in the air",
+      "filename": "332_the_logicians_ghost.png"
+    },
+    {
+      "id": "333",
+      "name": "The Franchise Builder",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a hard hat and blueprints for a new franchise stadium",
+      "filename": "333_the_franchise_builder.png"
+    },
+    {
+      "id": "334",
+      "name": "The Architect",
+      "rb_strategy": "Zero RB",
+      "icon_description": "architectural drawing tools including compass and triangle on blueprints",
+      "filename": "334_the_architect.png"
+    },
+    {
+      "id": "335",
+      "name": "The Commander",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a commander's baton and campaign map unrolled on a table",
+      "filename": "335_the_commander.png"
+    },
+    {
+      "id": "336",
+      "name": "The Gambler",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a single card being flipped face-up with chips on the table",
+      "filename": "336_the_gambler.png"
+    },
+    {
+      "id": "337",
+      "name": "The Tactician",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a tabletop tactical game board with pieces in a winning position",
+      "filename": "337_the_tactician.png"
+    },
+    {
+      "id": "338",
+      "name": "The Signal Corps",
+      "rb_strategy": "Zero RB",
+      "icon_description": "military signal flags crossed with a radio transmitter",
+      "filename": "338_the_signal_corps.png"
+    },
+    {
+      "id": "339",
+      "name": "The Air Raid",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a fleet of futuristic stealth aircraft viewed from a low angle looking up and slightly to the side, the planes flying overhead in formation, visible underside and side profile of the aircraft against clean transparency",
+      "filename": "339_the_air_raid.png"
+    },
+    {
+      "id": "340",
+      "name": "The Field Marshal",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a field marshal's baton with campaign ribbons attached",
+      "filename": "340_the_field_marshal.png"
+    },
+    {
+      "id": "341",
+      "name": "The Pillar",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a single massive stone column standing alone",
+      "filename": "341_the_pillar.png"
+    },
+    {
+      "id": "342",
+      "name": "The Premium Collector",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a display case with premium rare items carefully organized",
+      "filename": "342_the_premium_collector.png"
+    },
+    {
+      "id": "343",
+      "name": "The Route Runner",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a route tree diagram with every route branch lit up",
+      "filename": "343_the_route_runner.png"
+    },
+    {
+      "id": "344",
+      "name": "The Wide Open",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a wide receiver silhouette with acres of open space around him",
+      "filename": "344_the_wide_open.png"
+    },
+    {
+      "id": "345",
+      "name": "The Value Seeker",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a metal detector scanning over a field and beeping on a gem",
+      "filename": "345_the_value_seeker.png"
+    },
+    {
+      "id": "346",
+      "name": "The Grinder",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a coffee grinder working steadily with consistent output",
+      "filename": "346_the_grinder.png"
+    },
+    {
+      "id": "347",
+      "name": "The Boom Factory",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a single industrial conveyor belt with one large mechanical crane arm on the left side and one on the right side, the left crane lifting a glowing gem off the belt and the right crane dropping trash off the other side",
+      "filename": "347_the_boom_factory.png"
+    },
+    {
+      "id": "348",
+      "name": "The Realist",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a clear glass half full of water with no illusions around it",
+      "filename": "348_the_realist.png"
+    },
+    {
+      "id": "349",
+      "name": "The Foundation",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a concrete foundation being poured for a large structure",
+      "filename": "349_the_foundation.png"
+    },
+    {
+      "id": "350",
+      "name": "The Double Down",
+      "rb_strategy": "Zero RB",
+      "icon_description": "an ace of spades and an ace of hearts overlapping each other at an angle, classic blackjack double down hand, bold clean card faces",
+      "filename": "350_the_double_down.png"
+    },
+    {
+      "id": "351",
+      "name": "The Optimizer",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a dial turned to maximum with every setting in the green zone",
+      "filename": "351_the_optimizer.png"
+    },
+    {
+      "id": "352",
+      "name": "The Safe Bet",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a sure-win lottery ticket already scratched to reveal a winner",
+      "filename": "352_the_safe_bet.png"
+    },
+    {
+      "id": "353",
+      "name": "The Streaker",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a comet streaking across a night sky leaving a bright trail",
+      "filename": "353_the_streaker.png"
+    },
+    {
+      "id": "354",
+      "name": "The Efficient Market",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a stock market board showing perfectly priced assets",
+      "filename": "354_the_efficient_market.png"
+    },
+    {
+      "id": "355",
+      "name": "The Steady Receiver",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a pair of hands with fingers spread wide open ready to catch, viewed from the front",
+      "filename": "355_the_steady_receiver.png"
+    },
+    {
+      "id": "356",
+      "name": "The Spreadsheet",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a clean modern spreadsheet with color-coded cells and formulas",
+      "filename": "356_the_spreadsheet.png"
+    },
+    {
+      "id": "357",
+      "name": "The Bedrock",
+      "rb_strategy": "Zero RB",
+      "icon_description": "deep exposed bedrock at the base of a cliff, solid and ancient",
+      "filename": "357_the_bedrock.png"
+    },
+    {
+      "id": "358",
+      "name": "The Swing Trader",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a stock chart with a perfectly timed buy-low sell-high swing",
+      "filename": "358_the_swing_trader.png"
+    },
+    {
+      "id": "359",
+      "name": "The Anarchist",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a broken rulebook with pages flying in every direction",
+      "filename": "359_the_anarchist.png"
+    },
+    {
+      "id": "360",
+      "name": "The Pure Chaos",
+      "rb_strategy": "Zero RB",
+      "icon_description": "a total explosion of color and energy with no discernible center",
+      "filename": "360_the_pure_chaos.png"
+    }
+  ],
+  "chaos_archetypes": [
+    {
+      "id": "361",
+      "name": "The Special Teams Stan",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL TIMING CHAOS",
+      "frequency": "Rare",
+      "icon_description": "five or six large hulking armored defensive linemen crowded together in a tight group, all looking mean and intimidating, viewed from slightly below",
+      "badge_background": "chaos_tier",
+      "filename": "361_the_special_teams_stan.png"
+    },
+    {
+      "id": "362",
+      "name": "The Kicker Truther",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL TIMING CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a premium sports trading card in a protective graded slab case, the card shows a large golden field goal post as the central image, glowing with maximum grade value label",
+      "badge_background": "chaos_tier",
+      "filename": "362_the_kicker_truther.png"
+    },
+    {
+      "id": "363",
+      "name": "The Double Dipper",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL TIMING CHAOS",
+      "frequency": "Rare",
+      "icon_description": "two separate football goalposts standing side by side independently, each a complete upright structure, both glowing in the end zone",
+      "badge_background": "chaos_tier",
+      "filename": "363_the_double_dipper.png"
+    },
+    {
+      "id": "364",
+      "name": "The DST Hoarder",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL TIMING CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "four defensive helmets stacked in a pile with a revolving door behind them",
+      "badge_background": "chaos_tier",
+      "filename": "364_the_dst_hoarder.png"
+    },
+    {
+      "id": "365",
+      "name": "The Ostrich",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL TIMING CHAOS",
+      "frequency": "Rare",
+      "icon_description": "an ostrich standing upright on two long legs with its entire neck and head plunged straight down into a mound of dirt below its feet, the head is completely underground and invisible, only the headless body standing on legs above ground is visible, exactly like the classic cartoon ostrich head in sand pose",
+      "badge_background": "chaos_tier",
+      "filename": "365_the_ostrich.png"
+    },
+    {
+      "id": "366",
+      "name": "The Opening Kickoff",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL TIMING CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "a full body stylized armored kicker figure at the exact moment after making contact, right leg fully extended upward in a high follow-through while the left arm swings forward for balance and the left leg is the plant foot firmly on the ground, opposite arm and leg are raised simultaneously like a natural kicking motion, a brown American football with white laces already launched and flying away upward and to the right with the pointed tip leading the way, the football must look like a real brown leather American football with visible white lace stitching not a glowing orb, electric pink and purple and yellow lightning energy trailing from the kicker's foot only, cracked stone platform beneath, full body visible from head to toe, neutral eye level viewing angle",
+      "badge_background": "chaos_tier",
+      "filename": "366_the_opening_kickoff.png"
+    },
+    {
+      "id": "367",
+      "name": "The Special Teams First Ballot",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL TIMING CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "a short scrawny figure in an oversized suit standing at a podium accepting a giant MVP style trophy that towers over them, spotlight shining down, crowd energy around them",
+      "badge_background": "chaos_tier",
+      "filename": "367_the_special_teams_first_ballot.png"
+    },
+    {
+      "id": "368",
+      "name": "The Homer",
+      "rb_strategy": "Chaos Tier",
+      "category": "LOYALTY & BIAS CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a foam finger pointing upward with a team logo and five player cards fanned out below",
+      "badge_background": "chaos_tier",
+      "filename": "368_the_homer.png"
+    },
+    {
+      "id": "369",
+      "name": "The One Trick Pony",
+      "rb_strategy": "Chaos Tier",
+      "category": "LOYALTY & BIAS CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "a goofy looking donkey wearing a party hat strapped to its head like a fake unicorn horn, looking proud of itself",
+      "badge_background": "chaos_tier",
+      "filename": "369_the_one_trick_pony.png"
+    },
+    {
+      "id": "370",
+      "name": "The Hometown Hero",
+      "rb_strategy": "Chaos Tier",
+      "category": "LOYALTY & BIAS CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "a city skyline surrounding an empty stadium field in the center, no compass, civic pride energy",
+      "badge_background": "chaos_tier",
+      "filename": "370_the_hometown_hero.png"
+    },
+    {
+      "id": "371",
+      "name": "The Time Traveler",
+      "rb_strategy": "Chaos Tier",
+      "category": "ANTI-STRATEGY CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a vintage clock face melting slightly with an old football card stuck in the hands",
+      "badge_background": "chaos_tier",
+      "filename": "371_the_time_traveler.png"
+    },
+    {
+      "id": "372",
+      "name": "The Fantasy Hipster",
+      "rb_strategy": "Chaos Tier",
+      "category": "ANTI-STRATEGY CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "a pair of thick-framed glasses sitting on top of an obscure player's trading card",
+      "badge_background": "chaos_tier",
+      "filename": "372_the_fantasy_hipster.png"
+    },
+    {
+      "id": "373",
+      "name": "The Anti-ADP",
+      "rb_strategy": "Chaos Tier",
+      "category": "ANTI-STRATEGY CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "a price tag with a large downward arrow showing a steep markdown on every item",
+      "badge_background": "chaos_tier",
+      "filename": "373_the_anti_adp.png"
+    },
+    {
+      "id": "374",
+      "name": "The Injury Magnet",
+      "rb_strategy": "Chaos Tier",
+      "category": "ANTI-STRATEGY CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a cartoon styled armored figure or robot standing upright with both arms on crutches, head wrapped in a white bandage, one leg in a cast, looking beat up and held together",
+      "badge_background": "chaos_tier",
+      "filename": "374_the_injury_magnet.png"
+    },
+    {
+      "id": "375",
+      "name": "The Rookie Truther",
+      "rb_strategy": "Chaos Tier",
+      "category": "ANTI-STRATEGY CHAOS",
+      "frequency": "Rare",
+      "icon_description": "five shiny rookie cards fanned out with a ROOKIE stamp across each one",
+      "badge_background": "chaos_tier",
+      "filename": "375_the_rookie_truther.png"
+    },
+    {
+      "id": "376",
+      "name": "The Old Boys Club",
+      "rb_strategy": "Chaos Tier",
+      "category": "ANTI-STRATEGY CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a vintage grandfather clock with the hands showing it is past midnight, cobwebs on the corners, symbolizing being past their prime and time running out",
+      "badge_background": "chaos_tier",
+      "filename": "376_the_old_boys_club.png"
+    },
+    {
+      "id": "377",
+      "name": "The RB Apocalypse",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL HOARDING CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "eight running back helmets arranged in a chaotic pile with one rising above the rest",
+      "badge_background": "chaos_tier",
+      "filename": "377_the_rb_apocalypse.png"
+    },
+    {
+      "id": "378",
+      "name": "The Air Show",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL HOARDING CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "exactly five stylized fighter jets arranged in one tight V wedge formation treated as a single centered emblem, low angle looking upward, thin white contrails only behind each jet, no footballs, no stadium, no players, no ground or horizon line, no sun or clouds filling the frame, only the jet group and contrails as the subject",
+      "badge_background": "chaos_tier",
+      "filename": "378_the_air_show.png"
+    },
+    {
+      "id": "379",
+      "name": "The Quarterback Factory",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL HOARDING CHAOS",
+      "frequency": "Rare",
+      "icon_description": "three quarterback helmets on an assembly line conveyor belt with only one exit gate",
+      "badge_background": "chaos_tier",
+      "filename": "379_the_quarterback_factory.png"
+    },
+    {
+      "id": "380",
+      "name": "The TE Convention",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL HOARDING CHAOS",
+      "frequency": "Rare",
+      "icon_description": "three tight end figures in a group huddle wearing matching lanyards like a conference",
+      "badge_background": "chaos_tier",
+      "filename": "380_the_te_convention.png"
+    },
+    {
+      "id": "381",
+      "name": "The Zero Position",
+      "rb_strategy": "Chaos Tier",
+      "category": "POSITIONAL HOARDING CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a depth chart with one position row completely empty and a question mark in the slot",
+      "badge_background": "chaos_tier",
+      "filename": "381_the_zero_position.png"
+    },
+    {
+      "id": "382",
+      "name": "The Panic Button",
+      "rb_strategy": "Chaos Tier",
+      "category": "GAMBLING & HIGH VARIANCE CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a large red emergency button locked behind a clear glass safety case with a small hammer on a chain beside it",
+      "badge_background": "chaos_tier",
+      "filename": "382_the_panic_button.png"
+    },
+    {
+      "id": "383",
+      "name": "The YOLO",
+      "rb_strategy": "Chaos Tier",
+      "category": "GAMBLING & HIGH VARIANCE CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "a person in freefall with a parachute that is tangled and not opening properly, flailing in the air",
+      "badge_background": "chaos_tier",
+      "filename": "383_the_yolo.png"
+    },
+    {
+      "id": "384",
+      "name": "The Handcuff Army",
+      "rb_strategy": "Chaos Tier",
+      "category": "GAMBLING & HIGH VARIANCE CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "four pairs of handcuffs linked together with a running back silhouette in each",
+      "badge_background": "chaos_tier",
+      "filename": "384_the_handcuff_army.png"
+    },
+    {
+      "id": "385",
+      "name": "The Lottery Ticket Booth",
+      "rb_strategy": "Chaos Tier",
+      "category": "GAMBLING & HIGH VARIANCE CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a carnival lottery ticket booth with injury report sheets instead of prize tickets",
+      "badge_background": "chaos_tier",
+      "filename": "385_the_lottery_ticket_booth.png"
+    },
+    {
+      "id": "386",
+      "name": "The Fantasy Sommelier",
+      "rb_strategy": "Chaos Tier",
+      "category": "TROLL & COMEDIC CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "a sommelier holding a draft card up to the light like a fine wine label",
+      "badge_background": "chaos_tier",
+      "filename": "386_the_fantasy_sommelier.png"
+    },
+    {
+      "id": "387",
+      "name": "The Alphabetical",
+      "rb_strategy": "Chaos Tier",
+      "category": "TROLL & COMEDIC CHAOS",
+      "frequency": "Very Rare",
+      "icon_description": "wooden alphabet blocks with the letter A on one block and the letter Z on another with one or two other scattered blocks around them",
+      "badge_background": "chaos_tier",
+      "filename": "387_the_alphabetical.png"
+    },
+    {
+      "id": "388",
+      "name": "The Retirement Watch",
+      "rb_strategy": "Chaos Tier",
+      "category": "TROLL & COMEDIC CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a classic metal walker with tennis balls on the bottom feet next to a wooden walking cane",
+      "badge_background": "chaos_tier",
+      "filename": "388_the_retirement_watch.png"
+    },
+    {
+      "id": "389",
+      "name": "The Dynasty Dropout",
+      "rb_strategy": "Chaos Tier",
+      "category": "TROLL & COMEDIC CHAOS",
+      "frequency": "Rare",
+      "icon_description": "a row of five or six baby cribs and strollers lined up together viewed from slightly above, each one glowing warmly, a hopeful figure peering in from the edge",
+      "badge_background": "chaos_tier",
+      "filename": "389_the_dynasty_dropout.png"
+    }
+  ],
+  "meta": {
+    "total_standard_archetypes": 360,
+    "total_chaos_archetypes": 29,
+    "total_icons_needed": 389,
+    "badge_backgrounds": {
+      "BPA": "best_player_available.svg",
+      "Hero RB": "hero_rb.svg",
+      "Robust RB": "robust_rb.svg",
+      "Zero RB": "zero_rb.svg",
+      "Hybrid": "hybrid.svg",
+      "Chaos Tier": "chaos.svg"
+    },
+    "id_range": "1-389",
+    "numbering_note": "IDs 1-360 are standard archetypes, 361-389 are chaos tier archetypes"
+  }
+}

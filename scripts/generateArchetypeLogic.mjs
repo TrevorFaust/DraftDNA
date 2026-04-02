@@ -1,6 +1,7 @@
 /**
  * Generates src/constants/archetypeMappings.generated.ts from:
- * - archetype_logic/Fantasy_Football_Archetype_Master.xlsx - Master Archetypes.csv (preferred: named archetypes + flavor text)
+ * - archetype_logic/Fantasy_Football_Archetype_Master.xlsx - Master Archetypes (2).csv (preferred: named archetypes + flavor text)
+ *   OR archetype_logic/Fantasy_Football_Archetype_Master.xlsx - Master Archetypes.csv (secondary)
  *   OR archetype_logic/archetype_mapping(2).csv (fallback: no flavor text)
  * - archetype_logic/detection.scaling_mapping.csv (optional: round windows by total rounds)
  * Run: node scripts/generateArchetypeLogic.mjs
@@ -39,10 +40,13 @@ function parseCsv(content) {
 
 function normalize(s) { return (s || '').trim().toLowerCase(); }
 
-// Prefer Master Archetypes CSV (has Flavor Text); fallback to legacy mapping
+// Prefer Master Archetypes (2) CSV (has Flavor Text); then Master Archetypes; fallback to legacy mapping
+const masterArchetypePathV2 = path.join(root, 'archetype_logic', 'Fantasy_Football_Archetype_Master.xlsx - Master Archetypes (2).csv');
 const masterArchetypePath = path.join(root, 'archetype_logic', 'Fantasy_Football_Archetype_Master.xlsx - Master Archetypes.csv');
 const legacyArchetypePath = path.join(root, 'archetype_logic', 'archetype_mapping(2).csv');
-const archetypePath = fs.existsSync(masterArchetypePath) ? masterArchetypePath : legacyArchetypePath;
+const archetypePath = fs.existsSync(masterArchetypePathV2)
+  ? masterArchetypePathV2
+  : (fs.existsSync(masterArchetypePath) ? masterArchetypePath : legacyArchetypePath);
 const archetypeCsv = fs.readFileSync(archetypePath, 'utf8');
 const archetypeRows = parseCsv(archetypeCsv);
 const dataRows = archetypeRows.slice(1); // skip header
