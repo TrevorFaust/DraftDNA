@@ -40,6 +40,12 @@ function parseCsv(content) {
 
 function normalize(s) { return (s || '').trim().toLowerCase(); }
 
+function capitalizeSentenceStart(text) {
+  const s = (text || '').trim();
+  if (!s) return '';
+  return s.replace(/[a-zA-Z]/, (c) => c.toLocaleUpperCase('en-US'));
+}
+
 // Prefer Master Archetypes (2) CSV (has Flavor Text); then Master Archetypes; fallback to legacy mapping
 const masterArchetypePathV2 = path.join(root, 'archetype_logic', 'Fantasy_Football_Archetype_Master.xlsx - Master Archetypes (2).csv');
 const masterArchetypePath = path.join(root, 'archetype_logic', 'Fantasy_Football_Archetype_Master.xlsx - Master Archetypes.csv');
@@ -65,7 +71,8 @@ for (const row of dataRows) {
   const te = STRATEGY_TO_ID[normalize(row[6])];
   const late = STRATEGY_TO_ID[normalize(row[7])];
   if (name && rb && wr && qb && te && late) {
-    const flavorText = hasFlavorColumn && row[8] ? (row[8] || '').trim() : undefined;
+    let flavorText = hasFlavorColumn && row[8] ? (row[8] || '').trim() : undefined;
+    if (flavorText) flavorText = capitalizeSentenceStart(flavorText);
     if (hasFlavorColumn && (!flavorText || flavorText.length < 20)) missingFlavor.push(name);
     archetypes.push({ name, rb, wr, qb, te, late, flavorText: flavorText || undefined });
   }

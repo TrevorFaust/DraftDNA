@@ -22,7 +22,7 @@ import type { Player, MockDraft, DraftPick, RankedPlayer } from '@/types/databas
 import { fetchRookiesRankings } from '@/utils/rookiesFilter';
 import { useNflTeams } from '@/hooks/useNflTeams';
 import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
-import { cn } from '@/lib/utils';
+import { cn, capitalizeSentenceStart } from '@/lib/utils';
 import { tempDraftStorage, tempSettingsStorage } from '@/utils/temporaryStorage';
 import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
@@ -33,6 +33,7 @@ import {
   detectStrategiesFromPicks,
   getArchetypeBucketFromStrategies,
   chooseArchetypeIndexFromBucket,
+  hashPicksForTieBreak,
 } from '@/utils/archetypeDetection';
 import { getArchetypeByNameOrImproviser, FULL_ARCHETYPE_LIST } from '@/constants/archetypeListWithImproviser';
 import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
@@ -1667,7 +1668,8 @@ const DraftRoom = () => {
         tempIndices.forEach((i) => earnedSet.add(i));
         timesAssignedFromBucket = tempIndices.filter((i) => bucket.includes(i)).length;
       }
-      const chosenIndex = chooseArchetypeIndexFromBucket(bucket, earnedSet, timesAssignedFromBucket);
+      const tieBreakHash = hashPicksForTieBreak(teamPicksForDetection);
+      const chosenIndex = chooseArchetypeIndexFromBucket(bucket, earnedSet, timesAssignedFromBucket, tieBreakHash);
       const name = FULL_ARCHETYPE_LIST[chosenIndex]?.name ?? detectArchetypeName(teamPicksForDetection, config);
 
       // Fetch age for chaos (Old Boys Club, Time Traveler, Retirement Watch)
@@ -1890,11 +1892,24 @@ const DraftRoom = () => {
       })
       .filter((p): p is NonNullable<typeof p> => !!p)
       .sort((a, b) => a.pick_number - b.pick_number);
-    const detectedArchetype = draft?.user_detected_archetype ?? detectArchetypeName(teamPicksForDetection, config);
-    const chaosName = draft?.user_detected_chaos_archetype ?? null;
-    const isReplaceChaos = chaosName != null && isChaosReplace(chaosName);
-    const displayName = isReplaceChaos ? chaosName : detectedArchetype;
+    /** Picks are done but resolveArchetypeForCompletion / Finish Draft has not persisted yet — avoid wrong detectArchetypeName vs bucket-assigned badge. */
+    const isFinalizingBadge =
+      draft?.status !== 'completed' && teamPicksForDetection.length > 0;
+    const detectedArchetype = isFinalizingBadge
+      ? ''
+      : (draft?.user_detected_archetype ??
+        (teamPicksForDetection.length > 0 ? detectArchetypeName(teamPicksForDetection, config) : 'Unknown'));
+    const chaosName = isFinalizingBadge ? null : (draft?.user_detected_chaos_archetype ?? null);
     const chaosMeta = chaosName ? getChaosArchetypeByName(chaosName) : null;
+    const isReplaceChaos = chaosName != null && isChaosReplace(chaosName);
+    const headlineBadgeLabel =
+      isFinalizingBadge
+        ? ''
+        : isReplaceChaos && chaosName
+          ? chaosName
+          : !isReplaceChaos && chaosName && chaosMeta && detectedArchetype
+            ? `${detectedArchetype} & ${chaosName}`
+            : detectedArchetype;
     const archetypeMeta = getArchetypeByNameOrImproviser(detectedArchetype);
     const mainFlavor = archetypeMeta?.flavorText;
     const flavorText = isReplaceChaos ? (chaosMeta?.flavorText ?? null) : mainFlavor;
@@ -1906,9 +1921,18 @@ const DraftRoom = () => {
           <div className="text-center mb-8">
             <Trophy className="w-16 h-16 text-accent mx-auto mb-4" />
             <h1 className="font-display text-4xl mb-4">DRAFT COMPLETE!</h1>
-            <p className="text-xl font-medium text-accent mb-1">You&apos;re {displayName}</p>
+            <p className="text-xl font-medium text-accent mb-1">
+              {isFinalizingBadge ? 'Locking in your badges…' : `You're ${headlineBadgeLabel}`}
+            </p>
             <div className="flex flex-col items-center gap-4 mb-4 w-full max-w-5xl mx-auto">
-              {isReplaceChaos && chaosMeta ? (
+              {isFinalizingBadge ? (
+                <div className="flex flex-col items-center gap-3 py-6">
+                  <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+                  <p className="text-muted-foreground text-sm text-center max-w-sm">
+                    Assigning your archetype and any chaos badges from this draft…
+                  </p>
+                </div>
+              ) : isReplaceChaos && chaosMeta ? (
                 <>
                   <ArchetypeBadge
                     archetypeName={chaosName!}
@@ -1919,7 +1943,9 @@ const DraftRoom = () => {
                     className="shrink-0"
                   />
                   {chaosMeta.flavorText && (
-                    <p className="text-muted-foreground text-sm max-w-xl text-center">{chaosMeta.flavorText}</p>
+                    <p className="text-muted-foreground text-sm max-w-xl text-center">
+                      {capitalizeSentenceStart(chaosMeta.flavorText)}
+                    </p>
                   )}
                 </>
               ) : !isReplaceChaos && chaosName && chaosMeta ? (
@@ -1934,7 +1960,9 @@ const DraftRoom = () => {
                       className="shrink-0"
                     />
                     {mainFlavor && (
-                      <p className="text-muted-foreground text-sm text-center max-w-sm">{mainFlavor}</p>
+                      <p className="text-muted-foreground text-sm text-center max-w-sm">
+                        {capitalizeSentenceStart(mainFlavor)}
+                      </p>
                     )}
                   </div>
                   <div className="flex flex-col items-center gap-2 flex-1 min-w-0 max-w-sm">
@@ -1947,7 +1975,9 @@ const DraftRoom = () => {
                       className="shrink-0"
                     />
                     {chaosMeta.flavorText && (
-                      <p className="text-muted-foreground text-xs text-center max-w-sm">{chaosMeta.flavorText}</p>
+                      <p className="text-muted-foreground text-xs text-center max-w-sm">
+                        {capitalizeSentenceStart(chaosMeta.flavorText)}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -1962,7 +1992,9 @@ const DraftRoom = () => {
                     className="shrink-0"
                   />
                   {flavorText && (
-                    <p className="text-muted-foreground text-sm max-w-xl text-center">{flavorText}</p>
+                    <p className="text-muted-foreground text-sm max-w-xl text-center">
+                      {capitalizeSentenceStart(flavorText)}
+                    </p>
                   )}
                 </>
               )}
