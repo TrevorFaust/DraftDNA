@@ -164,7 +164,7 @@ export function detectStrategiesFromPicks(
 }
 
 /** Deterministic hash from team picks for tie-breaking (so different drafts get different badges when tied). */
-function hashPicksForTieBreak(picks: DraftPickWithPlayer[]): number {
+export function hashPicksForTieBreak(picks: DraftPickWithPlayer[]): number {
   let h = 0;
   for (const p of picks) {
     h = ((h << 5) - h) + p.pick_number;
@@ -192,17 +192,22 @@ export function getArchetypeBucketFromStrategies(strategies: ArchetypeStrategies
 }
 
 /**
- * Choose one index from the bucket for badge assignment. Prefers an archetype the user has not
- * earned yet (in order); if all in bucket are earned, rotates by timesAssignedFromBucket so
- * repeated drafts with the same profile get different badges when possible.
+ * Choose one index from the bucket for badge assignment. Among archetypes the user has not
+ * earned yet, picks using the same pick-hash as {@link detectArchetypeIndex} (stable order =
+ * ascending list index), not “first in list.” If every bucket archetype is already earned,
+ * rotates by timesAssignedFromBucket.
  */
 export function chooseArchetypeIndexFromBucket(
   bucketIndices: number[],
   earnedIndices: Set<number>,
-  timesAssignedFromBucket: number
+  timesAssignedFromBucket: number,
+  tieBreakHash: number
 ): number {
   const unearned = bucketIndices.filter((i) => !earnedIndices.has(i));
-  if (unearned.length > 0) return unearned[0];
+  if (unearned.length > 0) {
+    const sorted = [...unearned].sort((a, b) => a - b);
+    return sorted[Math.abs(tieBreakHash) % sorted.length];
+  }
   return bucketIndices[timesAssignedFromBucket % bucketIndices.length];
 }
 

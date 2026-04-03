@@ -1,19 +1,22 @@
 /**
  * Badge component for draft archetypes.
  * When composed PNGs exist under public/badges/ (see archetypeBadgeAssets.generated.ts),
- * earned / preview-unlocked badges show that art; otherwise gold/bronze gradient + icon.
+ * earned badges show that art. Locked badges use public/badges/locked.png; otherwise gradient + icon.
  *
- * iconOnly: thumbnail (size sm/md); hover shows name + description + why earned.
+ * iconOnly: thumbnail (size sm/md); hover shows name + description + why earned when unlocked. Locked: no tooltip (identity hidden until earned).
  * Full badge: large composed art (name is on the asset), or pill with icon + name for gradient fallback.
  */
 
 import { useState, useEffect } from 'react';
-import { Crown, Trophy, Award, Target, Zap, Star, Shield, Flame, Swords, Sparkles, HelpCircle } from 'lucide-react';
+import { Crown, Trophy, Award, Target, Zap, Star, Shield, Flame, Swords, Sparkles } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getArchetypeByName } from '@/constants/archetypeMappings.generated';
 import { getArchetypeDescription, getArchetypeEarnedReason } from '@/constants/archetypeDescriptions';
 import { getArchetypeBadgePublicUrl } from '@/constants/archetypeBadgeAssets.generated';
-import { cn } from '@/lib/utils';
+import { cn, capitalizeSentenceStart } from '@/lib/utils';
+
+/** Served from `public/badges/locked.png`. */
+const BADGE_LOCKED_PUBLIC_URL = '/badges/locked.png';
 
 const BADGE_ICONS = [Crown, Trophy, Award, Target, Zap, Star, Shield, Flame, Swords, Sparkles];
 
@@ -51,9 +54,9 @@ interface ArchetypeBadgeProps {
   size?: 'sm' | 'md';
   /** Draft-specific context for "why you got it" */
   earnedFromDraft?: string;
-  /** Greyed out with ? icon (not yet earned) */
+  /** Not yet earned: uses public/badges/locked.png instead of composed art (unless showUnlockedAppearance). */
   locked?: boolean;
-  /** When true with locked, still render full gradient + archetype icon (tooltip stays locked). Badges page preview mode. */
+  /** When true with locked, show real badge art instead of locked.png (preview / debug). */
   showUnlockedAppearance?: boolean;
   /** Override flavor text (e.g. for chaos badges) */
   flavorText?: string;
@@ -73,7 +76,8 @@ export function ArchetypeBadge({
 }: ArchetypeBadgeProps) {
   const archetype = getArchetypeByName(archetypeName);
   const strategies = archetype?.strategies;
-  const flavorText = flavorTextOverride ?? archetype?.flavorText;
+  const flavorTextRaw = flavorTextOverride ?? archetype?.flavorText;
+  const flavorText = flavorTextRaw ? capitalizeSentenceStart(flavorTextRaw) : undefined;
   const description = strategies ? getArchetypeDescription(strategies) : archetypeName;
   const whyText = strategies ? getArchetypeEarnedReason(strategies) : `Complete a draft matching this archetype to unlock.`;
   const { Icon, gradient } = getBadgeStyle(archetypeName, archetypeIndex);
@@ -88,26 +92,13 @@ export function ArchetypeBadge({
 
   const tooltipContent = (
     <TooltipContent side="top" className="max-w-[320px]">
-      {locked ? (
-        <>
-          <p className="font-medium mb-1">{archetypeName}</p>
-          {flavorText ? (
-            <p className="text-muted-foreground text-xs">{flavorText}</p>
-          ) : (
-            <p className="text-muted-foreground text-sm">Complete a draft matching this strategy to unlock.</p>
-          )}
-        </>
+      <p className="font-medium mb-1">{archetypeName}</p>
+      {flavorText ? (
+        <p className="text-muted-foreground text-xs">{flavorText}</p>
       ) : (
         <>
-          <p className="font-medium mb-1">{archetypeName}</p>
-          {flavorText ? (
-            <p className="text-muted-foreground text-xs">{flavorText}</p>
-          ) : (
-            <>
-              <p className="text-muted-foreground text-xs mb-1">{description}</p>
-              <p className="text-muted-foreground/80 text-xs italic">{whyText}</p>
-            </>
-          )}
+          <p className="text-muted-foreground text-xs mb-1">{description}</p>
+          <p className="text-muted-foreground/80 text-xs italic">{whyText}</p>
         </>
       )}
     </TooltipContent>
@@ -123,17 +114,30 @@ export function ArchetypeBadge({
         ? 'w-[min(100%,7.5rem)] max-w-[7.5rem] aspect-[3/4]'
         : 'w-full max-w-[min(100%,11rem)] sm:max-w-[12.5rem] aspect-[3/4]';
 
+    if (circleLocked) {
+      return (
+        <div
+          className={cn('cursor-default flex items-center justify-center', customThumbClass, className)}
+          role="img"
+          aria-label="Locked badge"
+        >
+          <img
+            src={BADGE_LOCKED_PUBLIC_URL}
+            alt=""
+            className="max-h-full max-w-full w-full h-full object-contain object-center select-none pointer-events-none"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      );
+    }
+
     if (showCustomArt && badgeAssetUrl) {
       return (
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={cn(
-                'cursor-default flex items-center justify-center',
-                customThumbClass,
-                circleLocked && 'opacity-45 grayscale',
-                className
-              )}
+              className={cn('cursor-default flex items-center justify-center', customThumbClass, className)}
               role="img"
               aria-label={archetypeName}
             >
@@ -158,20 +162,37 @@ export function ArchetypeBadge({
           <div
             className={cn(
               'rounded-full flex items-center justify-center border shadow-sm cursor-default',
-              circleLocked
-                ? 'bg-muted/60 border-muted-foreground/20 text-muted-foreground'
-                : cn('border-amber-500/30 bg-gradient-to-br text-amber-950', gradient),
+              'border-amber-500/30 bg-gradient-to-br text-amber-950',
+              gradient,
               circleSize,
               className
             )}
             role="img"
             aria-label={archetypeName}
           >
-            {circleLocked ? <HelpCircle className={iconSize} /> : <Icon className={iconSize} />}
+            <Icon className={iconSize} />
           </div>
         </TooltipTrigger>
         {tooltipContent}
       </Tooltip>
+    );
+  }
+
+  if (locked && !showUnlockedAppearance) {
+    return (
+      <div
+        className={cn('inline-flex flex-col items-center max-w-[min(100vw-2rem,28rem)]', className)}
+        role="img"
+        aria-label="Locked badge"
+      >
+        <img
+          src={BADGE_LOCKED_PUBLIC_URL}
+          alt=""
+          className="w-full h-auto max-h-[min(75vh,36rem)] object-contain select-none"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
     );
   }
 

@@ -44,7 +44,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "vbd"
     },
-    "flavorText": "best player available from start to finish, anchored by an early QB, a premium TE, and stacked WRs, with value-based drafting driving every late pick. The Value GM runs the most disciplined front office in the league: no ego, no agenda, just the ranked board. Every pick was optimal. The roster is the proof."
+    "flavorText": "Best player available from start to finish, anchored by an early QB, a premium TE, and stacked WRs, with value-based drafting driving every late pick. The Value GM runs the most disciplined front office in the league: no ego, no agenda, just the ranked board. Every pick was optimal. The roster is the proof."
   },
   {
     "name": "The Calculated Risk",
@@ -55,18 +55,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "floor"
     },
-    "flavorText": "best player available drafting led naturally to an early QB, stacked WRs, a reliable mid-round TE, and a floor-first backend. The Calculated Risk knew the odds before every pick and only accepted risk when the value justified it. Every gamble was calculated. Every calculation was correct."
-  },
-  {
-    "name": "The Cold Calculation",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB with a Hero WR, mid-round QB, streamed TE, and value-based drafting calculating the risk-adjusted return on every backend pick. The Cold Calculation ran the math: Zero RB at the right ADP, Hero WR at the right price, mid-round QB at value, and value-based drafting confirming every subsequent pick. The risk was calculated. The calculation was correct."
+    "flavorText": "Best player available drafting led naturally to an early QB, stacked WRs, a reliable mid-round TE, and a floor-first backend. The Calculated Risk knew the odds before every pick and only accepted risk when the value justified it. Every gamble was calculated. Every calculation was correct."
   },
   {
     "name": "The Free Agent",
@@ -110,7 +99,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "upside"
     },
-    "flavorText": "best player available led to an early QB and stacked WRs, then you went after boom-or-bust picks every round after. The Opportunist's Gambit seized every value opening and then swung hard for the fences. Value in the foundation, ceiling in the roof, the complete package."
+    "flavorText": "Best player available led to an early QB and stacked WRs, then you went after boom-or-bust picks every round after. The Opportunist's Gambit seized every value opening and then swung hard for the fences. Value in the foundation, ceiling in the roof, the complete package."
   },
   {
     "name": "The Evaluator",
@@ -121,7 +110,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "vbd"
     },
-    "flavorText": "best player available produced an early QB, stacked WRs, a streamed TE, and value-based drafting guiding every late pick without exception. The Evaluator rates every player the same way, objectively, without bias, without sentiment. The evaluation was correct. It always is."
+    "flavorText": "Best player available produced an early QB, stacked WRs, a streamed TE, and value-based drafting guiding every late pick without exception. The Evaluator rates every player the same way, objectively, without bias, without sentiment. The evaluation was correct. It always is."
   },
   {
     "name": "The Disciplined",
@@ -132,7 +121,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "floor"
     },
-    "flavorText": "best player available produced a premium TE, strong WR depth, a late QB at tremendous value, and a reliable conservative bench. The Disciplined never reaches, never panics, and never pays more than a pick is worth. Fifteen rounds of discipline compounds into something very difficult to beat."
+    "flavorText": "Best player available produced a premium TE, strong WR depth, a late QB at tremendous value, and a reliable conservative bench. The Disciplined never reaches, never panics, and never pays more than a pick is worth. Fifteen rounds of discipline compounds into something very difficult to beat."
   },
   {
     "name": "The Pure Play",
@@ -143,7 +132,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "upside"
     },
-    "flavorText": "best player available delivered a premium TE, stacked WRs, a late QB at incredible value, and upside picks late. The Pure Play is best player available in its most honest form, no strategy overlaid, no positional agenda imposed. The board ran the draft. The board did well."
+    "flavorText": "Best player available delivered a premium TE, stacked WRs, a late QB at incredible value, and upside picks late. The Pure Play is best player available in its most honest form, no strategy overlaid, no positional agenda imposed. The board ran the draft. The board did well."
   },
   {
     "name": "The Robot",
@@ -157,17 +146,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
     "flavorText": "Best player available, premium TE, stacked WRs, late QB, and value-based drafting closing out the backend with zero emotional picks from start to finish. The Robot will be optimizing lineups in October while everyone else is still second-guessing August. There were no human decisions made in this draft. Only optimal ones."
   },
   {
-    "name": "The Automaton",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "robust_wr",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB with heavy Robust WR investment, QB fully punted, streamed TE, and value-based drafting running the backend with automated precision. The Automaton processed every available data point, confirmed the Zero RB directive, executed the QB punt on schedule, and output the optimal value-based drafting roster without a single deviation. No human decisions were made in this draft. Only optimal ones."
-  },
-  {
     "name": "The Stabilizer",
     "strategies": {
       "rb": "bpa",
@@ -176,7 +154,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "floor"
     },
-    "flavorText": "best player available gave you stacked WRs, a solid mid-round TE, a late QB at great value, and a reliable conservative bench. The Stabilizer keeps everything running smoothly through every storm the season can throw at it. It cannot be destabilized. That's the whole point."
+    "flavorText": "Best player available gave you stacked WRs, a solid mid-round TE, a late QB at great value, and a reliable conservative bench. The Stabilizer keeps everything running smoothly through every storm the season can throw at it. It cannot be destabilized. That's the whole point."
   },
   {
     "name": "The Ballast",
@@ -187,7 +165,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "floor"
     },
-    "flavorText": "best player available gave you a premium TE, a reliable mid-round QB, late WRs, and a dependable floor-first bench. The Ballast keeps the roster balanced and the floor elevated through every injury, bye week, and cold stretch. It cannot be shaken. It will not be moved."
+    "flavorText": "Best player available gave you a premium TE, a reliable mid-round QB, late WRs, and a dependable floor-first bench. The Ballast keeps the roster balanced and the floor elevated through every injury, bye week, and cold stretch. It cannot be shaken. It will not be moved."
   },
   {
     "name": "The Sleeper",
@@ -198,7 +176,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "upside"
     },
-    "flavorText": "best player available produced stacked WRs and a patient QB strategy, then you chased upside picks all the way to the final round. The Sleeper is the team nobody remembers drafting until week 7, when everyone suddenly remembers it. It was hiding in plain sight the entire time."
+    "flavorText": "Best player available produced stacked WRs and a patient QB strategy, then you chased upside picks all the way to the final round. The Sleeper is the team nobody remembers drafting until week 7, when everyone suddenly remembers it. It was hiding in plain sight the entire time."
   },
   {
     "name": "The Formula",
@@ -209,18 +187,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, stacked WRs, late QB at value, mid-round TE, and value-based drafting all the way to the final pick, a proven equation. The Formula has been backtested extensively and the results are consistently excellent. Trust the formula. The formula works."
-  },
-  {
-    "name": "The Proof",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB anchored by a Hero WR, mid-round QB, mid-round TE, and value-based drafting driving every pick from round five onward. The Proof is the same equation as always, avoid the position with the highest injury rate and let the passing game do the heavy lifting. The math has not changed. It still works."
+    "flavorText": "Best player available, stacked WRs, late QB at value, mid-round TE, and value-based drafting all the way to the final pick, a proven equation. The Formula has been backtested extensively and the results are consistently excellent. Trust the formula. The formula works."
   },
   {
     "name": "The Scout",
@@ -234,17 +201,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
     "flavorText": "Pure best player available, stacked WRs, late QB at tremendous value, stream TE, and a steady floor-first backend. The Scout did the homework long before the draft started and trusted it all the way through. The preparation is visible in every single pick."
   },
   {
-    "name": "The Talent Evaluator",
-    "strategies": {
-      "rb": "hero_rb",
-      "wr": "robust_wr",
-      "qb": "mid_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Hero RB anchored by a workhorse back, Robust WR depth alongside it, mid-round QB, streamed TE, and value-based drafting precision late. The Talent Evaluator did the film work before the draft started and trusted it through every round. Every pick is defensible. The tape doesn't lie."
-  },
-  {
     "name": "The Value Hunter",
     "strategies": {
       "rb": "bpa",
@@ -253,18 +209,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "upside"
     },
-    "flavorText": "best player available, stacked WRs, late QB at maximum value, stream TE, and boom-or-bust picks filling the bench. The Value Hunter finds diamonds even in the final five rounds, every round is an opportunity. Every opportunity was seized."
-  },
-  {
-    "name": "The Prospector",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB paired with a Hero WR, late QB taken at tremendous value, mid-round TE, and value-based drafting guiding the backend without exception. The Prospector finds the mispriced asset at every position and takes it before anyone else identifies the opportunity. The value was there. It always is."
+    "flavorText": "Best player available, stacked WRs, late QB at maximum value, stream TE, and boom-or-bust picks filling the bench. The Value Hunter finds diamonds even in the final five rounds, every round is an opportunity. Every opportunity was seized."
   },
   {
     "name": "The Analyst",
@@ -275,18 +220,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, stacked WRs, late QB at value, stream TE, and value-based drafting driving every single late pick. The Analyst turned the entire draft into a research project, and produced a research-grade roster. The findings were published in every selection."
-  },
-  {
-    "name": "The Examiner",
-    "strategies": {
-      "rb": "hero_rb",
-      "wr": "robust_wr",
-      "qb": "late_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Hero RB with stacked WRs, a late QB at maximum value, mid-round TE, and value-based drafting pulling the backend into shape. The Examiner ran the numbers on every position, every round, and produced a roster where every pick makes sense on paper. The analysis was thorough. The roster is the report."
+    "flavorText": "Best player available, stacked WRs, late QB at value, stream TE, and value-based drafting driving every single late pick. The Analyst turned the entire draft into a research project, and produced a research-grade roster. The findings were published in every selection."
   },
   {
     "name": "The Steady Hand",
@@ -300,17 +234,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
     "flavorText": "Pure value drafting gave you a premium TE, solid WRs, a reliable mid-round QB, and steady dependable depth. The Steady Hand never flinched, never panicked, and never once deviated from the ranked list. This is what composure looks like across fifteen rounds."
   },
   {
-    "name": "The Ironhand",
-    "strategies": {
-      "rb": "hero_rb",
-      "wr": "robust_wr",
-      "qb": "late_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Hero RB paired with deep WR investment, a late QB taken at a discount, streamed TE, and floor-first depth throughout. The Ironhand built this team to survive the season without drama, no boom weeks required, no busts tolerated. Fifteen rounds of composure. The composure shows."
-  },
-  {
     "name": "The Market Timer",
     "strategies": {
       "rb": "bpa",
@@ -319,18 +242,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "upside"
     },
-    "flavorText": "best player available produced a premium TE, stacked WRs, a QB grabbed at the perfect moment, and upside picks late. The Market Timer knew exactly when to pull the trigger at every position, the timing was impeccable. Patience plus preparation equals perfect execution."
-  },
-  {
-    "name": "The Window Spotter",
-    "strategies": {
-      "rb": "hero_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Hero RB leading the way, WRs taken late and at value, late QB at a discount, mid-round TE, and value-based drafting as the closing philosophy. The Window Spotter knows when every position peaks in value and drafts accordingly, patience is the edge, timing is the weapon. Every trigger was pulled at the right moment."
+    "flavorText": "Best player available produced a premium TE, stacked WRs, a QB grabbed at the perfect moment, and upside picks late. The Market Timer knew exactly when to pull the trigger at every position, the timing was impeccable. Patience plus preparation equals perfect execution."
   },
   {
     "name": "The Accountant",
@@ -341,18 +253,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "vbd"
     },
-    "flavorText": "best player available all the way, with a premium TE, stacked WRs, mid-round QB, and value-based drafting tracking every late pick. The Accountant ran the draft like a balance sheet, every pick measured against its replacement cost. The books are balanced. The roster is excellent."
-  },
-  {
-    "name": "The Ledger",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "robust_wr",
-      "qb": "late_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB alongside deep Robust WR investment, late QB at tremendous value, premium early TE, and value-based drafting tracking the backend. The Ledger tracked the cost basis on every pick. Zero RB as the value position, stacked WRs as the appreciating asset, late QB as the undervalued holding, and value-based drafting balancing the books. The books are clean."
+    "flavorText": "Best player available all the way, with a premium TE, stacked WRs, mid-round QB, and value-based drafting tracking every late pick. The Accountant ran the draft like a balance sheet, every pick measured against its replacement cost. The books are balanced. The roster is excellent."
   },
   {
     "name": "The Even Keel",
@@ -374,7 +275,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "upside"
     },
-    "flavorText": "best player available produced stacked WRs and a reliable mid-round QB and TE, then you chased upside all the way down. The Sleeper Agent blends into the background completely, unnoticed and underestimated. Until October. Then everyone notices."
+    "flavorText": "Best player available produced stacked WRs and a reliable mid-round QB and TE, then you chased upside all the way down. The Sleeper Agent blends into the background completely, unnoticed and underestimated. Until October. Then everyone notices."
   },
   {
     "name": "The Neutral",
@@ -385,7 +286,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "vbd"
     },
-    "flavorText": "best player available from start to finish, mid-round QB and TE, stacked WRs, and value-based drafting driving every late pick. The Neutral has no agenda, no positional bias, and no emotional attachment to any strategy. Just the ranked list and the discipline to follow it."
+    "flavorText": "Best player available from start to finish, mid-round QB and TE, stacked WRs, and value-based drafting driving every late pick. The Neutral has no agenda, no positional bias, and no emotional attachment to any strategy. Just the ranked list and the discipline to follow it."
   },
   {
     "name": "The Indexer",
@@ -396,7 +297,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "floor"
     },
-    "flavorText": "best player available produced stacked WRs, a reliable mid-round QB, a streamed TE, and a dependable conservative bench. The Indexer tracks the market and buys everything at fair value, no premiums, no discounts, no deviations. Fair value. Every single round."
+    "flavorText": "Best player available produced stacked WRs, a reliable mid-round QB, a streamed TE, and a dependable conservative bench. The Indexer tracks the market and buys everything at fair value, no premiums, no discounts, no deviations. Fair value. Every single round."
   },
   {
     "name": "The Pivot",
@@ -407,7 +308,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "upside"
     },
-    "flavorText": "best player available naturally built a WR-heavy team with a reliable mid-round QB, and then pivoted hard to upside late. The Pivot adapts to the board, always, and always finds a new angle worth exploiting. Flexibility is the strategy. The strategy is excellent."
+    "flavorText": "Best player available naturally built a WR-heavy team with a reliable mid-round QB, and then pivoted hard to upside late. The Pivot adapts to the board, always, and always finds a new angle worth exploiting. Flexibility is the strategy. The strategy is excellent."
   },
   {
     "name": "The Redirect",
@@ -418,7 +319,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "upside"
     },
-    "flavorText": "best player available produced a premium TE and a mid-round QB, with WRs deferred, then you pivoted hard to upside late. The Redirect adapts to the board in real time and always finds a new angle that the room missed. The ability to change direction is the whole advantage."
+    "flavorText": "Best player available produced a premium TE and a mid-round QB, with WRs deferred, then you pivoted hard to upside late. The Redirect adapts to the board in real time and always finds a new angle that the room missed. The ability to change direction is the whole advantage."
   },
   {
     "name": "The Spreadsheet Classic",
@@ -440,7 +341,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "floor"
     },
-    "flavorText": "best player available, premium TE, stacked WRs, punted QB, and a reliable dependable bench to anchor everything. The Safe Harbor is your port in a storm, stable, anchored, and impossible to rattle by midseason. When the season gets turbulent, this team holds course."
+    "flavorText": "Best player available, premium TE, stacked WRs, punted QB, and a reliable dependable bench to anchor everything. The Safe Harbor is your port in a storm, stable, anchored, and impossible to rattle by midseason. When the season gets turbulent, this team holds course."
   },
   {
     "name": "The Chaos Agent",
@@ -451,7 +352,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "upside"
     },
-    "flavorText": "best player available led to stacked WRs, a premium TE, a punted QB, and boom-or-bust picks filling the backend. The Chaos Agent followed the board wherever it went, and it went somewhere genuinely interesting. The chaos wasn't planned. It was discovered. And it's magnificent."
+    "flavorText": "Best player available led to stacked WRs, a premium TE, a punted QB, and boom-or-bust picks filling the backend. The Chaos Agent followed the board wherever it went, and it went somewhere genuinely interesting. The chaos wasn't planned. It was discovered. And it's magnificent."
   },
   {
     "name": "The Actuarial",
@@ -462,18 +363,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, premium TE, stacked WRs, punted QB, and value-based drafting all the way to the final pick. The Actuarial calculated the expected value of punting QB versus drafting one early, and the math supported the decision. It was a data-driven conclusion. The data was correct."
-  },
-  {
-    "name": "The Underwriter",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB with a Hero WR riding alongside it, full QB punt, premium early TE, and value-based drafting extracting every available drop of value late. The Underwriter ran the probability tables on every possible build and determined this combination produces the best expected outcomes. The actuary's table doesn't care about feelings. Just frequency."
+    "flavorText": "Best player available, premium TE, stacked WRs, punted QB, and value-based drafting all the way to the final pick. The Actuarial calculated the expected value of punting QB versus drafting one early, and the math supported the decision. It was a data-driven conclusion. The data was correct."
   },
   {
     "name": "The Minimalist",
@@ -484,18 +374,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "floor"
     },
-    "flavorText": "best player available, stacked WRs, mid-round TE, punted QB, and a lean reliable backend with no wasted spots. The Minimalist cut everything that isn't essential and built a clean, functional, no-nonsense roster. Less is more, especially at quarterback."
-  },
-  {
-    "name": "The Spartan Draft",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "robust_wr",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Zero RB with heavy Robust WR depth, QB punt, mid-round TE, and a floor-first backend stripped to the essentials. The Spartan Draft removes every non-essential from the draft strategy. Zero RB is the essential starting point, stacked WRs are the essential asset, and the floor-first backend is the essential safety margin. Minimal. Essential. Correct."
+    "flavorText": "Best player available, stacked WRs, mid-round TE, punted QB, and a lean reliable backend with no wasted spots. The Minimalist cut everything that isn't essential and built a clean, functional, no-nonsense roster. Less is more, especially at quarterback."
   },
   {
     "name": "The Pure Opportunist",
@@ -506,7 +385,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "upside"
     },
-    "flavorText": "best player available produced stacked WRs and a mid-round TE, then you punted QB and took shots on upside everywhere. The Pure Opportunist seizes every opening the board presents without hesitation or second-guessing. Every round had an opportunity. Every opportunity was captured."
+    "flavorText": "Best player available produced stacked WRs and a mid-round TE, then you punted QB and took shots on upside everywhere. The Pure Opportunist seizes every opening the board presents without hesitation or second-guessing. Every round had an opportunity. Every opportunity was captured."
   },
   {
     "name": "The Algorithm",
@@ -517,18 +396,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, stacked WRs, mid-round TE, punted QB, and value-based drafting driving every remaining pick, zero human error. The Algorithm doesn't need intuition, hunches, or gut feelings. It has a ranked list. The ranked list was followed to the letter."
-  },
-  {
-    "name": "The Cipher",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "robust_wr",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB with deep Robust WR investment, QB fully punted, mid-round TE, and value-based drafting running the backend with algorithmic precision. The Cipher processed every pick through the Zero RB model, confirmed the value-based outputs at every position, and executed without emotional interference from start to finish. The algorithm ran correctly. The roster is the output."
+    "flavorText": "Best player available, stacked WRs, mid-round TE, punted QB, and value-based drafting driving every remaining pick, zero human error. The Algorithm doesn't need intuition, hunches, or gut feelings. It has a ranked list. The ranked list was followed to the letter."
   },
   {
     "name": "The Monk",
@@ -539,18 +407,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "floor"
     },
-    "flavorText": "best player available, stacked WRs, punted QB, stream TE, and a steady conservative bench built with complete calm. The Monk is devoted to the process and the process alone, no deviations, no compromises, no noise. The process was followed. The results will follow."
-  },
-  {
-    "name": "The Ascetic",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB paired with a Hero WR, full QB punt accepted, premium early TE investment, and a floor-first conservative backend. The Ascetic drafts without ego, without noise, and without the temptation to overcomplicate what already works. Silence and discipline. The roster reflects both."
+    "flavorText": "Best player available, stacked WRs, punted QB, stream TE, and a steady conservative bench built with complete calm. The Monk is devoted to the process and the process alone, no deviations, no compromises, no noise. The process was followed. The results will follow."
   },
   {
     "name": "The Iconoclast",
@@ -561,18 +418,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "upside"
     },
-    "flavorText": "best player available led to stacked WRs, punted QB, stream TE, and boom-or-bust picks, all by pure board logic. The Iconoclast breaks convention without even trying, the board just took it somewhere unconventional. The result is unorthodox. The process was pure."
-  },
-  {
-    "name": "The Heretic",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "early_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with a Hero WR running alongside it, QB punted entirely, premium early TE, and boom-or-bust upside picks filling the backend. The Heretic rejects every convention that doesn't make mathematical sense and builds the team the field is too timid to draft. Convention is overrated. The ceiling is not."
+    "flavorText": "Best player available led to stacked WRs, punted QB, stream TE, and boom-or-bust picks, all by pure board logic. The Iconoclast breaks convention without even trying, the board just took it somewhere unconventional. The result is unorthodox. The process was pure."
   },
   {
     "name": "The Spartan Analyst",
@@ -583,7 +429,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, stacked WRs, punted QB, stream TE, and value-based drafting all the way to the final pick without a single detour. The Spartan Analyst is lean, efficient, completely unemotional, and mathematically correct at every turn. The ranked list was the only voice in the draft room."
+    "flavorText": "Best player available, stacked WRs, punted QB, stream TE, and value-based drafting all the way to the final pick without a single detour. The Spartan Analyst is lean, efficient, completely unemotional, and mathematically correct at every turn. The ranked list was the only voice in the draft room."
   },
   {
     "name": "The Commander in Chief",
@@ -594,18 +440,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "floor"
     },
-    "flavorText": "best player available naturally delivered an early QB and a premium TE before WRs entered the picture, then a reliable floor-first bench. The Commander in Chief runs the most organized operation in the league, with premium picks at the two positions that matter most. This is the draft of someone who walked in with a hierarchy and executed it perfectly."
-  },
-  {
-    "name": "The Dispatch",
-    "strategies": {
-      "rb": "hero_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Hero RB paired with late WRs, early QB priority, streamed TE, and value-based drafting providing direction through every backend round. The Dispatch runs the draft room with authority, every pick serves the roster strategy, no exceptions made, no deviations tolerated. The command was total. The roster reflects it."
+    "flavorText": "Best player available naturally delivered an early QB and a premium TE before WRs entered the picture, then a reliable floor-first bench. The Commander in Chief runs the most organized operation in the league, with premium picks at the two positions that matter most. This is the draft of someone who walked in with a hierarchy and executed it perfectly."
   },
   {
     "name": "The Field General",
@@ -616,18 +451,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "upside"
     },
-    "flavorText": "best player available gave you an early QB, a premium TE, late WRs, and boom-or-bust upside picks filling the bench. The Field General commands from the most important positions on the field and dares everything else to keep up. Premium at QB and TE, ceiling everywhere else."
-  },
-  {
-    "name": "The Commanding Officer",
-    "strategies": {
-      "rb": "hero_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Hero RB with WRs taken late, early QB locked in, streamed TE, and a floor-first backend built for durability. The Commanding Officer commands the roster from the front, sets the tone with the RB anchor, and keeps every position group disciplined. The general leads from the top. The roster follows."
+    "flavorText": "Best player available gave you an early QB, a premium TE, late WRs, and boom-or-bust upside picks filling the bench. The Field General commands from the most important positions on the field and dares everything else to keep up. Premium at QB and TE, ceiling everywhere else."
   },
   {
     "name": "The Strategist",
@@ -638,18 +462,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, early QB, premium TE, late WRs, and value-based drafting driving every pick from round 5 onward. The Strategist sees three moves ahead and executes each one before the rest of the room catches on. This draft was pre-planned, the plan was excellent, and it was followed exactly."
-  },
-  {
-    "name": "The Planner",
-    "strategies": {
-      "rb": "hero_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Hero RB with late WRs, early QB secured, mid-round TE, and value-based drafting closing out the backend. The Planner mapped the draft before the first pick and executed a plan that balanced every position group without compromise. The board was a chessboard. Every move was calculated."
+    "flavorText": "Best player available, early QB, premium TE, late WRs, and value-based drafting driving every pick from round 5 onward. The Strategist sees three moves ahead and executes each one before the rest of the room catches on. This draft was pre-planned, the plan was excellent, and it was followed exactly."
   },
   {
     "name": "The Even Hand",
@@ -671,7 +484,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "upside"
     },
-    "flavorText": "best player available produced an early QB and a mid-round TE. WRs were deferred late, then upside picks all the way down. The Opportunist's Mirror reflects the board back at you with no filter and no preconceptions. The board said this was the right draft. The board was right."
+    "flavorText": "Best player available produced an early QB and a mid-round TE. WRs were deferred late, then upside picks all the way down. The Opportunist's Mirror reflects the board back at you with no filter and no preconceptions. The board said this was the right draft. The board was right."
   },
   {
     "name": "The Systems Thinker",
@@ -682,7 +495,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, early QB, value TE, late WRs, and value-based drafting late, every pick part of a larger interconnected system. The Systems Thinker sees how each selection affects every other selection on the roster. The system works. It always works."
+    "flavorText": "Best player available, early QB, value TE, late WRs, and value-based drafting late, every pick part of a larger interconnected system. The Systems Thinker sees how each selection affects every other selection on the roster. The system works. It always works."
   },
   {
     "name": "The Deliberate",
@@ -704,7 +517,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "upside"
     },
-    "flavorText": "best player available led to an early QB, stream TE, late WRs, and boom-or-bust picks attacking from every angle. The Open Field found space the rest of the room missed, every single round, without fail. There is always an open receiver if you know where to look."
+    "flavorText": "Best player available led to an early QB, stream TE, late WRs, and boom-or-bust picks attacking from every angle. The Open Field found space the rest of the room missed, every single round, without fail. There is always an open receiver if you know where to look."
   },
   {
     "name": "The Draft Engine",
@@ -715,7 +528,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, early QB, stream TE, late WRs, and value-based drafting driving every pick, a perpetual motion machine of value. The Draft Engine never stalls, never misfires, and never wastes a selection. It ran all fifteen rounds without a single hiccup."
+    "flavorText": "Best player available, early QB, stream TE, late WRs, and value-based drafting driving every pick, a perpetual motion machine of value. The Draft Engine never stalls, never misfires, and never wastes a selection. It ran all fifteen rounds without a single hiccup."
   },
   {
     "name": "The Quiet Storm",
@@ -726,18 +539,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "floor"
     },
-    "flavorText": "best player available produced a premium TE, late QB at great value, late WRs, and a dependable floor-first bench. The Quiet Storm doesn't announce itself in August, it just keeps winning quietly until October when everyone notices. It was coming the whole time."
-  },
-  {
-    "name": "The Grinding Stone",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB with a Hero WR anchor, QB fully punted, mid-round TE, and a floor-first backend built to grind through the entire schedule. The Grinding Stone doesn't need a splash moment, it accumulates quietly and is difficult to beat by week twelve. Nobody sees it coming until it's too late."
+    "flavorText": "Best player available produced a premium TE, late QB at great value, late WRs, and a dependable floor-first bench. The Quiet Storm doesn't announce itself in August, it just keeps winning quietly until October when everyone notices. It was coming the whole time."
   },
   {
     "name": "The Maverick's Twin",
@@ -748,7 +550,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "upside"
     },
-    "flavorText": "best player available gave you a premium TE, a late QB at tremendous value, late WRs, and boom-or-bust picks late. The Maverick's Twin plays by entirely different rules and still arrives at the same destination, a strong roster. Same destination, completely different route."
+    "flavorText": "Best player available gave you a premium TE, a late QB at tremendous value, late WRs, and boom-or-bust picks late. The Maverick's Twin plays by entirely different rules and still arrives at the same destination, a strong roster. Same destination, completely different route."
   },
   {
     "name": "The Logician",
@@ -759,18 +561,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, premium TE, late QB at maximum value, late WRs, and value-based drafting all the way to the final pick. The Logician can defend every single selection with cold, hard data and does not apologize for a single one. The logic is airtight. The roster reflects that."
-  },
-  {
-    "name": "The Rationalist",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB with a Hero WR, late QB at tremendous value, streamed TE, and value-based drafting conducting a precise logical analysis at every backend pick. The Rationalist identifies the Zero RB thesis as the most defensible strategic position in fantasy and applies formal logic to every subsequent selection, the late QB is the next logical step, and value-based drafting is the proof of concept. The logic was sound."
+    "flavorText": "Best player available, premium TE, late QB at maximum value, late WRs, and value-based drafting all the way to the final pick. The Logician can defend every single selection with cold, hard data and does not apologize for a single one. The logic is airtight. The roster reflects that."
   },
   {
     "name": "The Pragmatist",
@@ -781,18 +572,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "floor"
     },
-    "flavorText": "best player available gave you a value TE, a late QB, late WRs, and a reliable floor-first bench that never lets you down. The Pragmatist does what works, not what's exciting, and what works is building a dependable roster. Every pick served a purpose."
-  },
-  {
-    "name": "The Measured",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Zero RB with a Hero WR, late QB at a discount, streamed TE, and a floor-first backend built on pragmatic selection principles. The Measured makes the most defensible picks without requiring them to be exciting. Zero RB is the pragmatic stance on RB scarcity, late QB is the pragmatic value find, and the floor-first backend is the pragmatic finish. Practical. Correct."
+    "flavorText": "Best player available gave you a value TE, a late QB, late WRs, and a reliable floor-first bench that never lets you down. The Pragmatist does what works, not what's exciting, and what works is building a dependable roster. Every pick served a purpose."
   },
   {
     "name": "The Free Thinker",
@@ -803,7 +583,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "upside"
     },
-    "flavorText": "best player available, mid-round TE, late QB at value, late WRs, and boom-or-bust picks filling the entire bench. The Free Thinker doesn't follow a strategy, it builds one from scratch every single draft. The result is always original and usually excellent."
+    "flavorText": "Best player available, mid-round TE, late QB at value, late WRs, and boom-or-bust picks filling the entire bench. The Free Thinker doesn't follow a strategy, it builds one from scratch every single draft. The result is always original and usually excellent."
   },
   {
     "name": "The Cold Eye",
@@ -814,18 +594,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, mid-round TE, late QB at maximum value, late WRs, and value-based drafting driving every remaining pick. The Cold Eye sees the board with total clarity, no emotion, no sentiment, no clouded judgment. This is what objectivity looks like across fifteen rounds."
-  },
-  {
-    "name": "The Dispassionate",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB alongside a Hero WR, QB punt accepted, premium early TE, and value-based drafting building a cold, analytical backend. The Dispassionate views the draft without sentiment. Zero RB is the logical stance, QB punt is the value maximization, premium TE is the positional edge, and value-based drafting confirms every pick was correct. No emotion. Only analysis."
+    "flavorText": "Best player available, mid-round TE, late QB at maximum value, late WRs, and value-based drafting driving every remaining pick. The Cold Eye sees the board with total clarity, no emotion, no sentiment, no clouded judgment. This is what objectivity looks like across fifteen rounds."
   },
   {
     "name": "The Disciplined Pro",
@@ -836,7 +605,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "floor"
     },
-    "flavorText": "best player available, stream TE, late QB at tremendous value, late WRs, and a dependable floor-first bench. The Disciplined Pro has been burned by flashy rosters before and builds exclusively for reliability. Experience turned into discipline. Discipline turned into this roster."
+    "flavorText": "Best player available, stream TE, late QB at tremendous value, late WRs, and a dependable floor-first bench. The Disciplined Pro has been burned by flashy rosters before and builds exclusively for reliability. Experience turned into discipline. Discipline turned into this roster."
   },
   {
     "name": "The Stoic",
@@ -847,18 +616,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "upside"
     },
-    "flavorText": "best player available, stream TE, late QB, late WRs, and boom-or-bust picks, drafted without a single flinch or second guess. The Stoic approached the entire draft with complete emotional detachment and zero outcome anxiety. The picks are made. The process was sound. Whatever happens next was always going to happen."
-  },
-  {
-    "name": "The Unflinching",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Zero RB with a Hero WR, QB punt committed, streamed TE, and a floor-first backend. The Unflinching accepts every uncomfortable trade-off. Zero RB, punted QB, no TE premium, without flinching and builds a floor-first backend that holds together regardless of the circumstances. Stoic in approach. Steady in production."
+    "flavorText": "Best player available, stream TE, late QB, late WRs, and boom-or-bust picks, drafted without a single flinch or second guess. The Stoic approached the entire draft with complete emotional detachment and zero outcome anxiety. The picks are made. The process was sound. Whatever happens next was always going to happen."
   },
   {
     "name": "The Pure BPA",
@@ -880,18 +638,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, premium TE, mid-round QB at value, late WRs, and value-based drafting all the way to the final pick. The Long Game isn't worried about week 1, it's worried about week 14, when the field is thinned and this roster peaks. Patience is the entire strategy. The patience was real."
-  },
-  {
-    "name": "The Marathon",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB with a Hero WR, late QB at value, mid-round TE, and value-based drafting playing the long game through the entire backend. The Marathon is not designed for week three, the late QB is a value investment that compounds, the Hero WR is the steady asset, and value-based drafting makes every backend pick a long-term holding. The game is long. This team finishes it."
+    "flavorText": "Best player available, premium TE, mid-round QB at value, late WRs, and value-based drafting all the way to the final pick. The Long Game isn't worried about week 1, it's worried about week 14, when the field is thinned and this roster peaks. Patience is the entire strategy. The patience was real."
   },
   {
     "name": "The Contrarian's Cousin",
@@ -913,7 +660,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "upside"
     },
-    "flavorText": "best player available produced a reliable mid-round QB and TE. WRs deferred, then boom-or-bust picks everywhere late. The Underdog was counted out in the draft room. They will remember that feeling around week 8. It was assembled quietly and it is going to cause problems."
+    "flavorText": "Best player available produced a reliable mid-round QB and TE. WRs deferred, then boom-or-bust picks everywhere late. The Underdog was counted out in the draft room. They will remember that feeling around week 8. It was assembled quietly and it is going to cause problems."
   },
   {
     "name": "The Arbitrage",
@@ -924,7 +671,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "mid_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, mid-round QB and TE at value, late WRs, and value-based drafting finding price discrepancies all the way down. The Arbitrage finds the spread between price and value and profits from every single one. The inefficiencies were real. They were all exploited."
+    "flavorText": "Best player available, mid-round QB and TE at value, late WRs, and value-based drafting finding price discrepancies all the way down. The Arbitrage finds the spread between price and value and profits from every single one. The inefficiencies were real. They were all exploited."
   },
   {
     "name": "The Workhorse's Cousin",
@@ -935,7 +682,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "floor"
     },
-    "flavorText": "best player available gave you a mid-round QB, stream TE, late WRs, and a reliable dependable bench. The Workhorse's Cousin works just as hard as the Workhorse, with a slightly more flexible origin story. It shows up every week. That's the whole job."
+    "flavorText": "Best player available gave you a mid-round QB, stream TE, late WRs, and a reliable dependable bench. The Workhorse's Cousin works just as hard as the Workhorse, with a slightly more flexible origin story. It shows up every week. That's the whole job."
   },
   {
     "name": "The Dark Horse",
@@ -946,18 +693,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "upside"
     },
-    "flavorText": "best player available, mid-round QB, stream TE, late WRs, and high-ceiling boom-or-bust picks filling the backend. The Dark Horse isn't on anyone's preseason radar, which is precisely how this drafter planned it. Being underestimated is a competitive advantage."
-  },
-  {
-    "name": "The Longshot Contender",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "early_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with a Hero WR, late QB at value, premium early TE investment, and upside picks swinging for the fences late. The Longshot Contender is the team nobody picked in the preseason preview but is somehow leading the league by October. The shadow was deliberate. So was the roster."
+    "flavorText": "Best player available, mid-round QB, stream TE, late WRs, and high-ceiling boom-or-bust picks filling the backend. The Dark Horse isn't on anyone's preseason radar, which is precisely how this drafter planned it. Being underestimated is a competitive advantage."
   },
   {
     "name": "The Smart Money",
@@ -968,18 +704,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "stream_te",
       "late": "vbd"
     },
-    "flavorText": "best player available, mid-round QB on value, stream TE, late WRs, and value-based drafting all the way to the final pick. The Smart Money knows something the rest of the room doesn't, and bet accordingly at every turn. The market was mispriced. This drafter noticed first."
-  },
-  {
-    "name": "The Informed Edge",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB paired with a Hero WR, late QB taken at great value, streamed TE, and value-based drafting tracking every late-round pick. The Informed Edge identifies inefficiencies in the draft room and exploits them systematically from start to finish. The edge isn't luck. It's process."
+    "flavorText": "Best player available, mid-round QB on value, stream TE, late WRs, and value-based drafting all the way to the final pick. The Smart Money knows something the rest of the room doesn't, and bet accordingly at every turn. The market was mispriced. This drafter noticed first."
   },
   {
     "name": "The Steady Maverick",
@@ -990,7 +715,7 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "floor"
     },
-    "flavorText": "best player available gave you a premium TE, punted QB, late WRs, and a steady reliable bench with a high floor. The Steady Maverick is unconventional at the top of the draft, and completely responsible everywhere else. Bold where it counts, reliable where it must be."
+    "flavorText": "Best player available gave you a premium TE, punted QB, late WRs, and a steady reliable bench with a high floor. The Steady Maverick is unconventional at the top of the draft, and completely responsible everywhere else. Bold where it counts, reliable where it must be."
   },
   {
     "name": "The Maverick",
@@ -1001,7 +726,161 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "te": "early_te",
       "late": "upside"
     },
-    "flavorText": "best player available led to a premium TE, punted QB entirely, late WRs, and boom-or-bust picks all the way down. The Maverick follows the board wherever it goes, even when it goes somewhere nobody else would follow. The board led here. The Maverick had no hesitation."
+    "flavorText": "Best player available led to a premium TE, punted QB entirely, late WRs, and boom-or-bust picks all the way down. The Maverick follows the board wherever it goes, even when it goes somewhere nobody else would follow. The board led here. The Maverick had no hesitation."
+  },
+  {
+    "name": "The Data Driven",
+    "strategies": {
+      "rb": "bpa",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Best player available, premium TE, punted QB, late WRs, and value-based drafting all the way to the final pick, the data made every call. The Data Driven let the numbers make every single decision and never once overrode the signal. The data was consulted. The data was correct."
+  },
+  {
+    "name": "The Controlled Burn",
+    "strategies": {
+      "rb": "bpa",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Best player available, mid-round TE, punted QB, late WRs, and a reliable floor-first bench with no unnecessary risk. The Controlled Burn eliminates the deadwood without burning down the whole forest. Careful, deliberate, and surprisingly effective."
+  },
+  {
+    "name": "The Wildcard",
+    "strategies": {
+      "rb": "bpa",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "upside"
+    },
+    "flavorText": "Best player available led to a punted QB, mid-round TE, late WRs, and boom-or-bust picks that nobody in the room predicted. The Wildcard is impossible to game-plan against because nobody knows what card is coming next. Including, possibly, this drafter."
+  },
+  {
+    "name": "The Quant",
+    "strategies": {
+      "rb": "bpa",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Best player available, mid-round TE, punted QB, late WRs, and value-based drafting all the way down, the quantitative approach in its purest form. The Quant ran the regression, found punt QB to be the correct output, and acted on it without hesitation. The math was done. The math was right."
+  },
+  {
+    "name": "The Minimalist Pro",
+    "strategies": {
+      "rb": "bpa",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Best player available, punted QB, stream TE, late WRs, and a lean reliable backend, everything unnecessary was cut. The Minimalist Pro is efficient by nature, not by effort, the simplest approach that still works. Less is more. This roster is proof."
+  },
+  {
+    "name": "The Free Spirit",
+    "strategies": {
+      "rb": "bpa",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Best player available, punted QB, stream TE, late WRs, and boom-or-bust picks everywhere late, no rules, no agenda. The Free Spirit goes wherever the vibes take them, and the vibes apparently led somewhere with real upside. No plan. Great result. That's the spirit."
+  },
+  {
+    "name": "The Pure Value",
+    "strategies": {
+      "rb": "bpa",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Best player available, punted QB, stream TE, late WRs, and value-based drafting driving every remaining pick without exception. The Pure Value doesn't draft, it harvests, round after round, extracting maximum value from minimum investment. The harvest was excellent."
+  },
+  {
+    "name": "The Talent Evaluator",
+    "strategies": {
+      "rb": "hero_rb",
+      "wr": "robust_wr",
+      "qb": "mid_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Hero RB anchored by a workhorse back, Robust WR depth alongside it, mid-round QB, streamed TE, and value-based drafting precision late. The Talent Evaluator did the film work before the draft started and trusted it through every round. Every pick is defensible. The tape doesn't lie."
+  },
+  {
+    "name": "The Examiner",
+    "strategies": {
+      "rb": "hero_rb",
+      "wr": "robust_wr",
+      "qb": "late_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Hero RB with stacked WRs, a late QB at maximum value, mid-round TE, and value-based drafting pulling the backend into shape. The Examiner ran the numbers on every position, every round, and produced a roster where every pick makes sense on paper. The analysis was thorough. The roster is the report."
+  },
+  {
+    "name": "The Ironhand",
+    "strategies": {
+      "rb": "hero_rb",
+      "wr": "robust_wr",
+      "qb": "late_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Hero RB paired with deep WR investment, a late QB taken at a discount, streamed TE, and floor-first depth throughout. The Ironhand built this team to survive the season without drama, no boom weeks required, no busts tolerated. Fifteen rounds of composure. The composure shows."
+  },
+  {
+    "name": "The Window Spotter",
+    "strategies": {
+      "rb": "hero_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Hero RB leading the way, WRs taken late and at value, late QB at a discount, mid-round TE, and value-based drafting as the closing philosophy. The Window Spotter knows when every position peaks in value and drafts accordingly, patience is the edge, timing is the weapon. Every trigger was pulled at the right moment."
+  },
+  {
+    "name": "The Dispatch",
+    "strategies": {
+      "rb": "hero_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Hero RB paired with late WRs, early QB priority, streamed TE, and value-based drafting providing direction through every backend round. The Dispatch runs the draft room with authority, every pick serves the roster strategy, no exceptions made, no deviations tolerated. The command was total. The roster reflects it."
+  },
+  {
+    "name": "The Commanding Officer",
+    "strategies": {
+      "rb": "hero_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Hero RB with WRs taken late, early QB locked in, streamed TE, and a floor-first backend built for durability. The Commanding Officer commands the roster from the front, sets the tone with the RB anchor, and keeps every position group disciplined. The general leads from the top. The roster follows."
+  },
+  {
+    "name": "The Planner",
+    "strategies": {
+      "rb": "hero_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Hero RB with late WRs, early QB secured, mid-round TE, and value-based drafting closing out the backend. The Planner mapped the draft before the first pick and executed a plan that balanced every position group without compromise. The board was a chessboard. Every move was calculated."
   },
   {
     "name": "The Outlier",
@@ -1013,94 +892,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "late": "upside"
     },
     "flavorText": "Hero RB with full WR investment, late QB at real value, premium early TE, and boom-or-bust upside swinging through the backend. The Outlier takes the path nobody else is walking and trusts the conviction all the way to the final round. Unconventional was the point. Upside was the reward."
-  },
-  {
-    "name": "The Data Driven",
-    "strategies": {
-      "rb": "bpa",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "best player available, premium TE, punted QB, late WRs, and value-based drafting all the way to the final pick, the data made every call. The Data Driven let the numbers make every single decision and never once overrode the signal. The data was consulted. The data was correct."
-  },
-  {
-    "name": "The Controlled Burn",
-    "strategies": {
-      "rb": "bpa",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "best player available, mid-round TE, punted QB, late WRs, and a reliable floor-first bench with no unnecessary risk. The Controlled Burn eliminates the deadwood without burning down the whole forest. Careful, deliberate, and surprisingly effective."
-  },
-  {
-    "name": "The Wildcard",
-    "strategies": {
-      "rb": "bpa",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "upside"
-    },
-    "flavorText": "best player available led to a punted QB, mid-round TE, late WRs, and boom-or-bust picks that nobody in the room predicted. The Wildcard is impossible to game-plan against because nobody knows what card is coming next. Including, possibly, this drafter."
-  },
-  {
-    "name": "The Quant",
-    "strategies": {
-      "rb": "bpa",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "best player available, mid-round TE, punted QB, late WRs, and value-based drafting all the way down, the quantitative approach in its purest form. The Quant ran the regression, found punt QB to be the correct output, and acted on it without hesitation. The math was done. The math was right."
-  },
-  {
-    "name": "The Modeler",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "robust_wr",
-      "qb": "punt_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB alongside deep Robust WR investment, QB fully punted, premium early TE, and value-based drafting quantifying every unit of value from the backend. The Modeler ran the models before the draft, confirmed the Zero RB and premium TE thesis with the data, punted QB as the model suggested, and used value-based drafting to validate every pick from round five on. The model was correct."
-  },
-  {
-    "name": "The Minimalist Pro",
-    "strategies": {
-      "rb": "bpa",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "best player available, punted QB, stream TE, late WRs, and a lean reliable backend, everything unnecessary was cut. The Minimalist Pro is efficient by nature, not by effort, the simplest approach that still works. Less is more. This roster is proof."
-  },
-  {
-    "name": "The Free Spirit",
-    "strategies": {
-      "rb": "bpa",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "best player available, punted QB, stream TE, late WRs, and boom-or-bust picks everywhere late, no rules, no agenda. The Free Spirit goes wherever the vibes take them, and the vibes apparently led somewhere with real upside. No plan. Great result. That's the spirit."
-  },
-  {
-    "name": "The Pure Value",
-    "strategies": {
-      "rb": "bpa",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "best player available, punted QB, stream TE, late WRs, and value-based drafting driving every remaining pick without exception. The Pure Value doesn't draft, it harvests, round after round, extracting maximum value from minimum investment. The harvest was excellent."
   },
   {
     "name": "The Empire",
@@ -1156,17 +947,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "late": "upside"
     },
     "flavorText": "Hero RB leading the way, heavy WR investment built around it, early QB locked in, mid-round TE, and boom-or-bust upside late. The Power Broker makes big commitments early and dares the rest of the league to match them. Bold picks. Bigger expectations."
-  },
-  {
-    "name": "The Freight Train",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB depth with WRs added late, early QB locked in, mid-round TE, and a floor-first backend. The Freight Train with a Robust RB approach locks up the ground game and the signal-caller simultaneously, the broker made two big deals before anyone else at the table was ready. The deals were made. The roster reflects them."
   },
   {
     "name": "The Executive Suite",
@@ -1356,17 +1136,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
     "flavorText": "Hero RB alongside heavy WR investment, mid-round QB, streamed TE, and a floor-first backend that plays it safe every week. The Conservative knows that the safest roster is the one still in contention in week fourteen. No fireworks. Just wins."
   },
   {
-    "name": "The Cautious",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Zero RB strategy with a Hero WR, mid-round QB, early premium TE, and a floor-first backend. The Cautious chose the Zero RB path with all three major positions managed carefully, mid-round QB at value, premium TE, and a floor-first backend that holds position every week. Conservative. Correct."
-  },
-  {
     "name": "The Air Raid Classic",
     "strategies": {
       "rb": "hero_rb",
@@ -1376,17 +1145,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "late": "upside"
     },
     "flavorText": "Hero RB with deep WR stacking, mid-round QB, streamed TE, and boom-or-bust upside picks throughout the entire backend. The Air Raid Classic runs it through the air at every position except the backfield, the Hero RB is the anchor, everything else is a target. The ball is in the air. Catch it."
-  },
-  {
-    "name": "The Air Raid Zero",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "robust_wr",
-      "qb": "mid_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "Zero RB alongside stacked Robust WRs, mid-round QB, streamed TE, and boom-or-bust upside picks running the air raid through the backend. The Air Raid Zero runs the same play every year, stack WRs, grab the QB in the middle rounds, skip the RBs entirely, and swing for the ceiling late. Classic play. Classic result."
   },
   {
     "name": "The Reliable",
@@ -1499,17 +1257,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
     "flavorText": "Hero RB with WRs taken late across the board, early QB priority established, premium early TE investment, and a floor-first backend. The Sure Thing builds around certainties, the elite RB, the premium TE, the reliable QB, and lets the late WRs add depth behind it. Certain foundation. Solid structure."
   },
   {
-    "name": "The Certainty",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB with late WRs, late QB at excellent value, premium early TE, and a floor-first backend. The Certainty anchors both skill positions, the Robust RB room and the premium TE, and gets the QB at tremendous value late. Two sure things locked in. The late QB was the third."
-  },
-  {
     "name": "The Luxury Tax",
     "strategies": {
       "rb": "hero_rb",
@@ -1541,17 +1288,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "late": "floor"
     },
     "flavorText": "Hero RB with WRs taken late, early QB secured, mid-round TE, and a floor-first backend built for consistent production. The Blueprint was drawn before the first pick and followed without revision, the Hero RB is the load-bearing wall, everything else is built to spec. Plans don't deviate. Neither did this draft."
-  },
-  {
-    "name": "The Schematic",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "robust_wr",
-      "qb": "early_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Zero RB strategy committed, heavy Robust WR investment built alongside it, early QB locked in, premium early TE, and a floor-first backend. The Schematic was drawn before the first pick and followed without a single revision. Zero RB as the architecture, early QB and TE as the load-bearing walls, and a floor-first backend as the foundation. Plans don't deviate. Neither did this draft."
   },
   {
     "name": "The Signal Caller",
@@ -1598,17 +1334,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
     "flavorText": "Hero RB paired with late WRs, late QB at value, premium early TE, and boom-or-bust upside picks through the backend. The Cornerstone stakes the entire structure on two premium investments and builds the rest with ceiling-chasing picks at value. The cornerstone is set. The ceiling is wherever the picks land."
   },
   {
-    "name": "The Load Bearing",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB depth anchored alongside a Hero WR, mid-round QB, premium early TE, and a floor-first backend. The Load Bearing stakes the structure on three premium positions, the Robust RBs, the WR, and the TE, and builds reliable floor around them. Three cornerstones. Unshakeable structure."
-  },
-  {
     "name": "The Value Engineer",
     "strategies": {
       "rb": "hero_rb",
@@ -1631,17 +1356,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
     "flavorText": "Hero RB paired with late WRs, late QB at a discount, mid-round TE, and a floor-first backend with reliable depth throughout. The Reliable Duo is exactly what the name says, the RB and TE are locked in every week, the rest fills in around them, and the team wins more than it loses. Reliability is repeatable."
   },
   {
-    "name": "The Twin Pillars",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB with a Hero WR, late QB at value, streamed TE, and a floor-first backend built for consistent weekly output. The Twin Pillars version two is still built around two reliable anchors, the Robust RB depth and the Hero WR, with everything else managed efficiently at value. The duo is different. The reliability is not."
-  },
-  {
     "name": "The Late Bloomer",
     "strategies": {
       "rb": "hero_rb",
@@ -1653,17 +1367,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
     "flavorText": "Hero RB with late WRs taken at value, late QB, mid-round TE, and boom-or-bust upside picks going deep in the backend. The Late Bloomer builds for the second half of the season, the late picks get cheaper and more explosive as the draft progresses, and this team is built to peak at the right time. The bloom is coming."
   },
   {
-    "name": "The Second Wind",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB alongside a Hero WR, late QB at great value, streamed TE, and boom-or-bust upside picks timing the backend for a late surge. The Second Wind with a Robust RB foundation has more ground-game security than its namesake, the RB depth provides the floor while the upside backend schedules the bloom. Two anchors. One bloom."
-  },
-  {
     "name": "The Hard Hat",
     "strategies": {
       "rb": "hero_rb",
@@ -1673,17 +1376,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "late": "floor"
     },
     "flavorText": "Hero RB with late WRs, late QB at a discount, streamed TE, and a floor-first backend filled with reliable depth. The Hard Hat clocks in every week and produces without complaint, no flashy moments, no fantasy headlines, just points in the box score and wins on the schedule. Clock in. Clock out. Win."
-  },
-  {
-    "name": "The Steel Toed",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB depth with late WRs, late QB at a discount, mid-round TE, and a floor-first backend built on grind-ready reliability. The Steel Toed with Robust RB depth clocks in twice every week, once from the backfield and once from the WR corps, and produces without asking for recognition. Clock in. Clock out. Win."
   },
   {
     "name": "The Bet Hedger",
@@ -1884,17 +1576,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
     "flavorText": "Hero RB with late WRs, QB punt, streamed TE, and a floor-first backend built on reliable production above all else. The Bruiser takes the hits and keeps moving, a punted QB, streamed TE, and floor-first backend means this team produces without relying on volatility. Durable. Relentless."
   },
   {
-    "name": "The Battering Ram",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB investment with late WRs, QB fully punted, streamed TE, and a floor-first backend built to absorb any blow the schedule delivers. The Battering Ram with a Robust RB foundation hits harder than the single-back version, the depth at running back means the ground game never stops, even when the QB position is empty. Durable. Relentless. Every week."
-  },
-  {
     "name": "The Lone Ranger",
     "strategies": {
       "rb": "hero_rb",
@@ -1915,677 +1596,6 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "late": "vbd"
     },
     "flavorText": "Hero RB with late WRs, QB punt, streamed TE, and value-based drafting tracking the committee through every backend round. The Run Committee distributes the draft equity across every position except QB and uses value-based drafting to ensure every selection carries its weight. The committee voted. Value-based drafting ran the meeting."
-  },
-  {
-    "name": "The Blue Chip",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB investment anchored the draft, Hero WR paired alongside it, early QB locked in, premium early TE, and a floor-first backend. The Blue Chip draft has the two most valuable assets in fantasy, the elite RB room and the premium receiver, surrounded by reliable supporting pieces. The chips were blue. The floor is high."
-  },
-  {
-    "name": "The Big Four",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "early_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB depth established early, Hero WR alongside it, early QB on board, premium early TE, and boom-or-bust upside late. The Big Four locked up four premium positions before the middle rounds and built the backend on upside ceiling. Four big assets. One direction: up."
-  },
-  {
-    "name": "The Asset Manager",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB with a Hero WR, early QB secured, premium early TE, and value-based drafting managing every backend pick with total precision. The Asset Manager identifies undervalued assets at every position and accumulates them systematically, the Robust RBs, the Hero WR, the early TE are all performing assets. The portfolio is stacked."
-  },
-  {
-    "name": "The Grand Slam",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB depth alongside a Hero WR, early QB locked in, mid-round TE, and a floor-first backend with no weak spots. The Grand Slam connects at every major position, the RBs, the WR, the QB, the TE, and builds out from there with conservative depth. Base hit on every pick. Grand slam on the roster."
-  },
-  {
-    "name": "The Big Three",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "mid_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with a Hero WR, early QB, mid-round TE, and boom-or-bust upside picks swinging hard through the backend. The Big Three locked up three premium offensive positions and dared the backend to deliver a championship. The three are big. The ceiling is bigger."
-  },
-  {
-    "name": "The GM",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB investment alongside a Hero WR, early QB, mid-round TE, and value-based drafting managing every remaining pick with precision. The GM runs the most complete front office in the draft room, the early investments are premium, the backend picks are optimal, and every roster decision is defensible. GMs build winners. This one did."
-  },
-  {
-    "name": "The Power Play",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB with a Hero WR, early QB, streamed TE, and a floor-first backend built around reliable weekly production. The Power Play sets up the formation with elite RBs and a top WR and runs it straight at the defense every week. The power is on. The play is called."
-  },
-  {
-    "name": "The Triple Header",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB depth alongside a Hero WR, early QB, streamed TE, and boom-or-bust upside picks filling every backend spot. The Triple Header puts three scoring threats on the field and backs them up with high-ceiling depth that can hit on any given week. Three ways to win. All of them active."
-  },
-  {
-    "name": "The Brass Tacks",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB with a Hero WR, early QB, streamed TE, and value-based drafting extracting every available unit of value through the entire backend. The Brass Tacks gets to the point: Robust RB, Hero WR, early QB, value-based drafting backend, no complexity, no overthinking, just the core principles applied without compromise. Tacks are in. Poster is up."
-  },
-  {
-    "name": "The Long Shot",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB depth with a Hero WR, late QB taken at real value, premium early TE, and a floor-first backend. The Long Shot plays the odds, the Robust RBs and Hero WR are the reliable core, the late QB is the value play, and the floor-first backend is the insurance policy. Long shot. Solid floor."
-  },
-  {
-    "name": "The Underdog Play",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB alongside a Hero WR, late QB at maximum value, early TE premium, and value-based drafting closing out the backend. The Underdog Play doesn't need every pick to hit, the Robust RB depth provides redundancy, the Hero WR anchors, and value-based drafting fills in around them with the most defensible picks available. The underdog always has a path."
-  },
-  {
-    "name": "The Reliable Roster",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB depth with a Hero WR, late QB at a discount, mid-round TE, and a floor-first backend that produces every week. The Reliable Roster has depth at every position, value at the QB and TE spots, and a floor-first backend that doesn't leave points on the bench. Reliability wasn't accidental. It was the goal."
-  },
-  {
-    "name": "The Late Surge",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "late_qb",
-      "te": "mid_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with a Hero WR, late QB at great value, mid-round TE, and boom-or-bust upside picks surging through the backend. The Late Surge builds the foundation first and saves the fireworks for the second half of the draft, and the second half of the season. The surge is loaded. Wait for it."
-  },
-  {
-    "name": "The Loaded Roster",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "early_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with a Hero WR, mid-round QB, premium early TE, and boom-or-bust upside picks loading up the backend. The Loaded Roster is exactly what it sounds like, premium at RB, WR, and TE, reliable QB in the middle, and upside picks stacking the bench behind it. It's loaded. Handle accordingly."
-  },
-  {
-    "name": "The Complete Roster",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB alongside a Hero WR, mid-round QB, premium early TE, and value-based drafting running the backend with systematic precision. The Complete Roster checks every box, the RB depth, the WR anchor, the TE premium, the QB value, and the value-based backend. Every column has a number. Every number is positive."
-  },
-  {
-    "name": "The Balanced Attack",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB depth with a Hero WR, mid-round QB, mid-round TE, and a floor-first backend built for consistent weekly output. The Balanced Attack doesn't need to win with any one position, it wins with balance, depth, and the inability to be targeted at a single weak spot. Every attack was balanced. Every week is covered."
-  },
-  {
-    "name": "The Dual Threat",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "mid_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with a Hero WR, mid-round QB, mid-round TE, and boom-or-bust upside picks filling every backend slot. The Dual Threat runs it and throws it, the Robust RBs carry the ground game and the Hero WR commands the air, with the backend swings deciding the margin. Two threats. Multiple ways to score."
-  },
-  {
-    "name": "The Diversified",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB alongside a Hero WR, mid-round QB, mid-round TE, and value-based drafting diversifying the backend across every available value. The Diversified holds positions in every category and manages the portfolio with the same analytical rigor applied to every single pick. No concentration risk. Maximum diversification."
-  },
-  {
-    "name": "The Coalition",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB with a Hero WR, mid-round QB, streamed TE, and a floor-first backend built through collective reliability. The Coalition combines every ground-game asset with a receiving star, manages the QB and TE efficiently, and closes with a floor-first backend that never surrenders a week. The coalition holds."
-  },
-  {
-    "name": "The Alliance",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "early_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Zero RB with a Hero WR, early QB locked in, mid-round TE, and a floor-first backend. The Alliance brings together the pass-catching investments. Hero WR, early QB, and builds floor-first reliability around them. The coalition holds every week."
-  },
-  {
-    "name": "The Contrarian",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB depth alongside a Hero WR, mid-round QB, streamed TE, and boom-or-bust upside picks going against the grain throughout. The Contrarian builds the team the room is avoiding and trusts that the unpopular combination is actually the correct one. The contrarian position is often the best one. Often is enough."
-  },
-  {
-    "name": "The Dissenter",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Zero RB with a Hero WR, QB punt, mid-round TE, and value-based drafting identifying the contrarian value the room left on the board. The Dissenter disagrees with consensus at every position and builds the case with value-based drafting at every backend pick. The contrarian position was correct. Value-based drafting is the evidence."
-  },
-  {
-    "name": "The Diversified Portfolio",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "mid_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB with a Hero WR, mid-round QB, streamed TE, and value-based drafting diversifying the backend across multiple positions and values. The Diversified Portfolio holds assets in every fantasy category and rebalances through value-based drafting all the way to the final round. Diverse inputs. Optimized output."
-  },
-  {
-    "name": "The Chaos Theory",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB alongside a Hero WR, QB fully punted, mid-round TE, and boom-or-bust upside picks shattering conventional wisdom. The Chaos Theory generates unpredictable outcomes from organized inputs, the Robust RBs and Hero WR are the structure, the punted QB and upside backend are the chaos. Theory confirmed."
-  },
-  {
-    "name": "The Spartan",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB depth with a Hero WR, QB punt accepted, mid-round TE, and value-based drafting extracting every unit of value from the backend. The Spartan eliminates waste at the QB position and redirects the value saved into the deepest, most defensible roster possible. No excess. Only necessity."
-  },
-  {
-    "name": "The Stripped Down",
-    "strategies": {
-      "rb": "zero_rb",
-      "wr": "robust_wr",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Zero RB alongside heavy Robust WR depth, QB punt, streamed TE, and a floor-first backend. The Stripped Down has no room for luxury: Zero RB, punted QB, streamed TE, and a floor-first backend mean every resource was deployed at WR depth. Nothing wasted. No luxuries. Results only."
-  },
-  {
-    "name": "The Iron Will",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB alongside a Hero WR, QB punted entirely, streamed TE, and a floor-first backend built with iron discipline. The Iron Will bends around the absence of a reliable QB and holds together through sheer depth and floor-first discipline at every remaining position. The will is iron. The roster holds."
-  },
-  {
-    "name": "The Maverick's Mirror",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with a Hero WR, QB punt, streamed TE, and boom-or-bust upside picks filling the backend with maximum variance. The Maverick's Mirror reflects the original approach, punt the conventional, chase the ceiling, trust the process even when nobody else does. The reflection is correct. So is the roster."
-  },
-  {
-    "name": "The Stoic's Formula",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "hero_wr",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB depth alongside a Hero WR, QB fully punted, streamed TE, and value-based drafting driving the backend with systematic discipline. The Stoic's Formula accepts the discomfort of the punted QB and executes value-based drafting through the backend without emotional interference. The formula doesn't require comfort. Just execution."
-  },
-  {
-    "name": "The Power Formation",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB investment anchored the formation, late WRs added at value, early QB locked in, premium early TE, and a floor-first backend. The Power Formation stacks the ground game first, secures the signal-caller early, anchors the TE position, and fills in the WRs at value behind it. The formation is set. Run the play."
-  },
-  {
-    "name": "The Triple Crown",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "early_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with late WRs, early QB priority, premium early TE, and boom-or-bust upside picks sweeping through the backend. The Triple Crown claims three distinct positional titles, the RB room, the early QB, and the premium TE, then rides upside swings to the finish line. The crown has three points. All three are set."
-  },
-  {
-    "name": "The War Room General",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB alongside late WRs, early QB, premium early TE, and value-based drafting running the entire backend operation. The War Room General maps the entire draft before pick one and executes the playbook without improvisation. The war room prepared. The general delivered."
-  },
-  {
-    "name": "The Triple Threat",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "mid_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with late WRs, early QB, mid-round TE, and boom-or-bust upside picks threatening at every backend spot. The Triple Threat attacks from three directions, the ground game, the signal-caller, and the upside swings, and forces the schedule to defend all of them simultaneously. Three threats. One direction."
-  },
-  {
-    "name": "The Draft Board",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB depth with late WRs, early QB, mid-round TE, and value-based drafting building the entire backend from a ranked list. The Draft Board trusts the board completely, the early picks are premium, the QB is secured, and value-based drafting handles every decision from round five onward. The board was correct. It always is."
-  },
-  {
-    "name": "The Formation",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB alongside late WRs, early QB secured, streamed TE, and a floor-first backend built on consistent production. The Formation sets up the ground game, locks in the signal-caller early, and fills the remaining positions with reliable floor-first pieces. The formation is locked. Run it every week."
-  },
-  {
-    "name": "The Gambler's Gambit",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB with late WRs, early QB, streamed TE, and boom-or-bust upside picks executing the most aggressive backend gambit available. The Gambler's Gambit locks in the safe investments first, the RBs and QB, then swings on everything else. The gambit was set before the draft started. The chips are all in."
-  },
-  {
-    "name": "The Draft Room",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "early_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB alongside late WRs, early QB, streamed TE, and value-based drafting managing every backend selection with the precision of a scouting department. The Draft Room runs the process the way it was designed, early positional priority, QB secured, value-based drafting closing, and the roster reflects every decision made correctly. The room produced."
-  },
-  {
-    "name": "The Trenches",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "early_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB depth with late WRs, late QB at real value, premium early TE, and boom-or-bust upside picks attacking from the backend. The Trenches wins in the line of scrimmage, the RBs and TE are the premium investments, the QB is the value find, and the backend swings are the fourth quarter surge. Win in the trenches. Win the league."
-  },
-  {
-    "name": "The Return on Rushes",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB with late WRs, late QB at a discount, premium early TE, and value-based drafting extracting maximum value through every backend pick. The Return on Rushes calculates the value generated by every ground-game carry and applies the same principle to every draft pick. The return was positive at every position."
-  },
-  {
-    "name": "The Lottery Ticket",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "mid_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB alongside late WRs, late QB at value, mid-round TE, and boom-or-bust upside picks stacking every backend slot. The Lottery Ticket buys all of them, the Robust RBs are the certain investment, the late QB is the value play, and every backend pick is a ticket stub. One of them hits. That's enough."
-  },
-  {
-    "name": "The Value Play",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB depth with late WRs, late QB, mid-round TE, and value-based drafting running the backend with clean mathematical discipline. The Value Play runs the same calculation every round, which player returns the most value relative to position scarcity, and executes without sentiment. Every pick was a value play. The value played."
-  },
-  {
-    "name": "The Workhorse Classic",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB with late WRs, late QB at real value, streamed TE, and a floor-first backend that never takes a bad week. The Workhorse Classic builds around the ground game, grabs the QB at maximum value, and fills every remaining position with floor-first reliability. Classic approach. Classic results."
-  },
-  {
-    "name": "The Hammer Drop",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB alongside late WRs, late QB, streamed TE, and boom-or-bust upside picks hammering the entire backend. The Hammer Drop establishes position at RB, grabs the QB at a discount, and then drops the hammer on every upside pick remaining. The hammer was raised in round three. It fell everywhere else."
-  },
-  {
-    "name": "The Mileage Counter",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "late_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB depth with late WRs, late QB at value, streamed TE, and value-based drafting counting every yard of value from the first pick to the last. The Mileage Counter logs every pick at optimal efficiency and measures the season the same way, one correct decision at a time, from week one to the championship. Every mile was logged."
-  },
-  {
-    "name": "The Portfolio",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "mid_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB with late WRs, mid-round QB, premium early TE, and a floor-first backend with diversified depth throughout. The Portfolio allocates capital to every premium position and manages the remaining assets with floor-first discipline. Diversified. Defensible. Durable."
-  },
-  {
-    "name": "The Full House",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "mid_qb",
-      "te": "early_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB alongside late WRs, mid-round QB, premium early TE, and boom-or-bust upside picks filling the house. The Full House has a premium player at every position that matters and chaos picks filling in behind them. The house is full. The visitors have nowhere to sit."
-  },
-  {
-    "name": "The Machine",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "mid_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB depth with late WRs, mid-round QB, premium early TE, and value-based drafting optimizing every backend pick with systematic precision. The Machine does not miss picks, the inputs are correct, the process is clean, and value-based drafting generates the most defensible output available at every position. The machine ran perfectly."
-  },
-  {
-    "name": "The Trench Worker",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "mid_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB with late WRs, mid-round QB, mid-round TE, and a floor-first backend filled with trench-level reliability. The Trench Worker punches the clock at every draft position and builds a team that wins through sheer production volume rather than star power. The work ethic is visible in every round."
-  },
-  {
-    "name": "The Gridiron",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "mid_qb",
-      "te": "mid_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB alongside late WRs, mid-round QB, mid-round TE, and boom-or-bust upside picks ripping through the backend. The Gridiron was built on the ground game and finished on big swings, the RBs set the tone and the backend picks decide whether this team has a championship ceiling. The gridiron is ready."
-  },
-  {
-    "name": "The Meat and Potatoes",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "mid_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB depth with late WRs, mid-round QB, mid-round TE, and value-based drafting providing simple, unadorned value at every backend pick. The Meat and Potatoes doesn't need a sophisticated strategy, the best available player at every position, priced fairly, taken when the board says to. Meat. Potatoes. Wins."
-  },
-  {
-    "name": "The Powerhouse",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "mid_qb",
-      "te": "stream_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB with late WRs, mid-round QB, streamed TE, and a floor-first backend that powers through every week without breaking. The Powerhouse generates consistent output across every lineup slot and refuses to surrender a week to circumstance. The power is always on."
-  },
-  {
-    "name": "The Hammer",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "mid_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB alongside late WRs, mid-round QB, streamed TE, and boom-or-bust upside picks falling with maximum impact. The Hammer struck at RB in the early rounds and kept swinging on upside picks all the way through the backend. The impact of each swing is cumulative. The ceiling is high."
-  },
-  {
-    "name": "The Strongman",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "mid_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB depth with late WRs, mid-round QB, streamed TE, and value-based drafting building out the backend with structural precision. The Strongman carries the weight of the ground-game investment and supports it with a value-based backend that never bends under pressure. The structure holds. It was built that way."
-  },
-  {
-    "name": "The Behemoth",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "early_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB alongside late WRs, QB fully punted, premium early TE, and a floor-first backend that gives nothing away. The Behemoth is the largest possible commitment to non-QB positions, the RBs and TE are both premium investments, the QB is punted, and the backend is built to absorb any shock. Enormous. Immovable."
-  },
-  {
-    "name": "The Tank",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "early_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB depth with late WRs, QB punt, premium early TE, and boom-or-bust upside picks filling every backend slot. The Tank rolls through the draft with no concern for the QB position and maximum concern for peak roster upside. Armored at the skill positions. Exposed at QB. Worth it."
-  },
-  {
-    "name": "The Juggernaut",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "early_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB with late WRs, QB punted entirely, premium early TE, and value-based drafting driving every backend pick. The Juggernaut cannot be stopped by a missing QB, the RB depth, the WR value, and the premium TE generate enough production to overwhelm most opponents without a top signal-caller. The juggernaut is rolling."
-  },
-  {
-    "name": "The Steel Curtain",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "floor"
-    },
-    "flavorText": "Robust RB alongside late WRs, QB fully punted, mid-round TE, and a floor-first backend that holds the line every week. The Steel Curtain drops at the QB position and builds an impenetrable wall of RB depth, WR value, and floor-first reliability everywhere else. The curtain is steel. It doesn't move."
-  },
-  {
-    "name": "The Bulldozer",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB depth with late WRs, QB punt, mid-round TE, and boom-or-bust upside picks bulldozing through the backend. The Bulldozer clears every obstacle in its path, the RBs are the blade, the backend swings are the engine, and the punted QB is just a speed bump. The path is clear."
-  },
-  {
-    "name": "The No-QB Club",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "mid_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB with late WRs, QB fully punted, mid-round TE, and value-based drafting maximizing every unit of value at every backend position. The No-QB Club has zero interest in drafting a starting quarterback early and complete interest in value-based drafting at every other position. The club has one rule. Value-based drafting has the rest."
-  },
-  {
-    "name": "The Gunslinger's Nemesis",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "upside"
-    },
-    "flavorText": "Robust RB alongside late WRs, QB punted, streamed TE, and boom-or-bust upside picks all the way through the backend. The Gunslinger's Nemesis was built to beat exactly one type of team, the QB-first roster that sacrificed positional depth to grab a signal-caller early. The nemesis is ready."
-  },
-  {
-    "name": "The Old Faithful",
-    "strategies": {
-      "rb": "robust_rb",
-      "wr": "wr_late",
-      "qb": "punt_qb",
-      "te": "stream_te",
-      "late": "vbd"
-    },
-    "flavorText": "Robust RB depth with late WRs, QB punt, streamed TE, and value-based drafting extracting every last unit of value from the backend. The Old Faithful runs the same course every season. Robust RBs, punt QB, trust value-based drafting, and the geyser goes off on schedule every time. Reliable. Predictable. Correct."
   },
   {
     "name": "The Lock In",
@@ -3378,6 +2388,996 @@ export const ARCHETYPE_LIST: NamedArchetype[] = [
       "late": "vbd"
     },
     "flavorText": "Running backs and wide receivers were loaded deliberately through the early rounds, with WRs revisited mid-draft, the tight end streamed late, and the quarterback punted to the final rounds where value-based drafting runs the backend like a system that cannot be second-guessed. The Robot Builder assembled the roster using an automated process that rejected emotion at every position, skill positions early, WRs mid, QB punted, value-based drafting closing, and output the optimal roster without a single deviation. The build was systematic. The results were not accidental."
+  },
+  {
+    "name": "The Prospector",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB paired with a Hero WR, late QB taken at tremendous value, mid-round TE, and value-based drafting guiding the backend without exception. The Prospector finds the mispriced asset at every position and takes it before anyone else identifies the opportunity. The value was there. It always is."
+  },
+  {
+    "name": "The Underwriter",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB with a Hero WR riding alongside it, full QB punt, premium early TE, and value-based drafting extracting every available drop of value late. The Underwriter ran the probability tables on every possible build and determined this combination produces the best expected outcomes. The actuary's table doesn't care about feelings. Just frequency."
+  },
+  {
+    "name": "The Ascetic",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB paired with a Hero WR, full QB punt accepted, premium early TE investment, and a floor-first conservative backend. The Ascetic drafts without ego, without noise, and without the temptation to overcomplicate what already works. Silence and discipline. The roster reflects both."
+  },
+  {
+    "name": "The Heretic",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "early_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with a Hero WR running alongside it, QB punted entirely, premium early TE, and boom-or-bust upside picks filling the backend. The Heretic rejects every convention that doesn't make mathematical sense and builds the team the field is too timid to draft. Convention is overrated. The ceiling is not."
+  },
+  {
+    "name": "The Grinding Stone",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB with a Hero WR anchor, QB fully punted, mid-round TE, and a floor-first backend built to grind through the entire schedule. The Grinding Stone doesn't need a splash moment, it accumulates quietly and is difficult to beat by week twelve. Nobody sees it coming until it's too late."
+  },
+  {
+    "name": "The Longshot Contender",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "early_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with a Hero WR, late QB at value, premium early TE investment, and upside picks swinging for the fences late. The Longshot Contender is the team nobody picked in the preseason preview but is somehow leading the league by October. The shadow was deliberate. So was the roster."
+  },
+  {
+    "name": "The Informed Edge",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB paired with a Hero WR, late QB taken at great value, streamed TE, and value-based drafting tracking every late-round pick. The Informed Edge identifies inefficiencies in the draft room and exploits them systematically from start to finish. The edge isn't luck. It's process."
+  },
+  {
+    "name": "The Freight Train",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB depth with WRs added late, early QB locked in, mid-round TE, and a floor-first backend. The Freight Train with a Robust RB approach locks up the ground game and the signal-caller simultaneously, the broker made two big deals before anyone else at the table was ready. The deals were made. The roster reflects them."
+  },
+  {
+    "name": "The Certainty",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB with late WRs, late QB at excellent value, premium early TE, and a floor-first backend. The Certainty anchors both skill positions, the Robust RB room and the premium TE, and gets the QB at tremendous value late. Two sure things locked in. The late QB was the third."
+  },
+  {
+    "name": "The Load Bearing",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB depth anchored alongside a Hero WR, mid-round QB, premium early TE, and a floor-first backend. The Load Bearing stakes the structure on three premium positions, the Robust RBs, the WR, and the TE, and builds reliable floor around them. Three cornerstones. Unshakeable structure."
+  },
+  {
+    "name": "The Twin Pillars",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB with a Hero WR, late QB at value, streamed TE, and a floor-first backend built for consistent weekly output. The Twin Pillars version two is still built around two reliable anchors, the Robust RB depth and the Hero WR, with everything else managed efficiently at value. The duo is different. The reliability is not."
+  },
+  {
+    "name": "The Second Wind",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB alongside a Hero WR, late QB at great value, streamed TE, and boom-or-bust upside picks timing the backend for a late surge. The Second Wind with a Robust RB foundation has more ground-game security than its namesake, the RB depth provides the floor while the upside backend schedules the bloom. Two anchors. One bloom."
+  },
+  {
+    "name": "The Steel Toed",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB depth with late WRs, late QB at a discount, mid-round TE, and a floor-first backend built on grind-ready reliability. The Steel Toed with Robust RB depth clocks in twice every week, once from the backfield and once from the WR corps, and produces without asking for recognition. Clock in. Clock out. Win."
+  },
+  {
+    "name": "The Battering Ram",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB investment with late WRs, QB fully punted, streamed TE, and a floor-first backend built to absorb any blow the schedule delivers. The Battering Ram with a Robust RB foundation hits harder than the single-back version, the depth at running back means the ground game never stops, even when the QB position is empty. Durable. Relentless. Every week."
+  },
+  {
+    "name": "The Blue Chip",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB investment anchored the draft, Hero WR paired alongside it, early QB locked in, premium early TE, and a floor-first backend. The Blue Chip draft has the two most valuable assets in fantasy, the elite RB room and the premium receiver, surrounded by reliable supporting pieces. The chips were blue. The floor is high."
+  },
+  {
+    "name": "The Big Four",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "early_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB depth established early, Hero WR alongside it, early QB on board, premium early TE, and boom-or-bust upside late. The Big Four locked up four premium positions before the middle rounds and built the backend on upside ceiling. Four big assets. One direction: up."
+  },
+  {
+    "name": "The Asset Manager",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB with a Hero WR, early QB secured, premium early TE, and value-based drafting managing every backend pick with total precision. The Asset Manager identifies undervalued assets at every position and accumulates them systematically, the Robust RBs, the Hero WR, the early TE are all performing assets. The portfolio is stacked."
+  },
+  {
+    "name": "The Grand Slam",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB depth alongside a Hero WR, early QB locked in, mid-round TE, and a floor-first backend with no weak spots. The Grand Slam connects at every major position, the RBs, the WR, the QB, the TE, and builds out from there with conservative depth. Base hit on every pick. Grand slam on the roster."
+  },
+  {
+    "name": "The Big Three",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "mid_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with a Hero WR, early QB, mid-round TE, and boom-or-bust upside picks swinging hard through the backend. The Big Three locked up three premium offensive positions and dared the backend to deliver a championship. The three are big. The ceiling is bigger."
+  },
+  {
+    "name": "The GM",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB investment alongside a Hero WR, early QB, mid-round TE, and value-based drafting managing every remaining pick with precision. The GM runs the most complete front office in the draft room, the early investments are premium, the backend picks are optimal, and every roster decision is defensible. GMs build winners. This one did."
+  },
+  {
+    "name": "The Power Play",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB with a Hero WR, early QB, streamed TE, and a floor-first backend built around reliable weekly production. The Power Play sets up the formation with elite RBs and a top WR and runs it straight at the defense every week. The power is on. The play is called."
+  },
+  {
+    "name": "The Triple Header",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB depth alongside a Hero WR, early QB, streamed TE, and boom-or-bust upside picks filling every backend spot. The Triple Header puts three scoring threats on the field and backs them up with high-ceiling depth that can hit on any given week. Three ways to win. All of them active."
+  },
+  {
+    "name": "The Brass Tacks",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB with a Hero WR, early QB, streamed TE, and value-based drafting extracting every available unit of value through the entire backend. The Brass Tacks gets to the point: Robust RB, Hero WR, early QB, value-based drafting backend, no complexity, no overthinking, just the core principles applied without compromise. Tacks are in. Poster is up."
+  },
+  {
+    "name": "The Long Shot",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB depth with a Hero WR, late QB taken at real value, premium early TE, and a floor-first backend. The Long Shot plays the odds, the Robust RBs and Hero WR are the reliable core, the late QB is the value play, and the floor-first backend is the insurance policy. Long shot. Solid floor."
+  },
+  {
+    "name": "The Underdog Play",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB alongside a Hero WR, late QB at maximum value, early TE premium, and value-based drafting closing out the backend. The Underdog Play doesn't need every pick to hit, the Robust RB depth provides redundancy, the Hero WR anchors, and value-based drafting fills in around them with the most defensible picks available. The underdog always has a path."
+  },
+  {
+    "name": "The Reliable Roster",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB depth with a Hero WR, late QB at a discount, mid-round TE, and a floor-first backend that produces every week. The Reliable Roster has depth at every position, value at the QB and TE spots, and a floor-first backend that doesn't leave points on the bench. Reliability wasn't accidental. It was the goal."
+  },
+  {
+    "name": "The Late Surge",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "mid_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with a Hero WR, late QB at great value, mid-round TE, and boom-or-bust upside picks surging through the backend. The Late Surge builds the foundation first and saves the fireworks for the second half of the draft, and the second half of the season. The surge is loaded. Wait for it."
+  },
+  {
+    "name": "The Loaded Roster",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "early_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with a Hero WR, mid-round QB, premium early TE, and boom-or-bust upside picks loading up the backend. The Loaded Roster is exactly what it sounds like, premium at RB, WR, and TE, reliable QB in the middle, and upside picks stacking the bench behind it. It's loaded. Handle accordingly."
+  },
+  {
+    "name": "The Complete Roster",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB alongside a Hero WR, mid-round QB, premium early TE, and value-based drafting running the backend with systematic precision. The Complete Roster checks every box, the RB depth, the WR anchor, the TE premium, the QB value, and the value-based backend. Every column has a number. Every number is positive."
+  },
+  {
+    "name": "The Balanced Attack",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB depth with a Hero WR, mid-round QB, mid-round TE, and a floor-first backend built for consistent weekly output. The Balanced Attack doesn't need to win with any one position, it wins with balance, depth, and the inability to be targeted at a single weak spot. Every attack was balanced. Every week is covered."
+  },
+  {
+    "name": "The Dual Threat",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "mid_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with a Hero WR, mid-round QB, mid-round TE, and boom-or-bust upside picks filling every backend slot. The Dual Threat runs it and throws it, the Robust RBs carry the ground game and the Hero WR commands the air, with the backend swings deciding the margin. Two threats. Multiple ways to score."
+  },
+  {
+    "name": "The Diversified",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB alongside a Hero WR, mid-round QB, mid-round TE, and value-based drafting diversifying the backend across every available value. The Diversified holds positions in every category and manages the portfolio with the same analytical rigor applied to every single pick. No concentration risk. Maximum diversification."
+  },
+  {
+    "name": "The Coalition",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB with a Hero WR, mid-round QB, streamed TE, and a floor-first backend built through collective reliability. The Coalition combines every ground-game asset with a receiving star, manages the QB and TE efficiently, and closes with a floor-first backend that never surrenders a week. The coalition holds."
+  },
+  {
+    "name": "The Contrarian",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB depth alongside a Hero WR, mid-round QB, streamed TE, and boom-or-bust upside picks going against the grain throughout. The Contrarian builds the team the room is avoiding and trusts that the unpopular combination is actually the correct one. The contrarian position is often the best one. Often is enough."
+  },
+  {
+    "name": "The Diversified Portfolio",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB with a Hero WR, mid-round QB, streamed TE, and value-based drafting diversifying the backend across multiple positions and values. The Diversified Portfolio holds assets in every fantasy category and rebalances through value-based drafting all the way to the final round. Diverse inputs. Optimized output."
+  },
+  {
+    "name": "The Chaos Theory",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB alongside a Hero WR, QB fully punted, mid-round TE, and boom-or-bust upside picks shattering conventional wisdom. The Chaos Theory generates unpredictable outcomes from organized inputs, the Robust RBs and Hero WR are the structure, the punted QB and upside backend are the chaos. Theory confirmed."
+  },
+  {
+    "name": "The Spartan",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB depth with a Hero WR, QB punt accepted, mid-round TE, and value-based drafting extracting every unit of value from the backend. The Spartan eliminates waste at the QB position and redirects the value saved into the deepest, most defensible roster possible. No excess. Only necessity."
+  },
+  {
+    "name": "The Iron Will",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB alongside a Hero WR, QB punted entirely, streamed TE, and a floor-first backend built with iron discipline. The Iron Will bends around the absence of a reliable QB and holds together through sheer depth and floor-first discipline at every remaining position. The will is iron. The roster holds."
+  },
+  {
+    "name": "The Maverick's Mirror",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with a Hero WR, QB punt, streamed TE, and boom-or-bust upside picks filling the backend with maximum variance. The Maverick's Mirror reflects the original approach, punt the conventional, chase the ceiling, trust the process even when nobody else does. The reflection is correct. So is the roster."
+  },
+  {
+    "name": "The Stoic's Formula",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB depth alongside a Hero WR, QB fully punted, streamed TE, and value-based drafting driving the backend with systematic discipline. The Stoic's Formula accepts the discomfort of the punted QB and executes value-based drafting through the backend without emotional interference. The formula doesn't require comfort. Just execution."
+  },
+  {
+    "name": "The Power Formation",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB investment anchored the formation, late WRs added at value, early QB locked in, premium early TE, and a floor-first backend. The Power Formation stacks the ground game first, secures the signal-caller early, anchors the TE position, and fills in the WRs at value behind it. The formation is set. Run the play."
+  },
+  {
+    "name": "The Triple Crown",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "early_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with late WRs, early QB priority, premium early TE, and boom-or-bust upside picks sweeping through the backend. The Triple Crown claims three distinct positional titles, the RB room, the early QB, and the premium TE, then rides upside swings to the finish line. The crown has three points. All three are set."
+  },
+  {
+    "name": "The War Room General",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB alongside late WRs, early QB, premium early TE, and value-based drafting running the entire backend operation. The War Room General maps the entire draft before pick one and executes the playbook without improvisation. The war room prepared. The general delivered."
+  },
+  {
+    "name": "The Triple Threat",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "mid_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with late WRs, early QB, mid-round TE, and boom-or-bust upside picks threatening at every backend spot. The Triple Threat attacks from three directions, the ground game, the signal-caller, and the upside swings, and forces the schedule to defend all of them simultaneously. Three threats. One direction."
+  },
+  {
+    "name": "The Draft Board",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB depth with late WRs, early QB, mid-round TE, and value-based drafting building the entire backend from a ranked list. The Draft Board trusts the board completely, the early picks are premium, the QB is secured, and value-based drafting handles every decision from round five onward. The board was correct. It always is."
+  },
+  {
+    "name": "The Formation",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB alongside late WRs, early QB secured, streamed TE, and a floor-first backend built on consistent production. The Formation sets up the ground game, locks in the signal-caller early, and fills the remaining positions with reliable floor-first pieces. The formation is locked. Run it every week."
+  },
+  {
+    "name": "The Gambler's Gambit",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB with late WRs, early QB, streamed TE, and boom-or-bust upside picks executing the most aggressive backend gambit available. The Gambler's Gambit locks in the safe investments first, the RBs and QB, then swings on everything else. The gambit was set before the draft started. The chips are all in."
+  },
+  {
+    "name": "The Draft Room",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "early_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB alongside late WRs, early QB, streamed TE, and value-based drafting managing every backend selection with the precision of a scouting department. The Draft Room runs the process the way it was designed, early positional priority, QB secured, value-based drafting closing, and the roster reflects every decision made correctly. The room produced."
+  },
+  {
+    "name": "The Trenches",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "early_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB depth with late WRs, late QB at real value, premium early TE, and boom-or-bust upside picks attacking from the backend. The Trenches wins in the line of scrimmage, the RBs and TE are the premium investments, the QB is the value find, and the backend swings are the fourth quarter surge. Win in the trenches. Win the league."
+  },
+  {
+    "name": "The Return on Rushes",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB with late WRs, late QB at a discount, premium early TE, and value-based drafting extracting maximum value through every backend pick. The Return on Rushes calculates the value generated by every ground-game carry and applies the same principle to every draft pick. The return was positive at every position."
+  },
+  {
+    "name": "The Lottery Ticket",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "mid_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB alongside late WRs, late QB at value, mid-round TE, and boom-or-bust upside picks stacking every backend slot. The Lottery Ticket buys all of them, the Robust RBs are the certain investment, the late QB is the value play, and every backend pick is a ticket stub. One of them hits. That's enough."
+  },
+  {
+    "name": "The Value Play",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB depth with late WRs, late QB, mid-round TE, and value-based drafting running the backend with clean mathematical discipline. The Value Play runs the same calculation every round, which player returns the most value relative to position scarcity, and executes without sentiment. Every pick was a value play. The value played."
+  },
+  {
+    "name": "The Workhorse Classic",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB with late WRs, late QB at real value, streamed TE, and a floor-first backend that never takes a bad week. The Workhorse Classic builds around the ground game, grabs the QB at maximum value, and fills every remaining position with floor-first reliability. Classic approach. Classic results."
+  },
+  {
+    "name": "The Hammer Drop",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB alongside late WRs, late QB, streamed TE, and boom-or-bust upside picks hammering the entire backend. The Hammer Drop establishes position at RB, grabs the QB at a discount, and then drops the hammer on every upside pick remaining. The hammer was raised in round three. It fell everywhere else."
+  },
+  {
+    "name": "The Mileage Counter",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "late_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB depth with late WRs, late QB at value, streamed TE, and value-based drafting counting every yard of value from the first pick to the last. The Mileage Counter logs every pick at optimal efficiency and measures the season the same way, one correct decision at a time, from week one to the championship. Every mile was logged."
+  },
+  {
+    "name": "The Portfolio",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "mid_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB with late WRs, mid-round QB, premium early TE, and a floor-first backend with diversified depth throughout. The Portfolio allocates capital to every premium position and manages the remaining assets with floor-first discipline. Diversified. Defensible. Durable."
+  },
+  {
+    "name": "The Full House",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "mid_qb",
+      "te": "early_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB alongside late WRs, mid-round QB, premium early TE, and boom-or-bust upside picks filling the house. The Full House has a premium player at every position that matters and chaos picks filling in behind them. The house is full. The visitors have nowhere to sit."
+  },
+  {
+    "name": "The Machine",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "mid_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB depth with late WRs, mid-round QB, premium early TE, and value-based drafting optimizing every backend pick with systematic precision. The Machine does not miss picks, the inputs are correct, the process is clean, and value-based drafting generates the most defensible output available at every position. The machine ran perfectly."
+  },
+  {
+    "name": "The Trench Worker",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "mid_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB with late WRs, mid-round QB, mid-round TE, and a floor-first backend filled with trench-level reliability. The Trench Worker punches the clock at every draft position and builds a team that wins through sheer production volume rather than star power. The work ethic is visible in every round."
+  },
+  {
+    "name": "The Gridiron",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "mid_qb",
+      "te": "mid_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB alongside late WRs, mid-round QB, mid-round TE, and boom-or-bust upside picks ripping through the backend. The Gridiron was built on the ground game and finished on big swings, the RBs set the tone and the backend picks decide whether this team has a championship ceiling. The gridiron is ready."
+  },
+  {
+    "name": "The Meat and Potatoes",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "mid_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB depth with late WRs, mid-round QB, mid-round TE, and value-based drafting providing simple, unadorned value at every backend pick. The Meat and Potatoes doesn't need a sophisticated strategy, the best available player at every position, priced fairly, taken when the board says to. Meat. Potatoes. Wins."
+  },
+  {
+    "name": "The Powerhouse",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "mid_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB with late WRs, mid-round QB, streamed TE, and a floor-first backend that powers through every week without breaking. The Powerhouse generates consistent output across every lineup slot and refuses to surrender a week to circumstance. The power is always on."
+  },
+  {
+    "name": "The Hammer",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "mid_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB alongside late WRs, mid-round QB, streamed TE, and boom-or-bust upside picks falling with maximum impact. The Hammer struck at RB in the early rounds and kept swinging on upside picks all the way through the backend. The impact of each swing is cumulative. The ceiling is high."
+  },
+  {
+    "name": "The Strongman",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "mid_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB depth with late WRs, mid-round QB, streamed TE, and value-based drafting building out the backend with structural precision. The Strongman carries the weight of the ground-game investment and supports it with a value-based backend that never bends under pressure. The structure holds. It was built that way."
+  },
+  {
+    "name": "The Behemoth",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB alongside late WRs, QB fully punted, premium early TE, and a floor-first backend that gives nothing away. The Behemoth is the largest possible commitment to non-QB positions, the RBs and TE are both premium investments, the QB is punted, and the backend is built to absorb any shock. Enormous. Immovable."
+  },
+  {
+    "name": "The Tank",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "early_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB depth with late WRs, QB punt, premium early TE, and boom-or-bust upside picks filling every backend slot. The Tank rolls through the draft with no concern for the QB position and maximum concern for peak roster upside. Armored at the skill positions. Exposed at QB. Worth it."
+  },
+  {
+    "name": "The Juggernaut",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB with late WRs, QB punted entirely, premium early TE, and value-based drafting driving every backend pick. The Juggernaut cannot be stopped by a missing QB, the RB depth, the WR value, and the premium TE generate enough production to overwhelm most opponents without a top signal-caller. The juggernaut is rolling."
+  },
+  {
+    "name": "The Steel Curtain",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Robust RB alongside late WRs, QB fully punted, mid-round TE, and a floor-first backend that holds the line every week. The Steel Curtain drops at the QB position and builds an impenetrable wall of RB depth, WR value, and floor-first reliability everywhere else. The curtain is steel. It doesn't move."
+  },
+  {
+    "name": "The Bulldozer",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB depth with late WRs, QB punt, mid-round TE, and boom-or-bust upside picks bulldozing through the backend. The Bulldozer clears every obstacle in its path, the RBs are the blade, the backend swings are the engine, and the punted QB is just a speed bump. The path is clear."
+  },
+  {
+    "name": "The No-QB Club",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB with late WRs, QB fully punted, mid-round TE, and value-based drafting maximizing every unit of value at every backend position. The No-QB Club has zero interest in drafting a starting quarterback early and complete interest in value-based drafting at every other position. The club has one rule. Value-based drafting has the rest."
+  },
+  {
+    "name": "The Gunslinger's Nemesis",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Robust RB alongside late WRs, QB punted, streamed TE, and boom-or-bust upside picks all the way through the backend. The Gunslinger's Nemesis was built to beat exactly one type of team, the QB-first roster that sacrificed positional depth to grab a signal-caller early. The nemesis is ready."
+  },
+  {
+    "name": "The Old Faithful",
+    "strategies": {
+      "rb": "robust_rb",
+      "wr": "wr_late",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Robust RB depth with late WRs, QB punt, streamed TE, and value-based drafting extracting every last unit of value from the backend. The Old Faithful runs the same course every season. Robust RBs, punt QB, trust value-based drafting, and the geyser goes off on schedule every time. Reliable. Predictable. Correct."
+  },
+  {
+    "name": "The Cold Calculation",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB with a Hero WR, mid-round QB, streamed TE, and value-based drafting calculating the risk-adjusted return on every backend pick. The Cold Calculation ran the math: Zero RB at the right ADP, Hero WR at the right price, mid-round QB at value, and value-based drafting confirming every subsequent pick. The risk was calculated. The calculation was correct."
+  },
+  {
+    "name": "The Automaton",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "robust_wr",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB with heavy Robust WR investment, QB fully punted, streamed TE, and value-based drafting running the backend with automated precision. The Automaton processed every available data point, confirmed the Zero RB directive, executed the QB punt on schedule, and output the optimal value-based drafting roster without a single deviation. No human decisions were made in this draft. Only optimal ones."
+  },
+  {
+    "name": "The Proof",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB anchored by a Hero WR, mid-round QB, mid-round TE, and value-based drafting driving every pick from round five onward. The Proof is the same equation as always, avoid the position with the highest injury rate and let the passing game do the heavy lifting. The math has not changed. It still works."
+  },
+  {
+    "name": "The Ledger",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "robust_wr",
+      "qb": "late_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB alongside deep Robust WR investment, late QB at tremendous value, premium early TE, and value-based drafting tracking the backend. The Ledger tracked the cost basis on every pick. Zero RB as the value position, stacked WRs as the appreciating asset, late QB as the undervalued holding, and value-based drafting balancing the books. The books are clean."
+  },
+  {
+    "name": "The Spartan Draft",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "robust_wr",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Zero RB with heavy Robust WR depth, QB punt, mid-round TE, and a floor-first backend stripped to the essentials. The Spartan Draft removes every non-essential from the draft strategy. Zero RB is the essential starting point, stacked WRs are the essential asset, and the floor-first backend is the essential safety margin. Minimal. Essential. Correct."
+  },
+  {
+    "name": "The Cipher",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "robust_wr",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB with deep Robust WR investment, QB fully punted, mid-round TE, and value-based drafting running the backend with algorithmic precision. The Cipher processed every pick through the Zero RB model, confirmed the value-based outputs at every position, and executed without emotional interference from start to finish. The algorithm ran correctly. The roster is the output."
+  },
+  {
+    "name": "The Rationalist",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "stream_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB with a Hero WR, late QB at tremendous value, streamed TE, and value-based drafting conducting a precise logical analysis at every backend pick. The Rationalist identifies the Zero RB thesis as the most defensible strategic position in fantasy and applies formal logic to every subsequent selection, the late QB is the next logical step, and value-based drafting is the proof of concept. The logic was sound."
+  },
+  {
+    "name": "The Measured",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Zero RB with a Hero WR, late QB at a discount, streamed TE, and a floor-first backend built on pragmatic selection principles. The Measured makes the most defensible picks without requiring them to be exciting. Zero RB is the pragmatic stance on RB scarcity, late QB is the pragmatic value find, and the floor-first backend is the pragmatic finish. Practical. Correct."
+  },
+  {
+    "name": "The Dispassionate",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB alongside a Hero WR, QB punt accepted, premium early TE, and value-based drafting building a cold, analytical backend. The Dispassionate views the draft without sentiment. Zero RB is the logical stance, QB punt is the value maximization, premium TE is the positional edge, and value-based drafting confirms every pick was correct. No emotion. Only analysis."
+  },
+  {
+    "name": "The Unflinching",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Zero RB with a Hero WR, QB punt committed, streamed TE, and a floor-first backend. The Unflinching accepts every uncomfortable trade-off. Zero RB, punted QB, no TE premium, without flinching and builds a floor-first backend that holds together regardless of the circumstances. Stoic in approach. Steady in production."
+  },
+  {
+    "name": "The Marathon",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "late_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB with a Hero WR, late QB at value, mid-round TE, and value-based drafting playing the long game through the entire backend. The Marathon is not designed for week three, the late QB is a value investment that compounds, the Hero WR is the steady asset, and value-based drafting makes every backend pick a long-term holding. The game is long. This team finishes it."
+  },
+  {
+    "name": "The Modeler",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "robust_wr",
+      "qb": "punt_qb",
+      "te": "early_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB alongside deep Robust WR investment, QB fully punted, premium early TE, and value-based drafting quantifying every unit of value from the backend. The Modeler ran the models before the draft, confirmed the Zero RB and premium TE thesis with the data, punted QB as the model suggested, and used value-based drafting to validate every pick from round five on. The model was correct."
+  },
+  {
+    "name": "The Cautious",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "mid_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Zero RB strategy with a Hero WR, mid-round QB, early premium TE, and a floor-first backend. The Cautious chose the Zero RB path with all three major positions managed carefully, mid-round QB at value, premium TE, and a floor-first backend that holds position every week. Conservative. Correct."
+  },
+  {
+    "name": "The Air Raid Zero",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "robust_wr",
+      "qb": "mid_qb",
+      "te": "stream_te",
+      "late": "upside"
+    },
+    "flavorText": "Zero RB alongside stacked Robust WRs, mid-round QB, streamed TE, and boom-or-bust upside picks running the air raid through the backend. The Air Raid Zero runs the same play every year, stack WRs, grab the QB in the middle rounds, skip the RBs entirely, and swing for the ceiling late. Classic play. Classic result."
+  },
+  {
+    "name": "The Schematic",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "robust_wr",
+      "qb": "early_qb",
+      "te": "early_te",
+      "late": "floor"
+    },
+    "flavorText": "Zero RB strategy committed, heavy Robust WR investment built alongside it, early QB locked in, premium early TE, and a floor-first backend. The Schematic was drawn before the first pick and followed without a single revision. Zero RB as the architecture, early QB and TE as the load-bearing walls, and a floor-first backend as the foundation. Plans don't deviate. Neither did this draft."
+  },
+  {
+    "name": "The Alliance",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "early_qb",
+      "te": "mid_te",
+      "late": "floor"
+    },
+    "flavorText": "Zero RB with a Hero WR, early QB locked in, mid-round TE, and a floor-first backend. The Alliance brings together the pass-catching investments. Hero WR, early QB, and builds floor-first reliability around them. The coalition holds every week."
+  },
+  {
+    "name": "The Dissenter",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "hero_wr",
+      "qb": "punt_qb",
+      "te": "mid_te",
+      "late": "vbd"
+    },
+    "flavorText": "Zero RB with a Hero WR, QB punt, mid-round TE, and value-based drafting identifying the contrarian value the room left on the board. The Dissenter disagrees with consensus at every position and builds the case with value-based drafting at every backend pick. The contrarian position was correct. Value-based drafting is the evidence."
+  },
+  {
+    "name": "The Stripped Down",
+    "strategies": {
+      "rb": "zero_rb",
+      "wr": "robust_wr",
+      "qb": "punt_qb",
+      "te": "stream_te",
+      "late": "floor"
+    },
+    "flavorText": "Zero RB alongside heavy Robust WR depth, QB punt, streamed TE, and a floor-first backend. The Stripped Down has no room for luxury: Zero RB, punted QB, streamed TE, and a floor-first backend mean every resource was deployed at WR depth. Nothing wasted. No luxuries. Results only."
   },
   {
     "name": "The Fortress",

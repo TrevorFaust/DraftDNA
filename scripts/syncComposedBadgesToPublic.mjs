@@ -41,3 +41,20 @@ for (const name of files) {
 console.log(
   `[sync:badges] ${composedDir} → ${publicBadgesDir} — copied ${copied}, up-to-date ${skipped}, total in composed ${files.length}`
 );
+
+const backgroundsDir = path.join(root, 'archetype_logic', 'badge images', 'backgrounds');
+function syncLockedAsset(fileName) {
+  const lockedSrc = path.join(backgroundsDir, fileName);
+  const lockedDst = path.join(publicBadgesDir, fileName);
+  if (!fs.existsSync(lockedSrc)) return;
+  try {
+    if (!fs.existsSync(lockedDst) || fs.statSync(lockedSrc).mtimeMs > fs.statSync(lockedDst).mtimeMs) {
+      fs.copyFileSync(lockedSrc, lockedDst);
+      console.log(`[sync:badges] ${fileName} → public/badges/${fileName}`);
+    }
+  } catch (e) {
+    console.warn('[sync:badges]', fileName, e.message);
+  }
+}
+syncLockedAsset('locked.png');
+syncLockedAsset('locked.svg');

@@ -1,9 +1,6 @@
 /**
- * Badges page — all archetype achievements. Earned = full color; unearned = greyed with ?.
- * Uses archetype index (not name) so duplicate names in the list each have one correct slot.
- * Grid order: master IDs 1–360. Click an earned badge to see it large + roster from the most recent qualifying draft.
- *
- * TEMP: show every badge in full (unlocked) style; remove SHOW_ALL_BADGES_AS_UNLOCKED when reverting.
+ * Badges page — single grid: standard archetypes (master order), then chaos badges (master order).
+ * Earned = composed art; unearned = locked.png. Click an earned badge for detail + roster.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -29,11 +26,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+import { cn, capitalizeSentenceStart } from '@/lib/utils';
 import type { DraftPick } from '@/types/database';
-
-/** When true, grid shows all badges full-color; unlock state still drives counts/tooltips and click-to-detail. */
-const SHOW_ALL_BADGES_AS_UNLOCKED = true;
 
 interface EarnedSlot {
   draftName: string;
@@ -63,9 +57,9 @@ function unlockedAtFromDraft(d: { completed_at?: string | null; created_at?: str
 /** Flavor text for standard archetypes; chaos uses its own copy. Falls back to strategy summary. */
 function badgeDetailArchetypeCopy(archetypeName: string): string {
   const chaos = getChaosArchetypeByName(archetypeName);
-  if (chaos?.flavorText?.trim()) return chaos.flavorText.trim();
+  if (chaos?.flavorText?.trim()) return capitalizeSentenceStart(chaos.flavorText);
   const named = getArchetypeByName(archetypeName);
-  if (named?.flavorText?.trim()) return named.flavorText.trim();
+  if (named?.flavorText?.trim()) return capitalizeSentenceStart(named.flavorText);
   if (named?.strategies) return getArchetypeDescription(named.strategies);
   return '';
 }
@@ -303,8 +297,16 @@ const Badges = () => {
               ...p,
               player: playersMap.get(p.player_id) || null,
             }));
+            const dRow = draft as { user_detected_archetype_index?: number | null };
+            const storedIndexOk =
+              typeof dRow.user_detected_archetype_index === 'number' &&
+              dRow.user_detected_archetype_index >= 0 &&
+              dRow.user_detected_archetype_index < ARCHETYPE_LIST.length;
+
             let idx: number | null = null;
-            if (picksWithPlayer.length > 0) {
+            if (storedIndexOk) {
+              idx = dRow.user_detected_archetype_index!;
+            } else if (picksWithPlayer.length > 0) {
               const limits = draft.league_id ? leaguesMap.get(draft.league_id)?.position_limits : undefined;
               const flex = limits?.FLEX ?? 1;
               const bench = limits?.BENCH ?? 6;
@@ -313,15 +315,6 @@ const Badges = () => {
                 benchSize: bench,
                 numTeams: draft.num_teams,
               });
-            } else {
-              const d = draft as { user_detected_archetype_index?: number | null };
-              if (
-                typeof d.user_detected_archetype_index === 'number' &&
-                d.user_detected_archetype_index >= 0 &&
-                d.user_detected_archetype_index < ARCHETYPE_LIST.length
-              ) {
-                idx = d.user_detected_archetype_index;
-              }
             }
             if (idx !== null) {
               mergeEarnedIndex(byIndex, idx, {
@@ -378,18 +371,21 @@ const Badges = () => {
           ...p,
           player: tempPlayersMap.get(p.player_id) || null,
         }));
-        let idx: number | null = getArchetypeIndexForTeam(picks, draft.user_pick_position, {
-          flexSlots: tempLimits?.FLEX ?? 1,
-          benchSize: tempLimits?.BENCH ?? 6,
-          numTeams: draft.num_teams,
-        });
-        if (
-          idx === null &&
-          typeof draft.user_detected_archetype_index === 'number' &&
-          draft.user_detected_archetype_index >= 0 &&
-          draft.user_detected_archetype_index < ARCHETYPE_LIST.length
-        ) {
-          idx = draft.user_detected_archetype_index;
+        const tempRow = draft as { user_detected_archetype_index?: number | null };
+        const tempStoredOk =
+          typeof tempRow.user_detected_archetype_index === 'number' &&
+          tempRow.user_detected_archetype_index >= 0 &&
+          tempRow.user_detected_archetype_index < ARCHETYPE_LIST.length;
+
+        let idx: number | null = null;
+        if (tempStoredOk) {
+          idx = tempRow.user_detected_archetype_index!;
+        } else {
+          idx = getArchetypeIndexForTeam(picks, draft.user_pick_position, {
+            flexSlots: tempLimits?.FLEX ?? 1,
+            benchSize: tempLimits?.BENCH ?? 6,
+            numTeams: draft.num_teams,
+          });
         }
         if (idx !== null) {
           mergeEarnedIndex(byIndex, idx, {
@@ -459,6 +455,8 @@ const Badges = () => {
   }
 
   const earnedByIndex = earned.byIndex;
+  const totalBadgeSlots = FULL_ARCHETYPE_LIST.length + CHAOS_ARCHETYPES.length;
+  const unlockedBadgeCount = earned.count + earnedChaos.count;
 
   return (
     <div className="min-h-screen bg-background">
@@ -470,7 +468,7 @@ const Badges = () => {
             <div>
               <h1 className="font-display text-3xl tracking-wide">Archetype Badges</h1>
               <p className="text-muted-foreground">
-                {earned.count} of {FULL_ARCHETYPE_LIST.length} unlocked — complete drafts to earn more
+                {unlockedBadgeCount} of {totalBadgeSlots} badges unlocked — complete drafts to earn more
               </p>
             </div>
           </div>
@@ -564,27 +562,21 @@ const Badges = () => {
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {badgeGridRows.map(({ archetype: a, listIndex }) => {
             const earnedInfo = earnedByIndex.get(listIndex);
-            const isEarnedVisual = SHOW_ALL_BADGES_AS_UNLOCKED || !!earnedInfo;
-            const actuallyEarned = !!earnedInfo;
+            const isEarned = !!earnedInfo;
             return (
               <div
-                key={listIndex}
+                key={`std-${listIndex}`}
                 className={cn(
                   'flex flex-col items-center justify-center min-h-[14rem] py-2',
-                  !SHOW_ALL_BADGES_AS_UNLOCKED && !actuallyEarned && 'opacity-80',
-                  actuallyEarned && 'cursor-pointer rounded-lg outline-offset-4 hover:opacity-95 focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring'
+                  !isEarned && 'opacity-90',
+                  isEarned &&
+                    'cursor-pointer rounded-lg outline-offset-4 hover:opacity-95 focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring'
                 )}
-                role={actuallyEarned ? 'button' : undefined}
-                tabIndex={actuallyEarned ? 0 : undefined}
-                onClick={
-                  actuallyEarned && earnedInfo
-                    ? () => {
-                        openUnlockDetail(a.name, earnedInfo);
-                      }
-                    : undefined
-                }
+                role={isEarned ? 'button' : undefined}
+                tabIndex={isEarned ? 0 : undefined}
+                onClick={isEarned && earnedInfo ? () => openUnlockDetail(a.name, earnedInfo) : undefined}
                 onKeyDown={
-                  actuallyEarned && earnedInfo
+                  isEarned && earnedInfo
                     ? (e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
@@ -600,67 +592,50 @@ const Badges = () => {
                   iconOnly
                   size="md"
                   earnedFromDraft={earnedInfo?.draftName}
-                  locked={!isEarnedVisual}
-                  showUnlockedAppearance={SHOW_ALL_BADGES_AS_UNLOCKED}
+                  locked={!isEarned}
                   className="shrink-0"
                 />
               </div>
             );
           })}
-        </div>
-
-        <div className="mt-12 pt-8 border-t border-border">
-          <h2 className="font-display text-xl mb-2">Chaos Badges</h2>
-          <p className="text-muted-foreground text-sm mb-4">
-            {earnedChaos.count} of {CHAOS_ARCHETYPES.length} chaos badges unlocked — wild drafts only
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {chaosDisplayOrder.map((chaos) => {
-              const earnedInfo = earnedChaos.byName.get(chaos.name);
-              const isEarnedVisual = SHOW_ALL_BADGES_AS_UNLOCKED || !!earnedInfo;
-              const actuallyEarned = !!earnedInfo;
-              return (
-                <div
-                  key={chaos.name}
-                  className={cn(
-                    'flex flex-col items-center justify-center min-h-[14rem] py-2',
-                    !SHOW_ALL_BADGES_AS_UNLOCKED && !actuallyEarned && 'opacity-80',
-                    actuallyEarned && 'cursor-pointer rounded-lg outline-offset-4 hover:opacity-95 focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring'
-                  )}
-                  role={actuallyEarned ? 'button' : undefined}
-                  tabIndex={actuallyEarned ? 0 : undefined}
-                  onClick={
-                    actuallyEarned && earnedInfo
-                      ? () => {
+          {chaosDisplayOrder.map((chaos) => {
+            const earnedInfo = earnedChaos.byName.get(chaos.name);
+            const isEarned = !!earnedInfo;
+            return (
+              <div
+                key={`chaos-${chaos.name}`}
+                className={cn(
+                  'flex flex-col items-center justify-center min-h-[14rem] py-2',
+                  !isEarned && 'opacity-90',
+                  isEarned &&
+                    'cursor-pointer rounded-lg outline-offset-4 hover:opacity-95 focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring'
+                )}
+                role={isEarned ? 'button' : undefined}
+                tabIndex={isEarned ? 0 : undefined}
+                onClick={isEarned && earnedInfo ? () => openUnlockDetail(chaos.name, earnedInfo) : undefined}
+                onKeyDown={
+                  isEarned && earnedInfo
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
                           openUnlockDetail(chaos.name, earnedInfo);
                         }
-                      : undefined
-                  }
-                  onKeyDown={
-                    actuallyEarned && earnedInfo
-                      ? (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            openUnlockDetail(chaos.name, earnedInfo);
-                          }
-                        }
-                      : undefined
-                  }
-                >
-                  <ArchetypeBadge
-                    archetypeName={chaos.name}
-                    iconOnly
-                    size="md"
-                    earnedFromDraft={earnedInfo?.draftName}
-                    locked={!isEarnedVisual}
-                    showUnlockedAppearance={SHOW_ALL_BADGES_AS_UNLOCKED}
-                    flavorText={chaos.flavorText}
-                    className="shrink-0"
-                  />
-                </div>
-              );
-            })}
-          </div>
+                      }
+                    : undefined
+                }
+              >
+                <ArchetypeBadge
+                  archetypeName={chaos.name}
+                  iconOnly
+                  size="md"
+                  earnedFromDraft={earnedInfo?.draftName}
+                  locked={!isEarned}
+                  flavorText={chaos.flavorText}
+                  className="shrink-0"
+                />
+              </div>
+            );
+          })}
         </div>
       </main>
     </div>
