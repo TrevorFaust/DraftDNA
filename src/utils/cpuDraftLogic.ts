@@ -31,6 +31,8 @@ export interface CpuDraftContext {
   flexSlots?: number;
   /** Bench size for getTotalRounds */
   benchSize?: number;
+  /** Rookie-only mock: no DST/kicker round rules; pool is skill positions only */
+  rookieFlexDraft?: boolean;
 }
 
 const DEFAULT_TOP_N = 5;
@@ -102,13 +104,15 @@ export function selectCpuPick(
     ? getCombinedWeights(strategies, config, context.roundNumber)
     : null;
 
-  // Hard: DST not before dstEarliestRound; K only in final round
-  const filtered = available.filter((p) => {
-    const pos = (p.position || '').toUpperCase();
-    if (pos === 'DEF' || pos === 'D/ST') return context.roundNumber >= constraints.dstEarliestRound;
-    if (pos === 'K') return context.roundNumber >= constraints.kickerOnlyRound;
-    return true;
-  });
+  // Hard: DST not before dstEarliestRound; K only in final round (skipped for rookie flex mocks)
+  const filtered = context.rookieFlexDraft
+    ? available
+    : available.filter((p) => {
+        const pos = (p.position || '').toUpperCase();
+        if (pos === 'DEF' || pos === 'D/ST') return context.roundNumber >= constraints.dstEarliestRound;
+        if (pos === 'K') return context.roundNumber >= constraints.kickerOnlyRound;
+        return true;
+      });
   const pool = filtered.length > 0 ? filtered : available;
 
   // No weights (e.g. invalid archetype) -> BPA fallback

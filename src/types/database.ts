@@ -9,6 +9,7 @@ export interface Player {
   season: number | null;
   created_at: string;
   espn_id?: string | null;
+  sleeper_id?: string | null;
 }
 
 export interface UserRanking {

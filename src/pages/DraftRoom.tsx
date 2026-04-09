@@ -83,6 +83,7 @@ const DraftRoom = () => {
   );
   const [teamNames, setTeamNames] = useState<Map<number, string>>(new Map());
   const [keepers, setKeepers] = useState<Array<{ team_number: number; player_id: string; round_number: number }>>([]);
+  const [isRookiesOnlyDraft, setIsRookiesOnlyDraft] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const cpuDraftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const draftBoardRef = useRef<HTMLDivElement | null>(null);
@@ -102,6 +103,7 @@ const DraftRoom = () => {
 
   const fetchDraftData = useCallback(async () => {
     if (!draftId) return;
+    setIsRookiesOnlyDraft(false);
 
     try {
       let draftData: MockDraft;
@@ -157,7 +159,6 @@ const DraftRoom = () => {
       console.log('CPU speed in fetched data:', (draftData as any).cpu_speed);
       console.log('Draft with defaults:', draftWithDefaults);
       console.log('CPU speed value:', draftWithDefaults.cpu_speed);
-      setDraft(draftWithDefaults);
 
       // Fetch league data (position limits, bucket settings) if draft is tied to a league
       let leagueData: { position_limits?: any; is_superflex?: boolean; scoring_format?: string; league_type?: string } | null = null;
@@ -222,6 +223,7 @@ const DraftRoom = () => {
       // Determine if rookies-only draft
       const isRookiesOnly = (draftData as any)?.player_pool === 'rookies' ||
         (isTempDraft && (tempSettingsStorage.get()?.playerPool === 'rookies' || tempSettingsStorage.get()?.rookiesOnly));
+      setIsRookiesOnlyDraft(isRookiesOnly);
 
       // Determine draft bucket for rookies fetch
       const draftBucketForRookies = (() => {
@@ -536,26 +538,61 @@ const DraftRoom = () => {
       if (defensesInRanked.length > 0) {
         console.log(`DraftRoom: Defense names in rankedPlayers:`, defensesInRanked.map(d => d.name));
       }
-      
-      // Set all players (including defenses - they're just regular players with position 'D/ST')
-      setPlayers(sortedRankedPlayers);
 
-      // Fetch existing picks (from database for regular drafts, from localStorage for temp drafts)
-      if (isTempDraft) {
-        setPicks(existingPicks);
-        setCurrentPick((existingPicks?.length || 0) + 1);
-      } else {
+      // Load picks before capping rounds so we never schedule more full rounds than the loaded pool supports
+      let loadedPicks: DraftPick[] = existingPicks;
+      if (!isTempDraft) {
         const { data: picksData } = await supabase
           .from('draft_picks')
           .select('*')
           .eq('mock_draft_id', draftId)
           .order('pick_number', { ascending: true });
-
-        setPicks(picksData || []);
-        setCurrentPick((picksData?.length || 0) + 1);
+        loadedPicks = picksData || [];
       }
+
+      const poolSize = sortedRankedPlayers.length;
+      const numTeamsCap = draftWithDefaults.num_teams;
+      const maxRoundsByLoadedPool = Math.floor(poolSize / numTeamsCap);
+
+      if (poolSize < numTeamsCap) {
+        toast.error(
+          `Not enough players in the pool (${poolSize}) for ${numTeamsCap} teams. Each team needs at least one pick.`
+        );
+        setLoading(false);
+        navigate('/mock-draft');
+        return;
+      }
+
+      let finalNumRounds = draftWithDefaults.num_rounds;
+      if (finalNumRounds > maxRoundsByLoadedPool) {
+        finalNumRounds = maxRoundsByLoadedPool;
+        if (isTempDraft) {
+          const stored = tempDraftStorage.getDraft(draftId!);
+          if (stored) {
+            tempDraftStorage.saveDraft({ ...stored.draft, num_rounds: finalNumRounds }, stored.picks);
+          }
+        } else if (user) {
+          await supabase.from('mock_drafts').update({ num_rounds: finalNumRounds }).eq('id', draftId);
+        }
+      }
+
+      const finalDraft: MockDraft = { ...draftWithDefaults, num_rounds: finalNumRounds };
+      const cappedTotalPicks = finalNumRounds * numTeamsCap;
+      if (loadedPicks.length > cappedTotalPicks) {
+        console.warn(
+          'DraftRoom: pick count exceeds capped total; capping may be inconsistent',
+          loadedPicks.length,
+          cappedTotalPicks
+        );
+      }
+
+      setDraft(finalDraft);
+      setPlayers(sortedRankedPlayers);
+      setPicks(loadedPicks);
+      setCurrentPick(loadedPicks.length + 1);
     } catch (error: any) {
       console.error('Error loading draft:', error);
+      setIsRookiesOnlyDraft(false);
       const errorMessage = error?.message || 'Unknown error occurred';
       toast.error(`Failed to load draft: ${errorMessage}`);
       
@@ -631,6 +668,11 @@ const DraftRoom = () => {
     draftedPlayers: RankedPlayer[],
     opts?: { teamNumber: number; currentRound: number }
   ): boolean => {
+    if (isRookiesOnlyDraft && draft && draft.num_rounds > 0) {
+      if (draftedPlayers.length >= draft.num_rounds) return false;
+      return true;
+    }
+
     let pos = position.toUpperCase();
     // Map D/ST to DEF for position limits
     if (pos === 'D/ST') {
@@ -733,10 +775,11 @@ const DraftRoom = () => {
   };
 
   useEffect(() => {
+    if (isRookiesOnlyDraft) return;
     if (draft && positionFilter === 'DEF' && !canDraftDefense(draft.user_pick_position)) {
       setPositionFilter('ALL');
     }
-  }, [draft, positionFilter, picks, positionLimits]);
+  }, [draft, positionFilter, picks, positionLimits, isRookiesOnlyDraft]);
 
   const draftPlayer = async (player: RankedPlayer, pickNumber: number, teamNumber: number, roundNumber: number, isAutodraft = false) => {
     if (!draft || !draftId) {
@@ -849,7 +892,7 @@ const DraftRoom = () => {
       return;
     }
 
-    if (player.position === 'DEF' || player.position === 'D/ST') {
+    if (!isRookiesOnlyDraft && (player.position === 'DEF' || player.position === 'D/ST')) {
       if (!canDraftDefense(draft.user_pick_position)) {
         toast.error('You cannot take another defense; only 32 exist and other teams need room to fill their DEF slots.');
         return;
@@ -1087,6 +1130,7 @@ const DraftRoom = () => {
           draftOrder: draft.draft_order,
           flexSlots: flexCount,
           benchSize: benchCount,
+          rookieFlexDraft: isRookiesOnlyDraft,
         };
         const cpuPick = selectCpuPick(available, archetypeIdOrIds, context) ?? available[0];
         
@@ -1231,7 +1275,7 @@ const DraftRoom = () => {
         clearTimeout(cpuDraftTimeoutRef.current);
       }
     };
-  }, [currentPick, draft, draftId, isDrafting, loading, picks, players, isDraftPaused, keepers]);
+  }, [currentPick, draft, draftId, isDrafting, loading, picks, players, isDraftPaused, keepers, isRookiesOnlyDraft]);
 
 
   // Timer logic for user's turn
@@ -1512,7 +1556,9 @@ const DraftRoom = () => {
     // Check if there's an available roster spot for this position (account for future keepers)
     const spotOpts = draft ? { teamNumber: draft.user_pick_position, currentRound: getCurrentRound() } : undefined;
     if (!hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts)) return false;
-    if (p.position === 'DEF' || p.position === 'D/ST') return draft ? canDraftDefense(draft.user_pick_position) : false;
+    if (!isRookiesOnlyDraft && (p.position === 'DEF' || p.position === 'D/ST')) {
+      return draft ? canDraftDefense(draft.user_pick_position) : false;
+    }
     return true;
   });
 
@@ -1874,6 +1920,7 @@ const DraftRoom = () => {
     const benchCount = positionLimits?.BENCH ?? 6;
     const benchPlayers = draftedPlayers.filter((p) => !assignedPlayerIds.has(p.id));
     const teamName = teamNames.get(draft?.user_pick_position || 1) || 'MY TEAM';
+    const sortedCompletionPicks = [...userPicks].sort((a, b) => a.pick_number - b.pick_number);
 
     // Detect archetype from user's picks
     const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
@@ -2015,10 +2062,45 @@ const DraftRoom = () => {
             </div>
           </div>
 
-          {/* Team Display - Two Column Layout */}
+          {/* Team Display - Two Column Layout (or ordered pick slots for rookie-only) */}
           <div className="glass-card p-6">
             <h2 className="font-display text-2xl mb-6 text-center">{teamName}</h2>
-            
+
+            {isRookiesOnlyDraft && draft ? (
+              <div>
+                <p className="text-sm text-muted-foreground text-center mb-4">
+                  Rookie draft — {draft.num_rounds} pick{draft.num_rounds !== 1 ? 's' : ''} in order (any position per slot).
+                </p>
+                <div className="max-w-xl mx-auto space-y-2">
+                  {Array.from({ length: draft.num_rounds }, (_, index) => {
+                    const pick = sortedCompletionPicks[index];
+                    const player = pick ? players.find((p) => p.id === pick.player_id) : undefined;
+                    return (
+                      <div
+                        key={pick?.id ?? `rookie-complete-${index}`}
+                        className={cn(
+                          'flex items-center gap-2 p-3 rounded-lg text-sm border',
+                          player ? 'bg-secondary/50 border-border/30' : 'bg-secondary/30 border-border/30'
+                        )}
+                      >
+                        <div className="w-14 text-xs font-semibold text-muted-foreground shrink-0">
+                          Pick {index + 1}
+                        </div>
+                        {player ? (
+                          <>
+                            <div className="flex-1 truncate font-medium">{player.name}</div>
+                            <PositionBadge position={player.position} className="text-[10px]" />
+                            <div className="text-xs text-muted-foreground shrink-0">{player.team || 'FA'}</div>
+                          </>
+                        ) : (
+                          <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Starting Lineup - Left Column */}
               <div>
@@ -2088,6 +2170,7 @@ const DraftRoom = () => {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </main>
       </div>
@@ -2321,8 +2404,8 @@ const DraftRoom = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1 min-h-0 overflow-hidden">
-          {/* My Roster */}
-          <div className="lg:col-span-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
+          {/* My Roster: align to top of row; scroll inside cell if roster is taller than the players column */}
+          <div className="lg:col-span-1 min-h-0 flex flex-col justify-start overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
             <MyRoster 
               picks={picks} 
               players={players} 
@@ -2331,6 +2414,7 @@ const DraftRoom = () => {
               isSuperflex={isSuperflex}
               userKeepers={draft?.user_pick_position ? keepers.filter((k) => k.team_number === draft.user_pick_position).map((k) => ({ player_id: k.player_id, round_number: k.round_number })) : undefined}
               currentRound={getCurrentRound()}
+              rookieDraftSlots={isRookiesOnlyDraft && draft ? draft.num_rounds : undefined}
             />
           </div>
 
@@ -2350,7 +2434,7 @@ const DraftRoom = () => {
                     <SelectItem value="WR">WR</SelectItem>
                     <SelectItem value="TE">TE</SelectItem>
                     <SelectItem value="K">K</SelectItem>
-                    {draft && canDraftDefense(draft.user_pick_position) && (
+                    {!isRookiesOnlyDraft && draft && canDraftDefense(draft.user_pick_position) && (
                       <SelectItem value="DEF">DEF</SelectItem>
                     )}
                   </SelectContent>
@@ -2388,7 +2472,9 @@ const DraftRoom = () => {
                     if (!p || filteredPlayerIds.has(p.id)) return false;
                     const spotOpts = draft ? { teamNumber: draft.user_pick_position, currentRound: getCurrentRound() } : undefined;
                     if (!hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts)) return false;
-                    if (p.position === 'DEF' || p.position === 'D/ST') return draft ? canDraftDefense(draft.user_pick_position) : false;
+                    if (!isRookiesOnlyDraft && (p.position === 'DEF' || p.position === 'D/ST')) {
+                      return draft ? canDraftDefense(draft.user_pick_position) : false;
+                    }
                     return true;
                   });
                 

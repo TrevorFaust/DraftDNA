@@ -20,6 +20,7 @@ import { ClipboardList } from 'lucide-react';
 import { tempDraftStorage, generateTempDraftId, tempSettingsStorage } from '@/utils/temporaryStorage';
 import type { MockDraft } from '@/types/database';
 import { assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
+import { fetchRookiesRankings } from '@/utils/rookiesFilter';
 
 const MockDraft = () => {
   const { user, loading: authLoading } = useAuth();
@@ -148,8 +149,6 @@ const MockDraft = () => {
         setUserPickPosition(validatedNumTeams.toString());
       }
 
-      const numRounds = calculateRounds();
-      
       // Get settings from selectedLeague for logged-in users, or tempSettingsStorage for guests
       let draftOrder = 'snake';
       let scoringFormat = 'ppr';
@@ -213,6 +212,26 @@ const MockDraft = () => {
       }
       
       const isDynasty = leagueType === 'dynasty';
+
+      let numRounds = calculateRounds();
+      if (isDynasty && effectivePlayerPool === 'rookies') {
+        const rookieRows = await fetchRookiesRankings({
+          scoringFormat,
+          leagueType,
+          isSuperflex,
+        });
+        const rookieCount = rookieRows.length;
+        const maxRoundsByPool = Math.floor(rookieCount / validatedNumTeams);
+        if (maxRoundsByPool < 1) {
+          toast.error(
+            `Not enough rookies in the pool (${rookieCount}) for ${validatedNumTeams} teams. At least one rookie per team is required.`
+          );
+          setLoading(false);
+          return;
+        }
+        const rosterRounds = numRounds;
+        numRounds = Math.min(rosterRounds, maxRoundsByPool);
+      }
       
       // Save settings to localStorage for non-logged-in users
       if (!user) {
@@ -430,9 +449,10 @@ const MockDraft = () => {
               </Label>
               <Input
                 id="numTeams"
-                type="number"
-                min={4}
-                max={32}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
                 value={numTeams}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -440,123 +460,37 @@ const MockDraft = () => {
                     setNumTeams('');
                     return;
                   }
-                  // Remove any non-numeric characters
                   const cleanedValue = value.replace(/[^0-9]/g, '');
                   if (cleanedValue === '') {
                     setNumTeams('');
                     return;
                   }
-                  
-                  // CRITICAL: Prevent more than 2 digits - if user tries to type a 3rd digit, immediately set to 32
                   if (cleanedValue.length > 2) {
                     setNumTeams('32');
                     return;
                   }
-                  
-                  const numValue = parseInt(cleanedValue);
-                  
-                  // If value is > 32, clamp to 32
+                  const numValue = parseInt(cleanedValue, 10);
                   if (!isNaN(numValue) && numValue > 32) {
                     setNumTeams('32');
                     return;
                   }
-                  
-                  // Allow typing any number, validation happens on blur
                   if (!isNaN(numValue)) {
                     setNumTeams(cleanedValue);
                   }
                 }}
-                onKeyDown={(e) => {
-                  const input = e.currentTarget;
-                  const currentValue = input.value.replace(/[^0-9]/g, ''); // Get only digits
-                  const key = e.key;
-                  
-                  // Allow: backspace, delete, tab, escape, enter, arrow keys
-                  if (['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(key)) {
-                    return;
-                  }
-                  
-                  // Allow: Ctrl/Cmd + A, C, V, X
-                  if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x'].includes(key.toLowerCase())) {
-                    return;
-                  }
-                  
-                  // If it's a number key
-                  if (/[0-9]/.test(key)) {
-                    // CRITICAL: If current value already has 2 digits, prevent typing a 3rd digit
-                    if (currentValue.length >= 2) {
-                      e.preventDefault();
-                      // Immediately set to 32 if they try to type a 3rd digit
-                      setNumTeams('32');
-                      return;
-                    }
-                    
-                    // Check if adding this digit would exceed 32
-                    const newValue = currentValue === '' ? key : currentValue + key;
-                    const numValue = parseInt(newValue);
-                    
-                    // If the new value would exceed 32, prevent the input and set to 32
-                    if (!isNaN(numValue) && numValue > 32) {
-                      e.preventDefault();
-                      setNumTeams('32');
-                      return;
-                    }
-                  }
-                  
-                  // Block any other characters (non-numeric)
-                  if (!/[0-9]/.test(key)) {
-                    e.preventDefault();
-                  }
-                }}
                 onPaste={(e) => {
-                  // Handle paste to prevent pasting large numbers
                   e.preventDefault();
                   const pastedText = e.clipboardData.getData('text');
                   const cleanedValue = pastedText.replace(/[^0-9]/g, '');
-                  
-                  // CRITICAL: If pasted value has more than 2 digits, immediately set to 32
                   if (cleanedValue.length > 2) {
                     setNumTeams('32');
-                    // Force the input value to 32 immediately to prevent freezing
-                    const target = e.currentTarget;
-                    setTimeout(() => {
-                      target.value = '32';
-                      setNumTeams('32');
-                    }, 0);
                     return;
                   }
-                  
                   if (cleanedValue) {
-                    const numValue = parseInt(cleanedValue);
+                    const numValue = parseInt(cleanedValue, 10);
                     if (!isNaN(numValue)) {
-                      // Clamp to 4-32 range
                       const clampedValue = Math.max(4, Math.min(32, numValue));
                       setNumTeams(clampedValue.toString());
-                    }
-                  }
-                }}
-                onInput={(e) => {
-                  // Additional safeguard: check on input event
-                  const target = e.currentTarget;
-                  const value = target.value.replace(/[^0-9]/g, '');
-                  
-                  // CRITICAL: If value has more than 2 digits, immediately set to 32
-                  if (value.length > 2) {
-                    setNumTeams('32');
-                    // Force the input value to 32 immediately
-                    setTimeout(() => {
-                      target.value = '32';
-                      setNumTeams('32');
-                    }, 0);
-                  } else {
-                    // Also check if the numeric value exceeds 32
-                    const numValue = parseInt(value);
-                    if (!isNaN(numValue) && numValue > 32) {
-                      setNumTeams('32');
-                      setTimeout(() => {
-                        target.value = '32';
-                        setNumTeams('32');
-                      }, 0);
                     }
                   }
                 }}
