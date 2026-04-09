@@ -1,192 +1,140 @@
 import { cn } from '@/lib/utils';
+import { parseSvgViewBox, recolorJerseyByInkscapeLabels } from '@/lib/jerseyRecolorByLabel';
+import jerseySvgRaw from '@/assets/empty_football_jersey.svg?raw';
 
 interface JerseyIconProps {
   jerseyNumber: number | null | undefined;
+  /** DB `team_color` */
   primaryColor?: string | null;
+  /** DB `team_color2` */
   secondaryColor?: string | null;
+  /** DB `team_color3` */
   tertiaryColor?: string | null;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
 
+const DEFAULT_PRIMARY = '#8B1538';
+const DEFAULT_SECONDARY = '#FFD700';
+const DEFAULT_TERTIARY = '#FFFFFF';
+
+function safeHexColor(value: string | null | undefined, fallback: string): string {
+  if (value == null || value === '') return fallback;
+  const t = value.trim();
+  if (/^#[0-9A-Fa-f]{3}$/.test(t) || /^#[0-9A-Fa-f]{6}$/.test(t) || /^#[0-9A-Fa-f]{8}$/.test(t)) {
+    return t;
+  }
+  return fallback;
+}
+
+function stripLeadingXmlDecl(svg: string): string {
+  return svg.replace(/<\?xml[\s\S]*?\?>\s*/i, '').trim();
+}
+
 export const JerseyIcon = ({
   jerseyNumber,
-  primaryColor = '#8B1538', // Deep maroon/burgundy
-  secondaryColor = '#FFD700', // Gold/yellow
-  tertiaryColor = '#FFFFFF',
+  primaryColor,
+  secondaryColor,
+  tertiaryColor,
   size = 'md',
-  className
+  className,
 }: JerseyIconProps) => {
-  // Make jersey larger and more visible
   const sizeClasses = {
     sm: 'w-16 h-20',
     md: 'w-20 h-28',
-    lg: 'w-28 h-36'
+    lg: 'w-28 h-36',
   };
 
-  // Default colors if not provided - using maroon and gold as default (matching the image)
-  const primary = primaryColor || '#8B1538'; // Maroon body
-  const secondary = secondaryColor || '#FFD700'; // Gold collar, sleeves, and numbers
-  const tertiary = tertiaryColor || '#FFFFFF';
+  const primary = safeHexColor(primaryColor, DEFAULT_PRIMARY);
+  const secondary = safeHexColor(secondaryColor, DEFAULT_SECONDARY);
+  const tertiary = safeHexColor(tertiaryColor, DEFAULT_TERTIARY);
 
-  // Convert jersey number to string, handling null/undefined
-  const jerseyNumStr = jerseyNumber !== null && jerseyNumber !== undefined 
-    ? Math.floor(jerseyNumber).toString() 
-    : null;
+  const jerseyNumStr =
+    jerseyNumber !== null && jerseyNumber !== undefined ? Math.floor(jerseyNumber).toString() : null;
+
+  const baseSvg = stripLeadingXmlDecl(jerseySvgRaw);
+  const themedSvg = recolorJerseyByInkscapeLabels(baseSvg, primary, secondary, tertiary);
+  const viewBox = parseSvgViewBox(themedSvg);
 
   return (
-    <div className={cn('relative flex items-center justify-center', sizeClasses[size], className)}>
-      <svg
-        viewBox="0 0 140 180"
-        className="w-full h-full"
-        xmlns="http://www.w3.org/2000/svg"
-        style={{ filter: 'drop-shadow(3px 5px 8px rgba(0,0,0,0.4))' }}
-      >
-        {/* Prominent drop shadow beneath and to the right */}
-        <ellipse
-          cx="75"
-          cy="175"
-          rx="45"
-          ry="5"
-          fill="#000000"
-          opacity="0.35"
-        />
-        
-        {/* Jersey body - maroon (primary color) with dark outline */}
-        <path
-          d="M 35 25 L 35 155 L 105 155 L 105 25 L 88 25 L 88 50 L 52 50 L 52 25 Z"
-          fill={primary}
-          stroke="#000000"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-        />
-        
-        {/* Left sleeve - gold (secondary color) */}
-        <path
-          d="M 35 25 L 52 25 L 52 50 L 35 50 Z"
-          fill={secondary}
-          stroke="#000000"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-        />
-        
-        {/* Right sleeve - gold (secondary color) */}
-        <path
-          d="M 88 25 L 105 25 L 105 50 L 88 50 Z"
-          fill={secondary}
-          stroke="#000000"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-        />
-        
-        {/* Left sleeve cuff - maroon (primary color) */}
-        <rect
-          x="35"
-          y="50"
-          width="17"
-          height="5"
-          fill={primary}
-          stroke="#000000"
-          strokeWidth="2.5"
-        />
-        
-        {/* Right sleeve cuff - maroon (primary color) */}
-        <rect
-          x="88"
-          y="50"
-          width="17"
-          height="5"
-          fill={primary}
-          stroke="#000000"
-          strokeWidth="2.5"
-        />
-        
-        {/* V-neck collar - gold (secondary color) */}
-        <path
-          d="M 52 25 L 70 32 L 88 25 L 88 45 L 52 45 Z"
-          fill={secondary}
-          stroke="#000000"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-        />
-        
-        {/* Main jersey number on front - gold with maroon outline (matching the image) */}
-        {jerseyNumStr && (
-          <>
-            {/* Maroon outline for number */}
-            <text
-              x="70"
-              y="110"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="58"
-              fontWeight="900"
-              fontFamily="Arial Black, Arial, sans-serif"
-              fill={primary}
-              stroke={primary}
-              strokeWidth="3"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              className="select-none"
-              style={{ paintOrder: 'stroke fill' }}
-            >
-              {jerseyNumStr}
-            </text>
-            {/* Main number in gold (secondary color) */}
-            <text
-              x="70"
-              y="110"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="58"
-              fontWeight="900"
-              fontFamily="Arial Black, Arial, sans-serif"
-              fill={secondary}
-              className="select-none"
-            >
-              {jerseyNumStr}
-            </text>
-          </>
-        )}
-        
-        {/* Small number on right sleeve - gold with maroon outline (matching the image) */}
-        {jerseyNumStr && (
-          <>
-            {/* Maroon outline for sleeve number */}
-            <text
-              x="96"
-              y="38"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="14"
-              fontWeight="900"
-              fontFamily="Arial Black, Arial, sans-serif"
-              fill={primary}
-              stroke={primary}
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-              className="select-none"
-              style={{ paintOrder: 'stroke fill' }}
-            >
-              {jerseyNumStr}
-            </text>
-            {/* Sleeve number in gold */}
-            <text
-              x="96"
-              y="38"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="14"
-              fontWeight="900"
-              fontFamily="Arial Black, Arial, sans-serif"
-              fill={secondary}
-              className="select-none"
-            >
-              {jerseyNumStr}
-            </text>
-          </>
-        )}
-      </svg>
+    <div
+      className={cn(
+        'relative flex items-center justify-center',
+        sizeClasses[size],
+        className
+      )}
+      style={{ filter: 'drop-shadow(3px 5px 8px rgba(0,0,0,0.4))' }}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 [&>svg]:h-full [&>svg]:w-full"
+        dangerouslySetInnerHTML={{ __html: themedSvg }}
+        aria-hidden
+      />
+      {jerseyNumStr && (
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full select-none"
+          viewBox={viewBox}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <text
+            x="50%"
+            y="38%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="88"
+            fontWeight="900"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fill={primary}
+            stroke={primary}
+            strokeWidth="4"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{ paintOrder: 'stroke fill' }}
+          >
+            {jerseyNumStr}
+          </text>
+          <text
+            x="50%"
+            y="38%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="88"
+            fontWeight="900"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fill={secondary}
+          >
+            {jerseyNumStr}
+          </text>
+          <text
+            x="82%"
+            y="20%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="26"
+            fontWeight="900"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fill={primary}
+            stroke={primary}
+            strokeWidth="2"
+            strokeLinejoin="round"
+            style={{ paintOrder: 'stroke fill' }}
+          >
+            {jerseyNumStr}
+          </text>
+          <text
+            x="82%"
+            y="20%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="26"
+            fontWeight="900"
+            fontFamily="Arial Black, Arial, sans-serif"
+            fill={secondary}
+          >
+            {jerseyNumStr}
+          </text>
+        </svg>
+      )}
     </div>
   );
 };

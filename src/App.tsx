@@ -9,6 +9,7 @@ import { LeaguesProvider } from "@/hooks/useLeagues";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import RecoverPassword from "./pages/RecoverPassword";
 import Dashboard from "./pages/Dashboard";
 import { Rankings } from "./pages/Rankings";
 import MockDraft from "./pages/MockDraft";
@@ -48,6 +49,7 @@ const App = () => (
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
+                    <Route path="/recover-password" element={<RecoverPassword />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/rankings" element={<Rankings />} />
                     <Route path="/statistics" element={<Suspense fallback={<PageFallback />}><Statistics /></Suspense>} />

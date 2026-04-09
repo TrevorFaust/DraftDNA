@@ -8,23 +8,14 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Mail, Lock, Loader2, ArrowLeft, User, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
+import { PasswordRecoveryForm } from '@/components/PasswordRecoveryForm';
+import { validatePassword } from '@/lib/passwordPolicy';
 import { z } from 'zod';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address'),
   password: z.string().min(1, 'Please enter your password'),
 });
-
-const PASSWORD_SPECIAL = /[!@#$%^&*()_\-+=[\]{}|:;<,>.?/~]/;
-
-function validatePassword(password: string): string | null {
-  if (password.length < 10) return 'Password must be at least 10 characters';
-  if (!/[A-Z]/.test(password)) return 'Password must include at least one uppercase letter';
-  if (!/[a-z]/.test(password)) return 'Password must include at least one lowercase letter';
-  if (!/\d/.test(password)) return 'Password must include at least one number';
-  if (!PASSWORD_SPECIAL.test(password)) return 'Password must include at least one special character (! @ # $ % ^ & * ( ) _ - + = { [ } ] | : ; < , > . ? / ~)';
-  return null;
-}
 
 const signUpSchema = z.object({
   username: z
@@ -64,14 +55,22 @@ const Auth = () => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendError, setResendError] = useState<string | null>(null);
-  const { signIn, signUp, user, resetPassword } = useAuth();
+  const {
+    signIn,
+    signUp,
+    user,
+    resetPassword,
+    loading: authLoading,
+    passwordRecoveryActive,
+  } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
+    if (authLoading) return;
+    if (user && !passwordRecoveryActive) {
       navigate('/dashboard');
     }
-  }, [user, navigate]);
+  }, [user, navigate, authLoading, passwordRecoveryActive]);
 
   const checkUsernameTaken = useCallback(async (value: string) => {
     const trimmed = value.trim();
@@ -292,12 +291,22 @@ const Auth = () => {
     setIsLogin(true);
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" aria-hidden />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsl(190_95%_50%/0.15),transparent_50%)]" />
 
       <div className="glass-card p-8 w-full max-w-md animate-slide-up relative">
-        {pendingVerificationEmail ? (
+        {passwordRecoveryActive && user ? (
+          <PasswordRecoveryForm />
+        ) : pendingVerificationEmail ? (
           <div className="space-y-6">
             <div className="flex flex-col items-center mb-6">
               <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center mb-4 shadow-glow overflow-hidden">

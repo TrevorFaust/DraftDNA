@@ -1,1 +1,5 @@
 project_id = "pavehsrhmpoexcqoighb"
+
+# Cron / server invokes: protect with SYNC_PLAYER_TEAMS_SECRET + x-sync-secret header.
+[functions.sync-player-teams]
+verify_jwt = false

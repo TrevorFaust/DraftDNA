@@ -11,7 +11,8 @@
     "build": "node scripts/syncComposedBadgesToPublic.mjs && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "bootstrap:sleeper-ids": "npx tsx scripts/bootstrap-sleeper-ids.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

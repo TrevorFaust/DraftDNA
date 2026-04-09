@@ -10,7 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Palette, HelpCircle, MessageSquare, User, Mail, ArrowLeft, Trophy, Plus, Trash2, Loader2, GripVertical, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Bell, Palette, HelpCircle, MessageSquare, User, Mail, ArrowLeft, Trophy, Plus, Trash2, Loader2, GripVertical, Lock, Eye, EyeOff, AlertTriangle, Database } from 'lucide-react';
+import { SyncPlayersButton } from '@/components/admin/SyncPlayersButton';
+import { isSyncAdminUser } from '@/constants/adminSync';
 import {
   Select,
   SelectContent,
@@ -1215,6 +1217,26 @@ const Settings = () => {
               </Button>
             </CardContent>
           </Card>
+
+          {user && isSyncAdminUser(user.id) && (
+            <Card className="glass-card border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-primary" />
+                  Player data (admin)
+                </CardTitle>
+                <CardDescription>
+                  Refresh NFL team and jersey from Sleeper for players that have a{' '}
+                  <code className="text-xs">sleeper_id</code>. Server checks{' '}
+                  <code className="text-xs">ADMIN_SYNC_USER_IDS</code>; this card only shows for your
+                  account (<code className="text-xs">VITE_SYNC_ADMIN_USER_ID</code>).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SyncPlayersButton userId={user.id} />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Delete Account - at the very bottom */}
           {user && (

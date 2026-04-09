@@ -2,12 +2,6 @@ import { PositionBadge } from '@/components/PositionBadge';
 import type { RankedPlayer, DraftPick } from '@/types/database';
 import { cn } from '@/lib/utils';
 
-interface RosterSlot {
-  label: string;
-  position: string;
-  filled?: RankedPlayer;
-}
-
 interface PositionLimits {
   QB?: number;
   RB?: number;
@@ -35,9 +29,21 @@ interface MyRosterProps {
   userKeepers?: UserKeeper[];
   /** Current draft round; keepers with round_number > currentRound are shown as "Rd X" on roster. */
   currentRound?: number;
+  /** Rookie-only mock: show N ordered pick slots (any position), not starters/bench. */
+  rookieDraftSlots?: number;
 }
 
-export const MyRoster = ({ picks, players, userPickPosition, positionLimits, isSuperflex = false, teamName, userKeepers, currentRound = 0 }: MyRosterProps) => {
+export const MyRoster = ({
+  picks,
+  players,
+  userPickPosition,
+  positionLimits,
+  isSuperflex = false,
+  teamName,
+  userKeepers,
+  currentRound = 0,
+  rookieDraftSlots,
+}: MyRosterProps) => {
   const userPicks = picks.filter((p) => p.team_number === userPickPosition);
   const draftedPlayers = userPicks
     .map((pick) => players.find((p) => p.id === pick.player_id))
@@ -51,6 +57,82 @@ export const MyRoster = ({ picks, players, userPickPosition, positionLimits, isS
   const draftedIds = new Set(draftedPlayers.map((p) => p.id));
   const keeperPlayersNotYetDrafted = keeperEntries.filter((e) => !draftedIds.has(e.player.id));
   const keeperRoundByPlayerId = new Map(keeperPlayersNotYetDrafted.map((e) => [e.player.id, e.round]));
+  const sortedUserPicks = [...userPicks].sort((a, b) => a.pick_number - b.pick_number);
+
+  if (rookieDraftSlots != null && rookieDraftSlots > 0) {
+    return (
+      <div className="glass-card p-4 w-full">
+        <h2 className="font-display text-xl mb-4">{teamName || 'MY TEAM'}</h2>
+        <p className="text-xs text-muted-foreground mb-3">
+          Rookie draft — {rookieDraftSlots} pick{rookieDraftSlots !== 1 ? 's' : ''}, any position per slot.
+        </p>
+        <div className="space-y-3">
+          {keeperPlayersNotYetDrafted.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Keepers</div>
+              {keeperPlayersNotYetDrafted.map((e) => (
+                <div
+                  key={e.player.id}
+                  className="flex items-center gap-2 p-2 rounded-lg text-sm border bg-secondary/50 border-border/30"
+                >
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                    <span className="truncate font-medium">{e.player.name}</span>
+                    <span
+                      className="shrink-0 text-[10px] font-medium text-primary/90 bg-primary/20 px-1.5 py-0.5 rounded"
+                      title="Keeper"
+                    >
+                      Rd {e.round}
+                    </span>
+                  </div>
+                  <PositionBadge position={e.player.position} className="text-[10px]" />
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Your picks</div>
+            {Array.from({ length: rookieDraftSlots }, (_, index) => {
+              const pick = sortedUserPicks[index];
+              const player = pick ? players.find((p) => p.id === pick.player_id) : undefined;
+              const keeperRound = player ? keeperRoundByPlayerId.get(player.id) : undefined;
+              return (
+                <div
+                  key={pick?.id ?? `slot-${index}`}
+                  className={cn(
+                    'flex items-center gap-2 p-2 rounded-lg text-sm border',
+                    player ? 'bg-secondary/50 border-border/30' : 'bg-secondary/30 border-border/30'
+                  )}
+                >
+                  <div className="w-14 text-xs font-semibold text-muted-foreground shrink-0">
+                    Pick {index + 1}
+                  </div>
+                  {player ? (
+                    <>
+                      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                        <span className="truncate font-medium">{player.name}</span>
+                        {keeperRound !== undefined && (
+                          <span
+                            className="shrink-0 text-[10px] font-medium text-primary/90 bg-primary/20 px-1.5 py-0.5 rounded"
+                            title="Keeper"
+                          >
+                            Rd {keeperRound}
+                          </span>
+                        )}
+                      </div>
+                      <PositionBadge position={player.position} className="text-[10px]" />
+                      <div className="text-xs text-muted-foreground shrink-0">{player.team || 'FA'}</div>
+                    </>
+                  ) : (
+                    <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Combined roster for slot assignment: drafted + keepers (so lineup shows keepers in position)
   const combinedRoster = [...draftedPlayers, ...keeperPlayersNotYetDrafted.map((e) => e.player)];
@@ -100,7 +182,7 @@ export const MyRoster = ({ picks, players, userPickPosition, positionLimits, isS
   const benchPlayers = combinedRoster.filter((p) => !assignedPlayerIds.has(p.id));
 
   return (
-    <div className="glass-card p-4 h-full">
+    <div className="glass-card p-4 w-full">
       <h2 className="font-display text-xl mb-4">{teamName || 'MY TEAM'}</h2>
       
       <div className="space-y-3">

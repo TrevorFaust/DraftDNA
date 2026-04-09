@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Save, Users, Settings2, ArrowLeft, Layers, BookmarkPlus, Plus, Trash2, HelpCircle, ListOrdered } from 'lucide-react';
+import { Save, Users, Settings2, ArrowLeft, Layers, BookmarkPlus, Plus, Trash2, HelpCircle, ListOrdered, Info } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { tempSettingsStorage } from '@/utils/temporaryStorage';
 import { cn } from '@/lib/utils';
 import { PlayerSearchCombobox } from '@/components/PlayerSearchCombobox';
@@ -1021,6 +1022,8 @@ export default function LeagueSettings() {
     );
   }
 
+  const isRookieOnlyLeague = leagueType === 'dynasty' && rookiesOnly;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -1306,17 +1309,31 @@ export default function LeagueSettings() {
                     )}
                   </CardTitle>
                   <CardDescription>
-                    Set the maximum number of players that can be drafted per position
+                    {isRookieOnlyLeague ? (
+                      <>
+                        With <strong>Rookies only</strong> enabled, mock rookie drafts use a limited rookie pool and open pick slots (any position)—these per-position limits are not used there. Values stay saved if you turn off rookies only later.
+                      </>
+                    ) : (
+                      <>Set the maximum number of players that can be drafted per position</>
+                    )}
                   </CardDescription>
                 </div>
                 {user && (
-                  <Button onClick={savePositionLimits} disabled={saving} className="shrink-0">
+                  <Button onClick={savePositionLimits} disabled={saving || isRookieOnlyLeague} className="shrink-0">
                     <Save className="w-4 h-4 mr-2" />
                     Save Position Limits
                   </Button>
                 )}
               </CardHeader>
               <CardContent className="space-y-6 relative">
+                {isRookieOnlyLeague && (
+                  <Alert className="border-muted-foreground/25 bg-muted/30">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      Rookie-only leagues draft from a finite list of rookies. Position limits do not apply in rookie only drafts. Uncheck <span className="font-medium text-foreground">Rookies only</span> on the General tab to edit limits for full-roster mocks.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {!user && (
                   <>
                     {/* Overlay that blocks interaction */}
@@ -1333,10 +1350,15 @@ export default function LeagueSettings() {
                       </div>
                     </div>
                     {/* Preview content behind overlay */}
-                    <div className="opacity-50 pointer-events-none">
+                    <div className={cn('opacity-50 pointer-events-none', isRookieOnlyLeague && 'opacity-40')}>
                       <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
                         <p className="text-sm text-primary/80">
                           💡 <strong>Preview Mode:</strong> Position limits allow you to control roster composition.
+                          {isRookieOnlyLeague && (
+                            <span className="block mt-2 text-muted-foreground">
+                              Rookies only is on—limits are not used for rookie mocks (limited player pool).
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -1380,7 +1402,12 @@ export default function LeagueSettings() {
                 )}
                 {user && (
                   <>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div
+                      className={cn(
+                        'grid grid-cols-2 sm:grid-cols-3 gap-4',
+                        isRookieOnlyLeague && 'pointer-events-none opacity-50'
+                      )}
+                    >
                       {(Object.keys(positionLimits) as Array<keyof PositionLimits>).map((position) => {
                         const maxDefLimit = position === 'DEF' ? 29 : 15;
                         const maxValue = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : 15;
@@ -1410,6 +1437,7 @@ export default function LeagueSettings() {
                               onChange={(e) => handlePositionLimitChange(position, e.target.value)}
                               onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                               className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              disabled={isRookieOnlyLeague}
                             />
                           </div>
                         );
@@ -1417,17 +1445,26 @@ export default function LeagueSettings() {
                     </div>
                   </>
                 )}
-                <div className="bg-muted/50 border border-border rounded-lg p-4 text-sm">
-                  <p className="font-medium mb-2">Minimum Requirements:</p>
-                  <ul className="space-y-1 text-muted-foreground list-disc list-outside pl-5">
-                    <li>QB: 1, RB: 2, WR: 2, TE: 1, Flex: 1 (default 2 in superflex), K: 1, DEF: 1, Bench: 0</li>
-                    <li>RB + WR + TE must total at least 5 + Flex count (to fill RB1, RB2, WR1, WR2, TE, and all FLEX positions)</li>
-                    <li>Total roster size must accommodate all starting positions plus bench</li>
-                    <li>Keepers: max per team (0 to number of draft rounds). When selecting keepers, each team may use up to this many keeper slots; keeper picks count toward position limits during the draft.</li>
-                    <li className="text-primary/50">Note: Bench slots can be filled by any position, but must still respect position limits. Bench count cannot exceed the total remaining player capacity after filling starting positions.</li>
-                    <li className="text-primary/50">Defense: There are 32 NFL defenses; at draft time you can take a defense only if enough remain for every other team to fill their DEF slots.</li>
-                  </ul>
-                </div>
+                {isRookieOnlyLeague ? (
+                  <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground mb-2">Minimum requirements (full-roster drafts only)</p>
+                    <p>
+                      The checklist for QB/RB/WR limits and defense rules applies when <strong>Rookies only</strong> is off. Rookie mocks use pool size and round count instead.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-muted/50 border border-border rounded-lg p-4 text-sm">
+                    <p className="font-medium mb-2">Minimum Requirements:</p>
+                    <ul className="space-y-1 text-muted-foreground list-disc list-outside pl-5">
+                      <li>QB: 1, RB: 2, WR: 2, TE: 1, Flex: 1 (default 2 in superflex), K: 1, DEF: 1, Bench: 0</li>
+                      <li>RB + WR + TE must total at least 5 + Flex count (to fill RB1, RB2, WR1, WR2, TE, and all FLEX positions)</li>
+                      <li>Total roster size must accommodate all starting positions plus bench</li>
+                      <li>Keepers: max per team (0 to number of draft rounds). When selecting keepers, each team may use up to this many keeper slots; keeper picks count toward position limits during the draft.</li>
+                      <li className="text-primary/50">Note: Bench slots can be filled by any position, but must still respect position limits. Bench count cannot exceed the total remaining player capacity after filling starting positions.</li>
+                      <li className="text-primary/50">Defense: There are 32 NFL defenses; at draft time you can take a defense only if enough remain for every other team to fill their DEF slots.</li>
+                    </ul>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
