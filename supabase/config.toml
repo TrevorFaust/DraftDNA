@@ -3,3 +3,7 @@ project_id = "pavehsrhmpoexcqoighb"
 # Cron / server invokes: protect with SYNC_PLAYER_TEAMS_SECRET + x-sync-secret header.
 [functions.sync-player-teams]
 verify_jwt = false
+
+# Auth is enforced inside the function (Bearer + auth.getUser); gateway JWT check caused 401 for valid sessions.
+[functions.delete-user]
+verify_jwt = false

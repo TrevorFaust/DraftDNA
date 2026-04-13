@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils';
 import { GripVertical } from 'lucide-react';
 import type { RankedPlayer } from '@/types/database';
 import type { Player2025Stats } from '@/hooks/usePlayer2025Stats';
+import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
+import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
 
 interface PlayerCardProps {
   player: RankedPlayer;
@@ -44,6 +46,9 @@ export const PlayerCard = ({
   positionColoredRank = false,
   stats2025
 }: PlayerCardProps) => {
+  const { data: jerseyColorsByAbbr } = useNflTeamJerseyColors();
+  const numberFill = lookupJerseyNumberFill(jerseyColorsByAbbr, player.team);
+
   return (
     <div
       onClick={onClick}
@@ -61,6 +66,14 @@ export const PlayerCard = ({
       )}>
         {rank}
       </div>
+
+      <PlayerJerseyWithNumber
+        team={player.team}
+        jerseyNumber={player.jersey_number}
+        numberFillColor={numberFill}
+        size="card"
+        position={player.position}
+      />
       
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
         <div className="flex items-center gap-2">

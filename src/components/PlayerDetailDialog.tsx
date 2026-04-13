@@ -7,11 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { PositionBadge } from './PositionBadge';
-import { JerseyIcon } from './JerseyIcon';
 import { supabase } from '@/integrations/supabase/client';
+import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
+import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
 import { Loader2, Calendar, BarChart3 } from 'lucide-react';
 import type { Player, NFLSchedule } from '@/types/database';
-import { getFullTeamName } from '@/utils/teamMapping';
 import type { Player2025Stats } from '@/hooks/usePlayer2025Stats';
 import type { ScoringFormat } from '@/utils/fantasyPoints';
 import { getAgeFromBirthDate } from '@/utils/playerAge';
@@ -66,12 +66,6 @@ interface PlayerDetailDialogProps {
   stats2025?: Player2025Stats | null;
 }
 
-interface TeamColors {
-  team_color: string | null;
-  team_color2: string | null;
-  team_color3: string | null;
-}
-
 interface WeeklyStats {
   week: number;
   opponent_team: string | null;
@@ -112,12 +106,12 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
   const scoringFormat = useScoringFormat();
   const [stats, setStats] = useState<WeeklyStats[]>([]);
   const [schedule, setSchedule] = useState<NFLSchedule[]>([]);
-  const [teamColors, setTeamColors] = useState<TeamColors | null>(null);
   const [playerAge, setPlayerAge] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<2025 | 2026>(2025);
   // For RBs/WRs: 'rushing' or 'receiving', for QBs: 'passing' or 'rushing'
   const [statView, setStatView] = useState<'rushing' | 'receiving' | 'passing'>('rushing');
+  const { data: jerseyColorsByAbbr } = useNflTeamJerseyColors();
 
   useEffect(() => {
     if (player && open) {
@@ -405,24 +399,6 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
           .limit(10);
 
         setSchedule((scheduleData as NFLSchedule[]) || []);
-
-        // Fetch team colors
-        const fullTeamName = getFullTeamName(player.team);
-        if (fullTeamName) {
-          const { data: teamData } = await supabase
-            .from('teams')
-            .select('team_color, team_color2, team_color3')
-            .eq('team_name', fullTeamName)
-            .single();
-
-          if (teamData) {
-            setTeamColors({
-              team_color: teamData.team_color,
-              team_color2: teamData.team_color2,
-              team_color3: teamData.team_color3,
-            });
-          }
-        }
       }
     } catch (error) {
       console.error('Failed to fetch player data:', error);
@@ -523,6 +499,7 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
 
   const statsForView = getStatsForView(player.position, statView);
   const showStatTabs = (player.position === 'QB' || player.position === 'RB' || player.position === 'FB' || player.position === 'WR' || player.position === 'TE');
+  const numberFill = lookupJerseyNumberFill(jerseyColorsByAbbr, player.team);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -531,12 +508,12 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
           <div className="flex items-start justify-between gap-4">
             <div>
               <DialogTitle className="flex items-center gap-3 flex-wrap">
-                <JerseyIcon
+                <PlayerJerseyWithNumber
+                  team={player.team}
                   jerseyNumber={player.jersey_number}
-                  primaryColor={teamColors?.team_color}
-                  secondaryColor={teamColors?.team_color2}
-                  tertiaryColor={teamColors?.team_color3}
-                  size="md"
+                  numberFillColor={numberFill}
+                  size="dialog"
+                  position={player.position}
                 />
                 <span className="font-display text-2xl">{player.name}</span>
                 <PositionBadge position={player.position} />
