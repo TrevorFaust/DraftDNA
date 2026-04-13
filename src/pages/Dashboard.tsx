@@ -27,7 +27,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { PositionBadge } from '@/components/PositionBadge';
-import { JerseyIconShowcase } from '@/components/JerseyIconShowcase';
 
 type LeaderboardRow = {
   rank: number;
@@ -381,8 +380,6 @@ const Dashboard = () => {
             </div>
           )}
         </div>
-
-        <JerseyIconShowcase />
 
         {/* Pick Six: view a user's picks (after deadline, or own picks anytime) */}
         <Dialog open={picksDialogOpen} onOpenChange={(open) => !open && closePicksDialog()}>
