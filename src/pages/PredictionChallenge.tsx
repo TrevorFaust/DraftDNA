@@ -1,5 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import ReCAPTCHA from 'react-google-recaptcha';
 import { useNavigate, Link } from 'react-router-dom';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
@@ -29,8 +31,13 @@ import { OfficialRulesContent } from '@/components/OfficialRulesContent';
 import { SITE_NAME, SEASON } from '@/constants/contest';
 import { cn } from '@/lib/utils';
 
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY?.trim() || undefined;
+/** v2 “normal” iframe is ~304×78px; slight headroom on height to avoid clipping when scaled. */
+const RECAPTCHA_BASE_W = 304;
+const RECAPTCHA_BASE_H = 80;
+const RECAPTCHA_SCALE = 0.88;
+
 const TOP_N = 6;
-const TERMS_STORAGE_KEY = 'pick_six_terms_accepted_v1';
 // NFL 2026 season typically starts early September; entries close 8pm ET on first Sunday
 const SEASON_START_DATE = new Date(`${SEASON}-09-01`);
 const SEASON_STARTED = new Date() >= SEASON_START_DATE;
@@ -90,10 +97,30 @@ export default function PredictionChallenge() {
   const [termsAccepted, setTermsAccepted] = useState<boolean | null>(null);
   const [termsAgeChecked, setTermsAgeChecked] = useState(false);
   const [termsRulesChecked, setTermsRulesChecked] = useState(false);
-  const [termsBotChecked, setTermsBotChecked] = useState(false);
+  const [termsSaving, setTermsSaving] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
+  const [htmlIsLight, setHtmlIsLight] = useState(
+    () => typeof document !== 'undefined' && document.documentElement.classList.contains('light')
+  );
   const playerStats = usePlayer2025Stats();
 
   const termsDialogOpen = user != null && termsAccepted === false;
+
+  useEffect(() => {
+    const el = document.documentElement;
+    const sync = () => setHtmlIsLight(el.classList.contains('light'));
+    sync();
+    const mo = new MutationObserver(sync);
+    mo.observe(el, { attributes: true, attributeFilter: ['class'] });
+    return () => mo.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!termsDialogOpen) return;
+    setCaptchaToken(null);
+    recaptchaRef.current?.reset();
+  }, [termsDialogOpen, htmlIsLight]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -102,9 +129,28 @@ export default function PredictionChallenge() {
   }, [authLoading, user]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const accepted = localStorage.getItem(TERMS_STORAGE_KEY) === 'true';
-    setTermsAccepted(accepted);
+    if (!user) {
+      setTermsAccepted(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('pick_six_rules_accepted_at')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) {
+        console.error('Failed to load Pick Six terms status:', error);
+        setTermsAccepted(false);
+        return;
+      }
+      setTermsAccepted(data?.pick_six_rules_accepted_at != null);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const loadExisting = useCallback(async () => {
@@ -251,14 +297,71 @@ ${shareUrl}`;
     [sharePosition, getShareCaption]
   );
 
-  const handleAcceptTerms = () => {
-    if (!termsAgeChecked || !termsRulesChecked || !termsBotChecked) return;
-    localStorage.setItem(TERMS_STORAGE_KEY, 'true');
-    setTermsAccepted(true);
-    setTermsAgeChecked(false);
-    setTermsRulesChecked(false);
-    setTermsBotChecked(false);
+  const handleAcceptTerms = async () => {
+    if (!termsAgeChecked || !termsRulesChecked) return;
+    if (!user) return;
+
+    if (RECAPTCHA_SITE_KEY) {
+      const token = captchaToken ?? recaptchaRef.current?.getValue() ?? null;
+      if (!token) {
+        toast.error('Please complete the "I am not a robot" verification.');
+        return;
+      }
+      const { data: captchaData, error: captchaError } = await supabase.functions.invoke('verify-recaptcha', {
+        body: { token },
+      });
+      if (captchaError) {
+        let msg = captchaError.message;
+        if (captchaError instanceof FunctionsHttpError && captchaError.context?.body) {
+          try {
+            const b = JSON.parse(captchaError.context.body as string) as { error?: string };
+            if (b.error) msg = b.error;
+          } catch {
+            /* keep message */
+          }
+        }
+        toast.error(msg || 'Could not verify reCAPTCHA. Try again in a moment.');
+        setCaptchaToken(null);
+        recaptchaRef.current?.reset();
+        return;
+      }
+      const ok =
+        captchaData &&
+        typeof captchaData === 'object' &&
+        'success' in captchaData &&
+        (captchaData as { success: unknown }).success === true;
+      if (!ok) {
+        toast.error('reCAPTCHA verification failed. Please try again.');
+        setCaptchaToken(null);
+        recaptchaRef.current?.reset();
+        return;
+      }
+    }
+
+    setTermsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ pick_six_rules_accepted_at: new Date().toISOString() })
+        .eq('id', user.id);
+      if (error) throw error;
+      setTermsAccepted(true);
+      setTermsAgeChecked(false);
+      setTermsRulesChecked(false);
+      setCaptchaToken(null);
+      recaptchaRef.current?.reset();
+    } catch (err) {
+      console.error('Failed to save rules acceptance:', err);
+      toast.error('Could not save your acceptance. Please try again.');
+    } finally {
+      setTermsSaving(false);
+    }
   };
+
+  const termsCanSubmit =
+    termsAgeChecked &&
+    termsRulesChecked &&
+    (!RECAPTCHA_SITE_KEY || Boolean(captchaToken && captchaToken.length > 0));
 
   const handleSavePosition = async (position: PositionKey) => {
     if (!user) return;
@@ -330,7 +433,7 @@ ${shareUrl}`;
     }
   };
 
-  if (authLoading || (user && loading)) {
+  if (authLoading || (user && loading) || (user && termsAccepted === null)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -748,24 +851,65 @@ ${shareUrl}`;
                   I agree to the Official Rules and the Arbitration Agreement.
                 </label>
               </div>
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  id="terms-bot-checkbox"
-                  checked={termsBotChecked}
-                  onCheckedChange={(c) => setTermsBotChecked(c === true)}
-                />
-                <label htmlFor="terms-bot-checkbox" className="text-sm font-medium leading-none cursor-pointer">
-                  (RECAPTCHA BOT CHECK)
-                </label>
-              </div>
+              {RECAPTCHA_SITE_KEY ? (
+                <div className="space-y-2 pt-1">
+                  {typeof window !== 'undefined' && window.location.hostname === '127.0.0.1' && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-2">
+                      reCAPTCHA often fails on <strong>127.0.0.1</strong>. Use <strong>http://localhost:8080</strong> for local
+                      testing, and add <code className="rounded bg-muted px-1">localhost</code> and{' '}
+                      <code className="rounded bg-muted px-1">127.0.0.1</code> under Domains in Google reCAPTCHA admin.
+                    </p>
+                  )}
+                  <div className="flex flex-nowrap justify-start items-center overflow-x-auto py-0.5 min-w-0">
+                    {/* Normal = horizontal checkbox row in iframe; scale() mimics ~2px smaller type (cannot style inside iframe). */}
+                    <div
+                      className={cn(
+                        'shrink-0 rounded-md border p-1 shadow-none overflow-hidden',
+                        htmlIsLight
+                          ? 'border-border/60 bg-card'
+                          : 'border-border/35 bg-background/50 backdrop-blur-sm'
+                      )}
+                      style={{
+                        width: `${RECAPTCHA_BASE_W * RECAPTCHA_SCALE}px`,
+                        height: `${RECAPTCHA_BASE_H * RECAPTCHA_SCALE}px`,
+                      }}
+                    >
+                      <div
+                        className="origin-top-left"
+                        style={{
+                          transform: `scale(${RECAPTCHA_SCALE})`,
+                          width: `${RECAPTCHA_BASE_W}px`,
+                          height: `${RECAPTCHA_BASE_H}px`,
+                        }}
+                      >
+                        <ReCAPTCHA
+                          key={htmlIsLight ? 'captcha-light' : 'captcha-dark'}
+                          ref={recaptchaRef}
+                          sitekey={RECAPTCHA_SITE_KEY}
+                          size="normal"
+                          theme={htmlIsLight ? 'light' : 'dark'}
+                          onChange={(t) => setCaptchaToken(t ?? null)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
             <div className="flex justify-end pt-2 shrink-0">
               <Button
-                onClick={handleAcceptTerms}
-                disabled={!termsAgeChecked || !termsRulesChecked || !termsBotChecked}
+                onClick={() => void handleAcceptTerms()}
+                disabled={!termsCanSubmit || termsSaving}
                 className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
               >
-                Accept &amp; Continue
+                {termsSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                    Saving…
+                  </>
+                ) : (
+                  'Accept & Continue'
+                )}
               </Button>
             </div>
           </DialogContent>

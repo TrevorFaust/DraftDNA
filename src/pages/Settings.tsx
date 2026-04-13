@@ -1307,7 +1307,7 @@ const Settings = () => {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure you want to delete your account?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will permanently remove your account, username, and email from our database. Any leagues, drafts, and other data associated with your account may also be removed. This action cannot be undone.
+                      This will permanently remove your account, username, and email from our database. Your Pick Six predictions and tiebreakers are removed with your account. Other leagues, drafts, or rankings may or may not be removed depending on how those features store data. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
