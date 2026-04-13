@@ -1,6 +1,7 @@
 // Supabase Edge Function: Delete the authenticated user's account.
 // Requires Authorization: Bearer <access_token>. Uses admin API to delete auth.users.
-// Deleting auth.users cascades to profiles (username). Other user data depends on schema.
+// Deleting auth.users cascades to profiles (username) and, via FK ON DELETE CASCADE, Pick Six
+// rows in user_season_predictions and user_season_tiebreakers (see migrations).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {

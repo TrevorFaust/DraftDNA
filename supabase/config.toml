@@ -7,3 +7,7 @@ verify_jwt = false
 # Auth is enforced inside the function (Bearer + auth.getUser); gateway JWT check caused 401 for valid sessions.
 [functions.delete-user]
 verify_jwt = false
+
+# Pick Six first-time rules flow (and any caller): verification uses Google siteverify + RECAPTCHA_SECRET_KEY.
+[functions.verify-recaptcha]
+verify_jwt = false
