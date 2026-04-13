@@ -22,9 +22,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+      console.error('delete-user: missing SUPABASE_URL, SUPABASE_ANON_KEY, or SUPABASE_SERVICE_ROLE_KEY');
+      return new Response(
+        JSON.stringify({
+          error:
+            'Account deletion is temporarily unavailable (server configuration). If this persists, contact support.',
+        }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },

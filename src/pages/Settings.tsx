@@ -32,6 +32,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import {
   DndContext,
@@ -252,13 +253,57 @@ const Settings = () => {
     if (!user) return;
     setDeleteAccountLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('delete-user', { method: 'POST' });
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      const accessToken =
+        refreshData.session?.access_token ?? session?.access_token;
+      if (!accessToken) {
+        toast({
+          title: 'Error',
+          description:
+            refreshError?.message ??
+            'Your session expired. Sign in again, then try deleting your account.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const { error, response } = await supabase.functions.invoke('delete-user', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: {},
+      });
       if (error) {
-        const msg = typeof data === 'object' && data && 'error' in data
-          ? (data as { error?: string }).error
-          : error.message;
-        toast({ title: 'Error', description: msg || 'Could not delete account. Please try again.', variant: 'destructive' });
-        setDeleteAccountLoading(false);
+        let msg = error.message;
+        if (error instanceof FunctionsHttpError && response) {
+          const status = response.status;
+          try {
+            const ct = response.headers.get('Content-Type') ?? '';
+            if (ct.includes('application/json')) {
+              const body: unknown = await response.json();
+              if (
+                body &&
+                typeof body === 'object' &&
+                'error' in body &&
+                typeof (body as { error: unknown }).error === 'string'
+              ) {
+                msg = (body as { error: string }).error;
+              }
+            } else {
+              const text = (await response.text()).trim();
+              if (text) msg = text.length > 240 ? `${text.slice(0, 240)}…` : text;
+            }
+          } catch {
+            /* keep generic FunctionsHttpError message */
+          }
+          if (status === 401 && msg === error.message) {
+            msg =
+              'Could not verify your session. Sign out, sign in again, then try deleting your account.';
+          }
+        }
+        toast({
+          title: 'Error',
+          description: msg || 'Could not delete account. Please try again.',
+          variant: 'destructive',
+        });
         return;
       }
       await signOut();
