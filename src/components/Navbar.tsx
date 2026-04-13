@@ -52,7 +52,7 @@ export const Navbar = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate('/auth', { replace: true });
   };
 
   return (

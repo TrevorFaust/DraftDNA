@@ -218,7 +218,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
+    // Always clear local state so UI updates even if revoke fails (e.g. right after account delete).
+    previousUserRef.current = null;
+    hasMigratedRef.current = false;
+    setPasswordRecoveryActive(false);
+    clearPasswordRecoveryPending();
+    setSession(null);
+    setUser(null);
+    setLoading(false);
+    if (error) {
+      console.error('Sign out:', error);
+      toast.error(error.message || 'Signed out here; if issues persist, refresh the page.');
+    }
   };
 
   const changePassword = async (newPassword: string) => {

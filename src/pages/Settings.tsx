@@ -307,7 +307,7 @@ const Settings = () => {
         return;
       }
       await signOut();
-      navigate('/auth');
+      navigate('/auth', { replace: true });
       toast({ title: 'Account deleted', description: 'Your account has been permanently deleted.' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not delete account. Please try again.';
