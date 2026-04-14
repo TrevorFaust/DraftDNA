@@ -44,20 +44,42 @@ const jerseyModules = import.meta.glob<{ default: string }>('../../jerseys/**/*.
   eager: true,
 });
 
+/** Prefer `jerseys/Teams/*.png` over same basename at `jerseys/*.png` when both exist. */
 const jerseyUrlByBasename: Record<string, string> = {};
 
+function isUnderTeamsFolder(path: string): boolean {
+  return /[/\\]Teams[/\\]/.test(path);
+}
+
 for (const [path, mod] of Object.entries(jerseyModules)) {
-  const file = path.replace(/^.*\//, '').replace(/\.png$/i, '');
+  if (!isUnderTeamsFolder(path)) continue;
+  const file = path.replace(/^.*[/\\]/, '').replace(/\.png$/i, '');
   jerseyUrlByBasename[file.toLowerCase()] = mod.default;
 }
 
+for (const [path, mod] of Object.entries(jerseyModules)) {
+  if (isUnderTeamsFolder(path)) continue;
+  const file = path.replace(/^.*[/\\]/, '').replace(/\.png$/i, '');
+  const key = file.toLowerCase();
+  if (!jerseyUrlByBasename[key]) {
+    jerseyUrlByBasename[key] = mod.default;
+  }
+}
+
+const FREE_AGENT = jerseyUrlByBasename['free_agent'];
 const PLAIN = jerseyUrlByBasename['plain_jersey'];
 
+/**
+ * Jersey image for a team abbreviation, or the free-agent jersey for FA / empty team.
+ * Unknown abbrev falls back to plain jersey if present, else free-agent asset.
+ */
 export function getTeamJerseyImageUrl(teamAbbrev: string | null | undefined): string {
-  const fallback = PLAIN ?? '';
   const raw = teamAbbrev?.trim();
-  if (!raw || raw.toUpperCase() === 'FA') return fallback;
+  if (!raw || raw.toUpperCase() === 'FA') {
+    return FREE_AGENT ?? PLAIN ?? '';
+  }
   const key = TEAM_ABBREV_TO_JERSEY_BASENAME[raw.toUpperCase()];
-  if (!key) return fallback;
-  return jerseyUrlByBasename[key.toLowerCase()] ?? fallback;
+  const fallbackUnknown = PLAIN ?? FREE_AGENT ?? '';
+  if (!key) return fallbackUnknown;
+  return jerseyUrlByBasename[key.toLowerCase()] ?? fallbackUnknown;
 }

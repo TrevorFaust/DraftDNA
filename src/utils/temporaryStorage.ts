@@ -176,6 +176,63 @@ export type AllLeaguesBucket = {
   rookiesOnly: boolean;
 };
 
+/** In-progress rankings order (session tab). Survives SPA navigation away from /rankings until finalize or tab close. */
+const RANKINGS_DRAFT_SESSION_PREFIX = 'rankings_draft_sess_v1';
+
+export type RankingsSessionDraft = { v: 1; ids: string[]; isEditMode: boolean };
+
+export function getRankingsDraftSessionStorageKey(params: {
+  userId: string | null;
+  guestSessionId: string | null;
+  leagueId: string | null;
+  bucketKey: string;
+}): string {
+  const safeBucket = params.bucketKey.replace(/\//g, '_');
+  const leagueSeg = params.leagueId ?? 'all';
+  if (params.userId) {
+    return `${RANKINGS_DRAFT_SESSION_PREFIX}_u_${params.userId}_${leagueSeg}_${safeBucket}`;
+  }
+  const gs = params.guestSessionId ?? 'x';
+  return `${RANKINGS_DRAFT_SESSION_PREFIX}_g_${gs}_${leagueSeg}_${safeBucket}`;
+}
+
+export const rankingsDraftSessionStorage = {
+  get(key: string): RankingsSessionDraft | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as RankingsSessionDraft;
+      if (parsed?.v !== 1 || !Array.isArray(parsed.ids)) return null;
+      return {
+        v: 1,
+        ids: parsed.ids.filter((id) => typeof id === 'string'),
+        isEditMode: Boolean(parsed.isEditMode),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  save(key: string, draft: RankingsSessionDraft): void {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem(key, JSON.stringify(draft));
+    } catch {
+      /* quota or private mode */
+    }
+  },
+
+  clear(key: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+  },
+};
+
 export const allLeaguesBucketStorage = {
   get(): AllLeaguesBucket | null {
     if (typeof window === 'undefined') return null;

@@ -13,7 +13,14 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { RotateCcw, Search, Filter, Loader2, Users, User, Save, Edit } from 'lucide-react';
 import type { RankedPlayer } from '@/types/database';
-import { tempRankingsStorage, tempSettingsStorage, getOrCreateGuestSessionId, allLeaguesBucketStorage } from '@/utils/temporaryStorage';
+import {
+  tempRankingsStorage,
+  tempSettingsStorage,
+  getOrCreateGuestSessionId,
+  allLeaguesBucketStorage,
+  getRankingsDraftSessionStorageKey,
+  rankingsDraftSessionStorage,
+} from '@/utils/temporaryStorage';
 import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
 import {
   DndContext,
@@ -98,7 +105,7 @@ function mergeLiveCommunity(
 ): RankedPlayer[] {
   const playerById = new Map(allPlayersData.map((p) => [p.id, p]));
   const communityMap = new Map(communityRaw.map((r) => [r.player_id, { avg: Number(r.avg_rank), n: Number(r.sample_count) || 1 }]));
-  const myRankMap = new Map(myRankedPlayers.map((p, i) => [p.id, i + 1]));
+  const myRankMap = new Map(myRankedPlayers.map((p) => [p.id, p.rank]));
 
   const withNewAvg: { id: string; newAvg: number }[] = [];
   const seen = new Set<string>();
@@ -134,6 +141,85 @@ function mergeLiveCommunity(
     }
   }
   return result;
+}
+
+/** Rounds midpoint ADP: nearest integer, but exactly .5 rounds down. */
+function roundAdpMidpoint(n: number): number {
+  const frac = Math.abs(n % 1);
+  if (Math.abs(frac - 0.5) < 1e-9) return Math.floor(n);
+  return Math.round(n);
+}
+
+/** Target rank when dropping between two neighbors in a filtered list (by their current ranks). */
+function rankFromFilteredNeighbors(rankAbove: number | undefined, rankBelow: number | undefined): number {
+  if (rankAbove != null && rankBelow != null) {
+    return roundAdpMidpoint((rankAbove + rankBelow) / 2);
+  }
+  if (rankBelow != null) return Math.max(1, rankBelow - 1);
+  if (rankAbove != null) return rankAbove + 1;
+  return 1;
+}
+
+/**
+ * When reordering inside a position (or filtered) list, set the moved player's rank to the midpoint
+ * between the neighbors' ranks and shift other players' ranks so order stays unique integers.
+ */
+function applyFilteredMidpointRankDrag(
+  allPlayers: RankedPlayer[],
+  filteredOrdered: RankedPlayer[],
+  activeId: string,
+  overId: string
+): RankedPlayer[] {
+  const oldF = filteredOrdered.findIndex((p) => p.id === activeId);
+  const newF = filteredOrdered.findIndex((p) => p.id === overId);
+  if (oldF < 0 || newF < 0) return allPlayers;
+
+  const reorderedF = arrayMove(filteredOrdered, oldF, newF);
+  const newIdx = reorderedF.findIndex((p) => p.id === activeId);
+  const above = reorderedF[newIdx - 1];
+  const below = reorderedF[newIdx + 1];
+
+  const movedEntry = allPlayers.find((p) => p.id === activeId);
+  if (!movedEntry) return allPlayers;
+  const oldPRank = movedEntry.rank;
+  const newMid = rankFromFilteredNeighbors(above?.rank, below?.rank);
+
+  const updated = allPlayers.map((p) => ({ ...p }));
+
+  if (newMid < oldPRank) {
+    for (const q of updated) {
+      if (q.id === activeId) continue;
+      if (q.rank >= newMid && q.rank < oldPRank) q.rank += 1;
+    }
+  } else if (newMid > oldPRank) {
+    for (const q of updated) {
+      if (q.id === activeId) continue;
+      if (q.rank > oldPRank && q.rank <= newMid) q.rank -= 1;
+    }
+  }
+
+  const moved = updated.find((p) => p.id === activeId);
+  if (moved) moved.rank = newMid;
+
+  updated.sort((a, b) => a.rank - b.rank);
+  return updated;
+}
+
+/** Reapply in-session draft order onto a freshly fetched list (new players append by rank). */
+function mergeRankingsWithDraftOrder(fetched: RankedPlayer[], draftIds: string[]): RankedPlayer[] {
+  const byId = new Map(fetched.map((p) => [p.id, p]));
+  const used = new Set<string>();
+  const ordered: RankedPlayer[] = [];
+  for (const id of draftIds) {
+    const p = byId.get(id);
+    if (p) {
+      used.add(p.id);
+      ordered.push({ ...p });
+    }
+  }
+  const rest = fetched.filter((p) => !used.has(p.id)).sort((a, b) => a.rank - b.rank);
+  for (const p of rest) ordered.push({ ...p });
+  return ordered.map((p, i) => ({ ...p, rank: i + 1 }));
 }
 
 // Sortable player with grab handle on the right and position-colored rank
@@ -308,6 +394,28 @@ const Rankings = () => {
     [nflTeams]
   );
   selectedLeagueIdRef.current = selectedLeague?.id ?? null;
+
+  const rankingsSessionDraftKey = useMemo(
+    () =>
+      getRankingsDraftSessionStorageKey({
+        userId: user?.id ?? null,
+        guestSessionId: user ? null : getOrCreateGuestSessionId(),
+        leagueId: user ? (selectedLeague?.id ?? null) : null,
+        bucketKey,
+      }),
+    [user?.id, user, selectedLeague?.id, bucketKey]
+  );
+
+  const persistRankingsSessionDraft = useCallback(
+    (list: RankedPlayer[], editMode: boolean) => {
+      rankingsDraftSessionStorage.save(rankingsSessionDraftKey, {
+        v: 1,
+        ids: list.map((p) => p.id),
+        isEditMode: editMode,
+      });
+    },
+    [rankingsSessionDraftKey]
+  );
 
   // Guest only: persist bucket to League Settings so Rankings dropdown and League Settings always match
   const saveGuestBucketToTempSettings = useCallback((scoringFormat: 'standard' | 'ppr' | 'half_ppr', leagueType: 'season' | 'dynasty', isSuperflex: boolean, rookiesOnly: boolean) => {
@@ -627,20 +735,37 @@ const Rankings = () => {
         
         // Only use saved rankings if they are for this bucket (guest must re-rank when changing league type)
         const currentBucketKey = `${effectiveBucket.scoringFormat}/${effectiveBucket.leagueType}/${effectiveBucket.isSuperflex}/${effectiveBucket.rookiesOnly || false}`;
+        const guestDraftKey = getRankingsDraftSessionStorageKey({
+          userId: null,
+          guestSessionId: getOrCreateGuestSessionId(),
+          leagueId: null,
+          bucketKey: effectiveBucketKey,
+        });
+        const guestSessionDraft = rankingsDraftSessionStorage.get(guestDraftKey);
         const tempRankings = tempRankingsStorage.get(currentBucketKey);
         if (tempRankings && tempRankings.length > 0) {
           // User has finalized rankings for this bucket, show comparison view
           guestPathJustCompletedRef.current = true; // So finally clears loading and doesn't refetch
-          setPlayers(tempRankings);
+          let list = tempRankings;
+          if (guestSessionDraft?.ids.length) {
+            list = mergeRankingsWithDraftOrder(tempRankings, guestSessionDraft.ids);
+          }
+          setPlayers(list);
           setHasExistingRankings(true);
-          setIsEditMode(false);
+          if (guestSessionDraft?.ids.length) setIsEditMode(guestSessionDraft.isEditMode);
+          else setIsEditMode(false);
         } else {
           // No rankings for this bucket: show edit mode with community seed (force resubmit when bucket changes)
           // Use guestCommunity so both columns show the same order (community rankings for this bucket)
           guestPathJustCompletedRef.current = true; // Don't refetch in finally (avoids flip loop)
-          setPlayers(guestCommunity);
+          let list = guestCommunity;
+          if (guestSessionDraft?.ids.length) {
+            list = mergeRankingsWithDraftOrder(guestCommunity, guestSessionDraft.ids);
+          }
+          setPlayers(list);
           setHasExistingRankings(false);
-          setIsEditMode(true);
+          if (guestSessionDraft?.ids.length) setIsEditMode(guestSessionDraft.isEditMode);
+          else setIsEditMode(true);
           // Keep dropdown and League Settings in sync with the bucket we actually used (so badge shows correct bucket)
           setAllLeaguesBucketScoring((effectiveBucket.scoringFormat as 'standard' | 'ppr' | 'half_ppr') || 'ppr');
           setAllLeaguesBucketLeagueType((effectiveBucket.leagueType as 'season' | 'dynasty') || 'season');
@@ -729,10 +854,21 @@ const Rankings = () => {
         console.log(`Rankings (All Leagues): Sorted ${sortedPersonal.length} players by average rank across leagues for this bucket`);
         const defensesInPersonal = sortedPersonal.filter(p => p.position === 'D/ST');
         console.log(`Rankings: Defenses in sortedPersonal: ${defensesInPersonal.length}`);
-        setPlayers(sortedPersonal);
-        // Signed-in All Leagues: always show comparison view (Community vs My Rankings from your leagues). Never edit mode.
+        const allLeaguesDraftKey = getRankingsDraftSessionStorageKey({
+          userId: user.id,
+          guestSessionId: null,
+          leagueId: null,
+          bucketKey: effectiveBucketKey,
+        });
+        const allLeaguesSessionDraft = rankingsDraftSessionStorage.get(allLeaguesDraftKey);
+        let personalForUi = sortedPersonal;
+        if (allLeaguesSessionDraft?.ids.length) {
+          personalForUi = mergeRankingsWithDraftOrder(sortedPersonal, allLeaguesSessionDraft.ids);
+        }
+        setPlayers(personalForUi);
         setHasExistingRankings(true);
-        setIsEditMode(false);
+        if (allLeaguesSessionDraft?.ids.length) setIsEditMode(allLeaguesSessionDraft.isEditMode);
+        else setIsEditMode(false);
 
         // Community rankings: bucket-based from RPC, ADP fallback (dynasty shows ADP + "coming soon")
         const allLeaguesCommunity = communityData.length > 0
@@ -751,8 +887,6 @@ const Rankings = () => {
         if (rankingsError) throw rankingsError;
 
         const hasRankings = rankingsData && rankingsData.length > 0;
-        setHasExistingRankings(hasRankings);
-        setIsEditMode(!hasRankings);
 
         let rankedPlayers: RankedPlayer[];
 
@@ -800,7 +934,22 @@ const Rankings = () => {
           console.error(`Rankings: WARNING - No defenses found in sortedPlayers! Total players: ${sortedPlayers.length}`);
         }
 
-        setPlayers(sortedPlayers);
+        const leagueDraftKey = getRankingsDraftSessionStorageKey({
+          userId: user.id,
+          guestSessionId: null,
+          leagueId: selectedLeague.id,
+          bucketKey: effectiveBucketKey,
+        });
+        const leagueSessionDraft = rankingsDraftSessionStorage.get(leagueDraftKey);
+        const displayPlayers =
+          leagueSessionDraft?.ids.length
+            ? mergeRankingsWithDraftOrder(sortedPlayers, leagueSessionDraft.ids)
+            : sortedPlayers;
+
+        setHasExistingRankings(hasRankings);
+        setPlayers(displayPlayers);
+        if (leagueSessionDraft?.ids.length) setIsEditMode(leagueSessionDraft.isEditMode);
+        else setIsEditMode(!hasRankings);
 
         // Fetch community EXCLUDING current user so we can merge in live when they drag
         let communityExcludingMe: CommunityRow[] = [];
@@ -821,7 +970,7 @@ const Rankings = () => {
               player_id: r.player_id,
               avg_rank: Number(r.avg_rank),
               sample_count: Number(r.sample_count) || 1,
-            })), sortedPlayers)
+            })), displayPlayers)
           : communityData.length > 0
             ? buildCommunityFromRpc(allPlayersData, communityData)
             : allPlayersData.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
@@ -1033,18 +1182,48 @@ const Rankings = () => {
     }
   }, [user]);
 
+  const filteredPlayers = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase().trim();
+    return players.filter((p) => {
+      const matchesSearch =
+        searchLower === '' ||
+        p.name.toLowerCase().includes(searchLower) ||
+        p.team?.toLowerCase().includes(searchLower) ||
+        p.name.toLowerCase().split(' ').some((part) => part.includes(searchLower));
+
+      const matchesPosition =
+        positionFilter.length === 0 || positionFilter.includes(p.position);
+
+      if (positionFilter.includes('D/ST') && p.position === 'D/ST') {
+        console.log(
+          `Rankings: D/ST player found: ${p.name}, matchesSearch: ${matchesSearch}, matchesPosition: ${matchesPosition}`
+        );
+      }
+
+      return matchesSearch && matchesPosition;
+    });
+  }, [players, searchTerm, positionFilter]);
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
-    if (over && active.id !== over.id) {
-      const oldIndex = players.findIndex((item) => item.id === active.id);
-      const newIndex = players.findIndex((item) => item.id === over.id);
-      const newItems = arrayMove(players, oldIndex, newIndex);
-      const updatedPlayers = newItems.map((item, index) => ({ ...item, rank: index + 1 }));
-      setPlayers(updatedPlayers);
-      // Don't auto-save on drag; save only when user clicks "Finalize Rankings"
+    if (!over || active.id === over.id) return;
+
+    const useMidpointDrag = positionFilter.length > 0;
+    if (useMidpointDrag) {
+      const updated = applyFilteredMidpointRankDrag(players, filteredPlayers, String(active.id), String(over.id));
+      setPlayers(updated);
+      persistRankingsSessionDraft(updated, isEditMode);
+      return;
     }
+
+    const oldIndex = players.findIndex((item) => item.id === active.id);
+    const newIndex = players.findIndex((item) => item.id === over.id);
+    const newItems = arrayMove(players, oldIndex, newIndex);
+    const updatedPlayers = newItems.map((item, index) => ({ ...item, rank: index + 1 }));
+    setPlayers(updatedPlayers);
+    persistRankingsSessionDraft(updatedPlayers, isEditMode);
   };
 
   const handleDragStart = (event: any) => {
@@ -1074,6 +1253,7 @@ const Rankings = () => {
         toast.error('Could not submit rankings to community. Your rankings are saved locally.');
       }
       tempRankingsStorage.save(players, bucketKey);
+      rankingsDraftSessionStorage.clear(rankingsSessionDraftKey);
       setHasExistingRankings(true);
       setIsEditMode(false);
       toast.success(
@@ -1088,6 +1268,7 @@ const Rankings = () => {
     setIsFinalizing(true);
     try {
       await saveRankings(players, selectedLeague.id);
+      rankingsDraftSessionStorage.clear(rankingsSessionDraftKey);
       setHasExistingRankings(true);
       setIsEditMode(false);
       toast.success('Rankings finalized!');
@@ -1108,32 +1289,14 @@ const Rankings = () => {
     });
     const resetPlayers = sorted.map((p, index) => ({ ...p, rank: index + 1 }));
     setPlayers(resetPlayers);
-    if (isAllLeagues) {
-      saveRankings(resetPlayers, null);
+    if (isAllLeagues && user) {
+      void saveRankings(resetPlayers, null).then(() => rankingsDraftSessionStorage.clear(rankingsSessionDraftKey));
+    } else {
+      persistRankingsSessionDraft(resetPlayers, isEditMode);
     }
     toast.info('Rankings reset to community consensus');
   };
 
-  const filteredPlayers = players.filter((p) => {
-    // Improved search: search in full name (handles "Travis Hunter" when searching "hunter")
-    const searchLower = searchTerm.toLowerCase().trim();
-    const matchesSearch = searchLower === '' || 
-      p.name.toLowerCase().includes(searchLower) ||
-      p.team?.toLowerCase().includes(searchLower) ||
-      // Also search by splitting name (handles "Travis Hunter" when searching "hunter")
-      p.name.toLowerCase().split(' ').some(part => part.includes(searchLower));
-    
-    const matchesPosition =
-      positionFilter.length === 0 || positionFilter.includes(p.position);
-    
-    // Debug logging for D/ST filter
-    if (positionFilter.includes('D/ST') && p.position === 'D/ST') {
-      console.log(`Rankings: D/ST player found: ${p.name}, matchesSearch: ${matchesSearch}, matchesPosition: ${matchesPosition}`);
-    }
-    
-    return matchesSearch && matchesPosition;
-  });
-  
   // Debug: Log total defenses in players array (only warn when we have players but no D/ST — skip during initial load)
   const totalDefenses = players.filter(p => p.position === 'D/ST').length;
   if (totalDefenses > 0) {
@@ -1282,7 +1445,10 @@ const Rankings = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setIsEditMode(true)}
+                onClick={() => {
+                  persistRankingsSessionDraft(players, true);
+                  setIsEditMode(true);
+                }}
                 className="gap-2"
               >
                 <Edit className="w-4 h-4" />
@@ -1419,7 +1585,7 @@ const Rankings = () => {
                           <SortablePlayerWithHandle
                             key={player.id}
                             player={{ ...player, adp: communityRankMap.get(player.id) ?? player.adp }}
-                            rank={players.findIndex((p) => p.id === player.id) + 1}
+                            rank={player.rank}
                             onPlayerClick={handlePlayerClick}
                             stats2025={player2025Stats.get(player.id)}
                           />
@@ -1446,7 +1612,7 @@ const Rankings = () => {
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {(() => {
                       const diffs = players.slice(0, 150).map((myPlayer) => {
-                        const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
+                        const myRank = myPlayer.rank;
                         const communityRank = displayedCommunityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
                         return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
                       });
@@ -1488,7 +1654,7 @@ const Rankings = () => {
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {(() => {
                       const diffs = players.slice(0, 150).map((myPlayer) => {
-                        const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
+                        const myRank = myPlayer.rank;
                         const communityRank = displayedCommunityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
                         return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
                       });
@@ -1542,7 +1708,7 @@ const Rankings = () => {
                   <SortablePlayerWithHandle
                     key={player.id}
                     player={{ ...player, adp: communityRankMap.get(player.id) ?? player.adp }}
-                    rank={players.findIndex((p) => p.id === player.id) + 1}
+                    rank={player.rank}
                     onPlayerClick={handlePlayerClick}
                     stats2025={player2025Stats.get(player.id)}
                   />
@@ -1625,7 +1791,7 @@ const Rankings = () => {
                           <SortablePlayerWithHandle
                             key={player.id}
                             player={{ ...player, adp: communityRankMap.get(player.id) ?? player.adp }}
-                            rank={players.findIndex((p) => p.id === player.id) + 1}
+                            rank={player.rank}
                             onPlayerClick={handlePlayerClick}
                             stats2025={player2025Stats.get(player.id)}
                           />
@@ -1652,7 +1818,7 @@ const Rankings = () => {
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {(() => {
                       const diffs = players.slice(0, 150).map((myPlayer) => {
-                        const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
+                        const myRank = myPlayer.rank;
                         const communityRank = displayedCommunityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
                         return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
                       });
@@ -1694,7 +1860,7 @@ const Rankings = () => {
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {(() => {
                       const diffs = players.slice(0, 150).map((myPlayer) => {
-                        const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
+                        const myRank = myPlayer.rank;
                         const communityRank = displayedCommunityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
                         return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
                       });
