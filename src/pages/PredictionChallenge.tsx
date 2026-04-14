@@ -17,11 +17,32 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { ArrowLeft, Loader2, CheckCircle2, Target, ChevronUp, ChevronDown, Instagram, Medal, Pencil, Lock, Info } from 'lucide-react';
+import {
+  ArrowLeft,
+  Loader2,
+  CheckCircle2,
+  Target,
+  ChevronUp,
+  ChevronDown,
+  Instagram,
+  Medal,
+  Pencil,
+  Lock,
+  Info,
+  MessageSquare,
+  MoreHorizontal,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Player } from '@/types/database';
@@ -29,6 +50,7 @@ import { toast } from 'sonner';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { OfficialRulesContent } from '@/components/OfficialRulesContent';
 import { SITE_NAME, SEASON } from '@/constants/contest';
+import { getSiteOriginForAuth } from '@/lib/siteOrigin';
 import { cn } from '@/lib/utils';
 
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY?.trim() || undefined;
@@ -258,9 +280,10 @@ export default function PredictionChallenge() {
     setTiebreakers((prev) => ({ ...prev, [position]: value }));
   };
 
-  const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/prediction-challenge`
-    : '/prediction-challenge';
+  const shareUrl =
+    typeof window !== 'undefined'
+      ? `${getSiteOriginForAuth()}/prediction-challenge`
+      : '/prediction-challenge';
 
   const getShareCaption = useCallback(
     (variant: 'expert' | 'trash-talker', position: PositionKey) => {
@@ -279,23 +302,99 @@ ${shareUrl}`;
     [predictions, shareUrl]
   );
 
-  const handleCopyCaption = useCallback(
-    async (variant: 'expert' | 'trash-talker') => {
-      if (!sharePosition) return;
-      const caption = getShareCaption(variant, sharePosition);
-      try {
-        await navigator.clipboard.writeText(caption);
-        toast.success(
-          variant === 'expert'
-            ? 'Caption copied! Paste into X/Twitter.'
-            : 'Caption copied! Paste into Instagram Stories.'
-        );
-      } catch {
-        toast.error('Could not copy. Try selecting and copying manually.');
-      }
-    },
-    [sharePosition, getShareCaption]
+  /** Short text for X/Twitter Web Intent (stays under typical compose limits). */
+  const getTweetIntentText = useCallback(
+    (position: PositionKey) =>
+      `My Top 6 ${position} order is locked on DraftDNA. Think you can beat it?\n\n${shareUrl}\n\n#FantasyFootball #PickSix`,
+    [shareUrl]
   );
+
+  const handleShareToTwitter = useCallback(() => {
+    if (!sharePosition) return;
+    const text = getTweetIntentText(sharePosition);
+    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    window.open(intentUrl, '_blank', 'noopener,noreferrer');
+    toast.success('Opening X — post your tweet.');
+  }, [sharePosition, getTweetIntentText]);
+
+  const handleShareToInstagram = useCallback(async () => {
+    if (!sharePosition) return;
+    const caption = getShareCaption('trash-talker', sharePosition);
+    const sharePayload: ShareData = { text: caption, url: shareUrl };
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        if (!navigator.canShare || navigator.canShare(sharePayload)) {
+          await navigator.share(sharePayload);
+          return;
+        }
+      } catch (e) {
+        if (e instanceof Error && e.name === 'AbortError') return;
+        /* fall through to clipboard + web */
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(caption);
+      toast.success('Caption copied — opening Instagram. Paste into your Story.');
+      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
+    } catch {
+      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
+      toast.error('Could not copy the caption. Open Instagram and paste your caption manually.');
+    }
+  }, [sharePosition, getShareCaption, shareUrl]);
+
+  /** Premade SMS / text invite (Pick Six + prizes). */
+  const getSmsInviteText = useCallback(
+    () =>
+      `Join the DraftDNA Pick Six Challenge — make your picks in order and win up to $30,000 in prizes. ${shareUrl}`,
+    [shareUrl]
+  );
+
+  const handleShareToSms = useCallback(async () => {
+    const text = getSmsInviteText();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* still try to open sms: */
+    }
+    const smsHref = `sms:?body=${encodeURIComponent(text)}`;
+    window.location.href = smsHref;
+    toast.success('Message copied — opening your texting app if available.');
+  }, [getSmsInviteText]);
+
+  const copyToClipboard = useCallback(async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied.`);
+    } catch {
+      toast.error('Could not copy. Try again.');
+    }
+  }, []);
+
+  const handleSystemShareSheet = useCallback(async () => {
+    if (!sharePosition) return;
+    const text = getShareCaption('expert', sharePosition);
+    const payload: ShareData = {
+      title: 'DraftDNA Pick Six Challenge',
+      text,
+      url: shareUrl,
+    };
+    if (!navigator.share) {
+      toast.error('Sharing is not available in this browser.');
+      return;
+    }
+    try {
+      if (navigator.canShare && !navigator.canShare(payload)) {
+        toast.error('Sharing is not available for this content.');
+        return;
+      }
+      await navigator.share(payload);
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return;
+      toast.error('Could not open the share sheet.');
+    }
+  }, [sharePosition, getShareCaption, shareUrl]);
 
   const handleAcceptTerms = async () => {
     if (!termsAgeChecked || !termsRulesChecked) return;
@@ -451,13 +550,13 @@ ${shareUrl}`;
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/85 backdrop-blur-[2px]">
               <div className="glass-card p-8 max-w-sm text-center space-y-4 mx-4">
                 <p className="text-muted-foreground font-medium">
-                  Sign in to access this feature.
+                  Create an account to enter the Pick Six Challenge.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  You must be signed in to enter the Pick Six Challenge.
+                  New here? Sign up free to lock in your picks and compete for prizes.
                 </p>
                 <Button onClick={() => navigate('/auth')} className="bg-primary text-primary-foreground">
-                  Sign In
+                  Create account
                 </Button>
               </div>
             </div>
@@ -652,14 +751,19 @@ ${shareUrl}`;
                     </div>
                     <div className="space-y-2">
                       {predictions[position].filter(Boolean).map((player, i) => (
-                        <div key={player!.id} className="flex items-center gap-3 py-2 border-b border-border/50 last:border-0">
-                          <span className="text-muted-foreground font-mono w-6 shrink-0 text-sm">
+                        <div
+                          key={player!.id}
+                          className="flex items-center gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-2.5 sm:gap-3 sm:px-2.5"
+                        >
+                          <span className="w-6 shrink-0 text-sm font-mono tabular-nums text-muted-foreground">
                             #{i + 1}
                           </span>
                           <PositionBadge position={player!.position} className="shrink-0" />
-                          <span className="font-medium truncate">{player!.name}</span>
+                          <span className="min-w-0 flex-1 truncate text-base font-semibold leading-snug">
+                            {player!.name}
+                          </span>
                           {player!.team && (
-                            <span className="text-sm text-muted-foreground shrink-0">{player!.team}</span>
+                            <span className="shrink-0 text-sm text-muted-foreground">{player!.team}</span>
                           )}
                         </div>
                       ))}
@@ -720,7 +824,7 @@ ${shareUrl}`;
                               positionFilter={position}
                               excludePlayerIds={excludeIdsForPosition(position, i)}
                               placeholder={`Search ${position}...`}
-                              className="h-9 text-sm"
+                              className="min-h-11 text-base"
                             />
                           </div>
                           <div className="flex shrink-0">
@@ -940,26 +1044,84 @@ ${shareUrl}`;
                   shareUrl={shareUrl}
                 />
               )}
-              <div className="flex items-center justify-center gap-3 w-full shrink-0">
+              <div className="flex flex-col items-center gap-2 w-full shrink-0">
                 <span className="text-xs font-semibold text-muted-foreground">Share</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopyCaption('expert')}
-                  className="p-2 rounded-lg border border-border hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-colors"
-                  aria-label="Copy caption for X"
-                >
-                  <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current text-foreground" aria-hidden>
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCopyCaption('trash-talker')}
-                  className="p-2 rounded-lg border border-border hover:border-pink-500/50 hover:bg-pink-500/10 transition-colors"
-                  aria-label="Copy caption for Instagram"
-                >
-                  <Instagram className="w-5 h-5 text-foreground" />
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleShareToTwitter()}
+                    className="p-2 rounded-lg border border-border hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-colors"
+                    aria-label="Post to X (opens compose)"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current text-foreground" aria-hidden>
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleShareToInstagram()}
+                    className="p-2 rounded-lg border border-border hover:border-pink-500/50 hover:bg-pink-500/10 transition-colors"
+                    aria-label="Share to Instagram (opens app or Instagram.com)"
+                  >
+                    <Instagram className="w-5 h-5 text-foreground" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleShareToSms()}
+                    className="p-2 rounded-lg border border-border hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-colors"
+                    aria-label="Copy invite text and open Messages"
+                  >
+                    <MessageSquare className="w-5 h-5 text-foreground" />
+                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="p-2 rounded-lg border border-border hover:border-muted-foreground/40 hover:bg-muted/50 transition-colors"
+                        aria-label="More share options"
+                      >
+                        <MoreHorizontal className="w-5 h-5 text-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem
+                        onClick={() => void handleSystemShareSheet()}
+                        disabled={typeof navigator === 'undefined' || !navigator.share}
+                      >
+                        Share via device…
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => void copyToClipboard('Pick Six link', shareUrl)}
+                      >
+                        Copy Pick Six link
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => void copyToClipboard('Invite message', getSmsInviteText())}
+                      >
+                        Copy text invite
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          sharePosition &&
+                          void copyToClipboard('X caption', getShareCaption('expert', sharePosition))
+                        }
+                        disabled={!sharePosition}
+                      >
+                        Copy long caption (X style)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          sharePosition &&
+                          void copyToClipboard('Instagram caption', getShareCaption('trash-talker', sharePosition))
+                        }
+                        disabled={!sharePosition}
+                      >
+                        Copy Instagram-style caption
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </div>
           </DialogContent>

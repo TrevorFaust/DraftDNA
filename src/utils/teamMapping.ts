@@ -38,3 +38,24 @@ export const getFullTeamName = (teamAbbrev: string | null | undefined): string |
   if (!teamAbbrev) return null;
   return TEAM_ABBREV_TO_FULL_NAME[teamAbbrev] || teamAbbrev;
 };
+
+/** Lowercase full name → abbreviation (for D/ST rows that store full team names). */
+const FULL_NAME_TO_ABBREV: Record<string, string> = (() => {
+  const o: Record<string, string> = {};
+  for (const [abbr, full] of Object.entries(TEAM_ABBREV_TO_FULL_NAME)) {
+    o[full.toLowerCase()] = abbr;
+  }
+  return o;
+})();
+
+/**
+ * Normalize `players.team` to an abbreviation for lookups in `teams` / color maps.
+ * Accepts abbreviations (DAL, LAR, …) or full names (e.g. Dallas Cowboys for D/ST).
+ */
+export function teamFieldToAbbr(team: string | null | undefined): string | null {
+  if (!team?.trim()) return null;
+  const t = team.trim();
+  const upper = t.toUpperCase();
+  if (/^[A-Z]{2,4}$/.test(upper)) return upper;
+  return FULL_NAME_TO_ABBREV[t.toLowerCase()] ?? null;
+}

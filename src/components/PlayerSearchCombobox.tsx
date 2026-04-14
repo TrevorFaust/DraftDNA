@@ -115,25 +115,27 @@ export function PlayerSearchCombobox({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'w-full justify-between font-normal h-10',
+            'w-full justify-between font-normal min-h-11 py-2 h-auto px-2 sm:px-2.5',
             !value && 'text-muted-foreground',
             className
           )}
         >
-          <span className="truncate">
+          <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
             {value ? (
-              <span className="flex items-center gap-2">
-                {value.name}
-                <PositionBadge position={value.position} className="text-[10px]" />
+              <>
+                <span className="min-w-0 flex-1 truncate text-base font-semibold leading-tight">
+                  {value.name}
+                </span>
+                <PositionBadge position={value.position} className="shrink-0 text-[10px]" />
                 {!isDefense(value.position) && value.team && (
-                  <span className="text-muted-foreground text-xs">({value.team})</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">({value.team})</span>
                 )}
-              </span>
+              </>
             ) : (
-              placeholder
+              <span className="text-sm">{placeholder}</span>
             )}
           </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0" align="start">
