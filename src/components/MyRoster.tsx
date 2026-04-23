@@ -1,5 +1,6 @@
 import { PositionBadge } from '@/components/PositionBadge';
 import type { RankedPlayer, DraftPick } from '@/types/database';
+import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import { cn } from '@/lib/utils';
 
 interface PositionLimits {
@@ -120,7 +121,7 @@ export const MyRoster = ({
                         )}
                       </div>
                       <PositionBadge position={player.position} className="text-[10px]" />
-                      <div className="text-xs text-muted-foreground shrink-0">{player.team || 'FA'}</div>
+                      <div className="text-xs text-muted-foreground shrink-0">{displayTeamAbbrevOrFa(player.team, player.position, player.name)}</div>
                     </>
                   ) : (
                     <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
@@ -212,7 +213,7 @@ export const MyRoster = ({
                       )}
                     </div>
                     <PositionBadge position={player.position} className="text-[10px]" />
-                    <div className="text-xs text-muted-foreground shrink-0">{player.team || 'FA'}</div>
+                    <div className="text-xs text-muted-foreground shrink-0">{displayTeamAbbrevOrFa(player.team, player.position, player.name)}</div>
                   </>
                 ) : (
                   <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
@@ -248,7 +249,7 @@ export const MyRoster = ({
                       )}
                     </div>
                     <PositionBadge position={player.position} className="text-[10px]" />
-                    <div className="text-xs text-muted-foreground shrink-0">{player.team || 'FA'}</div>
+                    <div className="text-xs text-muted-foreground shrink-0">{displayTeamAbbrevOrFa(player.team, player.position, player.name)}</div>
                   </>
                 ) : (
                   <div className="flex-1 text-muted-foreground/50 italic">Empty</div>

@@ -2,6 +2,8 @@
  * NFL team abbreviation → basename of PNG under `jerseys/` (Teams/ or root).
  * File names match asset basenames (e.g. packers.png, bucs.png, 49ers.png).
  */
+import { teamFieldToAbbr } from '@/utils/teamMapping';
+
 const TEAM_ABBREV_TO_JERSEY_BASENAME: Record<string, string> = {
   ARI: 'cardinals',
   ATL: 'falcons',
@@ -75,10 +77,16 @@ const PLAIN = jerseyUrlByBasename['plain_jersey'];
  */
 export function getTeamJerseyImageUrl(teamAbbrev: string | null | undefined): string {
   const raw = teamAbbrev?.trim();
-  if (!raw || raw.toUpperCase() === 'FA') {
+  if (!raw) {
     return FREE_AGENT ?? PLAIN ?? '';
   }
-  const key = TEAM_ABBREV_TO_JERSEY_BASENAME[raw.toUpperCase()];
+
+  const normalizedTeam = teamFieldToAbbr(raw) ?? raw.toUpperCase();
+  if (normalizedTeam === 'FA') {
+    return FREE_AGENT ?? PLAIN ?? '';
+  }
+
+  const key = TEAM_ABBREV_TO_JERSEY_BASENAME[normalizedTeam];
   const fallbackUnknown = PLAIN ?? FREE_AGENT ?? '';
   if (!key) return fallbackUnknown;
   return jerseyUrlByBasename[key.toLowerCase()] ?? fallbackUnknown;

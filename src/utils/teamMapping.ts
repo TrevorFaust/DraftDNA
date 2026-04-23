@@ -59,3 +59,54 @@ export function teamFieldToAbbr(team: string | null | undefined): string | null 
   if (/^[A-Z]{2,4}$/.test(upper)) return upper;
   return FULL_NAME_TO_ABBREV[t.toLowerCase()] ?? null;
 }
+
+/** Normalize alternate abbreviations so stats rows and player rows match (e.g. `WSH` → `WAS`). */
+export function canonicalTeamAbbr(abbr: string | null | undefined): string | null {
+  if (!abbr?.trim()) return null;
+  const u = abbr.trim().toUpperCase();
+  if (u === 'WSH') return 'WAS';
+  if (u === 'LA') return 'LAR';
+  return u;
+}
+
+function isDefensePosition(position: string | null | undefined): boolean {
+  if (!position?.trim()) return false;
+  const p = position.trim().toUpperCase();
+  return p === 'D/ST' || p === 'DEF' || p === 'DST';
+}
+
+/**
+ * Resolve best team abbreviation for jersey/colors.
+ * Defense rows can carry team='FA'; in that case derive team from defense name.
+ */
+export function resolveTeamAbbrForDisplay(
+  team: string | null | undefined,
+  position: string | null | undefined,
+  playerName: string | null | undefined
+): string | null {
+  const fromTeamField = teamFieldToAbbr(team);
+  if (fromTeamField && fromTeamField !== 'FA') return canonicalTeamAbbr(fromTeamField);
+
+  if (isDefensePosition(position)) {
+    const fromDefenseName = teamFieldToAbbr(playerName);
+    if (fromDefenseName) return canonicalTeamAbbr(fromDefenseName);
+  }
+
+  return canonicalTeamAbbr(fromTeamField);
+}
+
+/**
+ * Team label for UI (cards, rankings): abbreviation when known (e.g. D/ST → ARI from name),
+ * otherwise `FA` or `Free Agent`.
+ */
+export function displayTeamAbbrevOrFa(
+  team: string | null | undefined,
+  position: string | null | undefined,
+  playerName: string | null | undefined,
+  opts?: { faLabel?: 'FA' | 'Free Agent' }
+): string {
+  const abbr = resolveTeamAbbrForDisplay(team, position, playerName);
+  const faLabel = opts?.faLabel ?? 'FA';
+  if (!abbr || abbr === 'FA') return faLabel;
+  return abbr;
+}

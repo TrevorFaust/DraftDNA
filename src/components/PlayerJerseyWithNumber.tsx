@@ -65,9 +65,11 @@ export function PlayerJerseyWithNumber({
 }: PlayerJerseyWithNumberProps) {
   const src = getTeamJerseyImageUrl(team);
   const numStr = jerseyNumberDisplay(jerseyNumber);
-  const overlayStr =
-    numStr ??
-    (isDefensePosition(position) ? 'X' : isFreeAgentTeam(team) ? '?' : null);
+  const overlayStr = isFreeAgentTeam(team)
+    ? '?'
+    : isDefensePosition(position)
+      ? 'X'
+      : numStr;
 
   const frame =
     size === 'dialog' ? 'h-28 w-20' : 'h-[4.25rem] w-[3.25rem]';
