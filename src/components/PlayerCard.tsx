@@ -5,6 +5,7 @@ import type { RankedPlayer } from '@/types/database';
 import type { Player2025Stats } from '@/hooks/usePlayer2025Stats';
 import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
 import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
+import { displayTeamAbbrevOrFa, resolveTeamAbbrForDisplay } from '@/utils/teamMapping';
 
 interface PlayerCardProps {
   player: RankedPlayer;
@@ -47,7 +48,8 @@ export const PlayerCard = ({
   stats2025
 }: PlayerCardProps) => {
   const { data: jerseyColorsByAbbr } = useNflTeamJerseyColors();
-  const numberFill = lookupJerseyNumberFill(jerseyColorsByAbbr, player.team);
+  const jerseyTeamAbbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
+  const numberFill = lookupJerseyNumberFill(jerseyColorsByAbbr, jerseyTeamAbbr);
 
   return (
     <div
@@ -68,7 +70,7 @@ export const PlayerCard = ({
       </div>
 
       <PlayerJerseyWithNumber
-        team={player.team}
+        team={jerseyTeamAbbr}
         jerseyNumber={player.jersey_number}
         numberFillColor={numberFill}
         size="card"
@@ -81,7 +83,7 @@ export const PlayerCard = ({
           <PositionBadge position={player.position} />
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-          <span>{player.team || 'FA'}</span>
+          <span>{displayTeamAbbrevOrFa(player.team, player.position, player.name)}</span>
           <span>ADP: {player.adp}</span>
           {player.bye_week && <span>BYE: {player.bye_week}</span>}
         </div>

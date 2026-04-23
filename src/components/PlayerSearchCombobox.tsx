@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { ChevronsUpDown } from 'lucide-react';
 import type { Player } from '@/types/database';
+import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import { PositionBadge } from '@/components/PositionBadge';
 import { Button } from '@/components/ui/button';
 
@@ -165,7 +166,7 @@ export function PlayerSearchCombobox({
                       <span className="truncate font-medium">{player.name}</span>
                       <PositionBadge position={player.position} className="text-[10px] shrink-0" />
                       {!isDefense(player.position) && (
-                        <span className="text-xs text-muted-foreground shrink-0">{player.team || 'FA'}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{displayTeamAbbrevOrFa(player.team, player.position, player.name)}</span>
                       )}
                     </div>
                   </CommandItem>

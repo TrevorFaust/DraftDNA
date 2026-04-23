@@ -8,6 +8,8 @@
  * Base scoring (same for all): 0.1 per rush/rec yard, 6 per TD, etc.
  */
 
+import { computeKickerFantasyPointsFromRow } from '@/utils/kickerFantasyPoints';
+
 export type ScoringFormat = 'standard' | 'ppr' | 'half_ppr';
 
 /**
@@ -67,8 +69,6 @@ const RATES = {
   receiving_yards: 0.1,
   receiving_td: 6,
   fumble: -2,
-  fg_made: 3,
-  pat_made: 1,
   def_int: 2,
   def_fumble: 2,
   def_sack: 1,
@@ -91,8 +91,6 @@ export interface FantasyBreakdownInput {
   receiving_yards?: number | null;
   receiving_tds?: number | null;
   fumbles?: number | null;
-  fg_made?: number | null;
-  pat_made?: number | null;
   def_tds?: number | null;
   def_interceptions?: number | null;
   def_fumbles?: number | null;
@@ -146,14 +144,6 @@ export function getFantasyPointsBreakdown(
   if (fum) {
     items.push({ label: 'Fumbles', statValue: fum, points: fum * RATES.fumble });
   }
-  const fgm = (stats.fg_made ?? 0);
-  if (fgm) {
-    items.push({ label: 'FG Made', statValue: fgm, points: fgm * RATES.fg_made });
-  }
-  const xpm = (stats.pat_made ?? 0);
-  if (xpm) {
-    items.push({ label: 'XPM', statValue: xpm, points: xpm * RATES.pat_made });
-  }
   const di = (stats.def_interceptions ?? 0);
   if (di) {
     items.push({ label: 'Def INT', statValue: di, points: di * RATES.def_int });
@@ -172,4 +162,73 @@ export function getFantasyPointsBreakdown(
   }
 
   return items;
+}
+
+/** Sum of per-stat breakdown points (matches ESPN-style rates in `getFantasyPointsBreakdown`). */
+export function sumFantasyBreakdownPoints(
+  stats: FantasyBreakdownInput,
+  scoringFormat: ScoringFormat
+): number {
+  return getFantasyPointsBreakdown(stats, scoringFormat).reduce((sum, item) => sum + item.points, 0);
+}
+
+/** Minimal weekly row fields used for skill-position fantasy (incl. kickers). */
+export type SkillWeeklyFantasyGameStats = Pick<
+  FantasyBreakdownInput,
+  | 'passing_yards'
+  | 'passing_tds'
+  | 'passing_interceptions'
+  | 'rushing_yards'
+  | 'rushing_tds'
+  | 'receptions'
+  | 'receiving_yards'
+  | 'receiving_tds'
+  | 'fumbles'
+> & {
+  fantasy_points?: number | null;
+  fantasy_points_ppr?: number | null;
+};
+
+function offenseBreakdownInputFromWeekly(game: SkillWeeklyFantasyGameStats): FantasyBreakdownInput {
+  return {
+    passing_yards: game.passing_yards,
+    passing_tds: game.passing_tds,
+    passing_interceptions: game.passing_interceptions,
+    rushing_yards: game.rushing_yards,
+    rushing_tds: game.rushing_tds,
+    receptions: game.receptions,
+    receiving_yards: game.receiving_yards,
+    receiving_tds: game.receiving_tds,
+    fumbles: game.fumbles,
+  };
+}
+
+/**
+ * Weekly fantasy points for a skill player. Kickers: DB `fantasy_points` often omits FG/PAT, so we
+ * take max(DB-derived format points, breakdown from counting stats). Other positions unchanged.
+ */
+export function getSkillWeeklyFantasyPoints(
+  game: SkillWeeklyFantasyGameStats,
+  position: string | null | undefined,
+  scoringFormat: ScoringFormat
+): number | null {
+  const fromDb = getFantasyPointsForFormat(
+    scoringFormat,
+    game.fantasy_points ?? null,
+    game.fantasy_points_ppr ?? null,
+    game.receptions ?? null
+  );
+
+  const isK = position?.trim().toUpperCase() === 'K';
+  if (!isK) {
+    return fromDb;
+  }
+
+  const offensePts = sumFantasyBreakdownPoints(offenseBreakdownInputFromWeekly(game), scoringFormat);
+  const kickPts = computeKickerFantasyPointsFromRow(game as unknown as Record<string, unknown>);
+  const fromBreakdown = offensePts + kickPts;
+  if (fromDb == null) {
+    return fromBreakdown === 0 ? null : fromBreakdown;
+  }
+  return Math.max(fromDb, fromBreakdown);
 }

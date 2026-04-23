@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LogOut, ListOrdered, History, User, Settings, ChevronDown, Trophy, Plus, Settings2, BarChart3, Home, Award, ClipboardList } from 'lucide-react';
+import { LogOut, ListOrdered, History, User, Settings, ChevronDown, Trophy, Plus, Settings2, BarChart3, Home, Award, ClipboardList, Table2 } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
 import { cn } from '@/lib/utils';
 
@@ -30,11 +30,12 @@ export const Navbar = () => {
   const navItems = [
     { path: '/dashboard', label: 'Home', icon: Home },
     { path: '/rankings', label: 'Rankings', icon: ListOrdered },
-    { path: '/statistics', label: 'Statistics', icon: BarChart3 },
+    { path: '/players', label: 'Player Stats', icon: Table2 },
+    { path: '/statistics', label: 'Draft Stats', icon: BarChart3 },
     { path: '/mock-draft', label: 'Mock Draft', icon: ClipboardList },
-    { path: '/league-settings', label: 'League Settings', icon: Settings2 },
     { path: '/history', label: 'History', icon: History },
     { path: '/badges', label: 'Badges', icon: Award },
+    { path: '/league-settings', label: 'League Settings', icon: Settings2 },
   ];
 
   const handleLeagueChange = (leagueId: string) => {

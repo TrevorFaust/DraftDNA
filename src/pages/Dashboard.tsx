@@ -188,7 +188,7 @@ const Dashboard = () => {
       iconColor: 'text-primary-foreground',
     },
     {
-      title: 'Statistics',
+      title: 'Draft Stats',
       description: 'View draft faves and fades with in-depth player analysis',
       icon: BarChart3,
       path: '/statistics',

@@ -1169,7 +1169,7 @@ const Statistics = () => {
       
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="font-display text-4xl tracking-wide">STATISTICS</h1>
+          <h1 className="font-display text-4xl tracking-wide">DRAFT STATS</h1>
           <p className="text-muted-foreground">
             Your drafting and rankings statistics
           </p>

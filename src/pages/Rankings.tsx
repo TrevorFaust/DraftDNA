@@ -22,6 +22,7 @@ import {
   rankingsDraftSessionStorage,
 } from '@/utils/temporaryStorage';
 import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
+import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import {
   DndContext,
   closestCenter,
@@ -1630,7 +1631,7 @@ const Rankings = () => {
                               <span className="text-lg font-bold text-green-400">+{diff}</span>
                               <div>
                                 <p className="font-medium">{player.name}</p>
-                                <p className="text-xs text-muted-foreground">{player.team} • {player.position}</p>
+                                <p className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}</p>
                               </div>
                             </div>
                             <div className="text-right text-sm">
@@ -1672,7 +1673,7 @@ const Rankings = () => {
                               <span className="text-lg font-bold text-red-400">{diff}</span>
                               <div>
                                 <p className="font-medium">{player.name}</p>
-                                <p className="text-xs text-muted-foreground">{player.team} • {player.position}</p>
+                                <p className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}</p>
                               </div>
                             </div>
                             <div className="text-right text-sm">
@@ -1836,7 +1837,7 @@ const Rankings = () => {
                               <span className="text-lg font-bold text-green-400">+{diff}</span>
                               <div>
                                 <p className="font-medium">{player.name}</p>
-                                <p className="text-xs text-muted-foreground">{player.team} • {player.position}</p>
+                                <p className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}</p>
                               </div>
                             </div>
                             <div className="text-right text-sm">
@@ -1878,7 +1879,7 @@ const Rankings = () => {
                               <span className="text-lg font-bold text-red-400">{diff}</span>
                               <div>
                                 <p className="font-medium">{player.name}</p>
-                                <p className="text-xs text-muted-foreground">{player.team} • {player.position}</p>
+                                <p className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}</p>
                               </div>
                             </div>
                             <div className="text-right text-sm">

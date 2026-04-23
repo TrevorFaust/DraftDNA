@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import RecoverPassword from "./pages/RecoverPassword";
 import Dashboard from "./pages/Dashboard";
 import { Rankings } from "./pages/Rankings";
+import PlayersSpreadsheet from "./pages/PlayersSpreadsheet";
 import MockDraft from "./pages/MockDraft";
 import DraftRoom from "./pages/DraftRoom";
 import PredictionChallenge from "./pages/PredictionChallenge";
@@ -52,6 +53,7 @@ const App = () => (
                     <Route path="/recover-password" element={<RecoverPassword />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/rankings" element={<Rankings />} />
+                    <Route path="/players" element={<PlayersSpreadsheet />} />
                     <Route path="/statistics" element={<Suspense fallback={<PageFallback />}><Statistics /></Suspense>} />
                     <Route path="/mock-draft" element={<MockDraft />} />
                     <Route path="/draft/:draftId" element={<DraftRoom />} />

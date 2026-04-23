@@ -41,6 +41,7 @@ import { ArchetypeBadge } from '@/components/ArchetypeBadge';
 import { buildDraftConfig, type DraftConfig } from '@/constants/buildDraftConfig';
 import { detectChaosArchetype, type ChaosPick } from '@/utils/chaosDetection';
 import { getAgeFromBirthDate } from '@/utils/playerAge';
+import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 
 const DraftRoom = () => {
   const { draftId } = useParams<{ draftId: string }>();
@@ -2090,7 +2091,7 @@ const DraftRoom = () => {
                           <>
                             <div className="flex-1 truncate font-medium">{player.name}</div>
                             <PositionBadge position={player.position} className="text-[10px]" />
-                            <div className="text-xs text-muted-foreground shrink-0">{player.team || 'FA'}</div>
+                            <div className="text-xs text-muted-foreground shrink-0">{displayTeamAbbrevOrFa(player.team, player.position, player.name)}</div>
                           </>
                         ) : (
                           <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
@@ -2125,7 +2126,7 @@ const DraftRoom = () => {
                           <>
                             <div className="flex-1 truncate font-medium">{player.name}</div>
                             <PositionBadge position={player.position} className="text-[10px]" />
-                            <div className="text-xs text-muted-foreground">{player.team || 'FA'}</div>
+                            <div className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)}</div>
                           </>
                         ) : (
                           <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
@@ -2159,7 +2160,7 @@ const DraftRoom = () => {
                           <>
                             <div className="flex-1 truncate font-medium">{player.name}</div>
                             <PositionBadge position={player.position} className="text-[10px]" />
-                            <div className="text-xs text-muted-foreground">{player.team || 'FA'}</div>
+                            <div className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)}</div>
                           </>
                         ) : (
                           <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
@@ -2533,7 +2534,7 @@ const DraftRoom = () => {
                         <PositionBadge position={player.position} />
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {player.team || 'FA'} • ADP: {player.adp}
+                        {displayTeamAbbrevOrFa(player.team, player.position, player.name)} • ADP: {player.adp}
                       </div>
                     </div>
                     <Button
