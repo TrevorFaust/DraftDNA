@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "sync:badges": "node scripts/syncComposedBadgesToPublic.mjs",
+    "sync:rookies-2026": "npx tsx scripts/sync-drafted-rookies-2026.ts",
+    "import:rookies-2026-board": "npx tsx scripts/import-rookies-2026-board.ts",
+    "sync:players-info": "npx tsx scripts/sync-players-info-from-nflverse.ts",
+    "cleanup:stale-rookies": "npx tsx scripts/cleanup-stale-expected-rookies.ts",
     "dev": "node scripts/syncComposedBadgesToPublic.mjs && vite",
     "generate:archetypes": "node scripts/generateArchetypeLogic.mjs",
     "generate:badge-assets": "node scripts/generateArchetypeBadgeMap.mjs",
@@ -12,7 +16,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "bootstrap:sleeper-ids": "npx tsx scripts/bootstrap-sleeper-ids.ts"
+    "bootstrap:sleeper-ids": "npx tsx scripts/bootstrap-sleeper-ids.ts",
+    "export:ranking-template": "npx tsx scripts/export-ranking-template-csv.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -50,7 +50,9 @@ export const JerseyIcon = ({
   const tertiary = safeHexColor(tertiaryColor, DEFAULT_TERTIARY);
 
   const jerseyNumStr =
-    jerseyNumber !== null && jerseyNumber !== undefined ? Math.floor(jerseyNumber).toString() : null;
+    jerseyNumber !== null && jerseyNumber !== undefined && !Number.isNaN(Number(jerseyNumber))
+      ? Math.floor(Number(jerseyNumber)).toString()
+      : '0';
 
   const baseSvg = stripLeadingXmlDecl(jerseySvgRaw);
   const themedSvg = recolorJerseyByInkscapeLabels(baseSvg, primary, secondary, tertiary);
@@ -70,7 +72,7 @@ export const JerseyIcon = ({
         dangerouslySetInnerHTML={{ __html: themedSvg }}
         aria-hidden
       />
-      {jerseyNumStr && (
+      {jerseyNumStr !== '' && (
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full select-none"
           viewBox={viewBox}

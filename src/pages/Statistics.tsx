@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { BarChart3, Loader2, Lock, HelpCircle } from 'lucide-react';
 import type { RankedPlayer, Player, MockDraft, DraftPick } from '@/types/database';
 import { tempDraftStorage, tempRankingsStorage } from '@/utils/temporaryStorage';
-import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
+import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { cn } from '@/lib/utils';
 import {
   Select,
@@ -38,6 +38,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
+import {
+  PLAYER_POOL_PRIOR_SEASON,
+  PLAYER_POOL_CURRENT_SEASON,
+} from '@/constants/playerPoolSeason';
 
 /** Build community RankedPlayer list from RPC results. Uses RPC order as source of truth. */
 /** ADP = bucket-specific community rank (rank_position) for this scoring/league type. */
@@ -153,6 +157,7 @@ const Statistics = () => {
         const { data, error: nonDefenseError } = await supabase
           .from('players')
           .select('*')
+          .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
           .neq('position', 'D/ST')
           .order('adp', { ascending: true })
           .range(from, from + pageSize - 1);
@@ -167,25 +172,27 @@ const Statistics = () => {
           hasMore = false;
         }
       }
+
+      nonDefensePlayers = mergePlayerPoolAcrossSeasons(
+        nonDefensePlayers,
+        PLAYER_POOL_PRIOR_SEASON,
+        PLAYER_POOL_CURRENT_SEASON
+      );
       
       const { data: allDefensePlayers, error: defenseError } = await supabase
         .from('players')
         .select('*')
+        .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
         .eq('position', 'D/ST')
         .order('created_at', { ascending: false });
       
       if (defenseError) throw defenseError;
 
-      // Deduplicate defenses by name
-      const uniqueDefenseMap = new Map<string, (typeof allDefensePlayers)[number]>();
-      if (allDefensePlayers) {
-        for (const defense of allDefensePlayers) {
-          if (!uniqueDefenseMap.has(defense.name)) {
-            uniqueDefenseMap.set(defense.name, defense);
-          }
-        }
-      }
-      let defensePlayers = Array.from(uniqueDefenseMap.values());
+      let defensePlayers = mergePlayerPoolAcrossSeasons(
+        allDefensePlayers || [],
+        PLAYER_POOL_PRIOR_SEASON,
+        PLAYER_POOL_CURRENT_SEASON
+      );
       defensePlayers = defensePlayers.sort((a, b) => a.name.localeCompare(b.name));
 
       const merged = [

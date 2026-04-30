@@ -8,6 +8,7 @@ import {
   calculateDefenseFantasyPoints,
 } from '@/utils/defenseFantasy2025';
 import { canonicalTeamAbbr, resolveTeamAbbrForDisplay, teamFieldToAbbr } from '@/utils/teamMapping';
+import { PLAYER_POOL_PRIOR_SEASON } from '@/constants/playerPoolSeason';
 
 /** Season kicking totals (Player Stats page when filtering to K). From `get_player_2025_season_stats` k_* columns. */
 export interface KickerSeasonTotals2025 {
@@ -134,7 +135,11 @@ export function usePlayer2025Stats(scoringFormatOverride?: ScoringFormat | null)
           .eq('season', 2025)
           .eq('game_type', 'REG')
           .lte('week', 18),
-        supabase.from('players').select('id, team, name, position').in('position', ['D/ST', 'DEF', 'DST']),
+        supabase
+          .from('players')
+          .select('id, team, name, position')
+          .eq('season', PLAYER_POOL_PRIOR_SEASON)
+          .in('position', ['D/ST', 'DEF', 'DST']),
       ]);
 
       if (rpcRes.error) {
@@ -145,7 +150,11 @@ export function usePlayer2025Stats(scoringFormatOverride?: ScoringFormat | null)
 
       let playersRes = plRes;
       if (plRes.error) {
-        const fallback = await supabase.from('players').select('id, team, name, position').eq('position', 'D/ST');
+        const fallback = await supabase
+          .from('players')
+          .select('id, team, name, position')
+          .eq('season', PLAYER_POOL_PRIOR_SEASON)
+          .eq('position', 'D/ST');
         if (!fallback.error) {
           playersRes = fallback as typeof plRes;
         }

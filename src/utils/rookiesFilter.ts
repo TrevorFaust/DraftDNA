@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { PLAYER_POOL_SEASON } from '@/constants/playerPoolSeason';
 
 export interface RookieRankRow {
   player_id: string;
@@ -25,6 +26,7 @@ export async function fetchRookiesRankings(
     p_scoring_format: params.scoringFormat,
     p_league_type: params.leagueType,
     p_is_superflex: params.isSuperflex,
+    p_season: PLAYER_POOL_SEASON,
   })) as { data: RookieRankRow[] | null; error: any };
 
   if (error || !data || !Array.isArray(data)) {

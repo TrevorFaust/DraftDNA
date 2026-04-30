@@ -7,6 +7,7 @@ export interface Player {
   bye_week: number | null;
   jersey_number: number | null;
   season: number | null;
+  years_exp?: number | null;
   created_at: string;
   espn_id?: string | null;
   sleeper_id?: string | null;
