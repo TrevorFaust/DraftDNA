@@ -109,6 +109,9 @@ export const KICKER_WEEKLY_PASSTHROUGH_KEYS = [
   'fg_miss',
   'fg_blocked',
   'fg_blocks',
+  /** Distance strings for weekly player popup tooltips */
+  'fg_made_list',
+  'fg_missed_list',
 ] as const;
 
 function toFiniteNumber(value: unknown): number | null {

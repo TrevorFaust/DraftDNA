@@ -14,6 +14,11 @@ import { cn } from "@/lib/utils";
 import { getAgeFromBirthDate } from "@/utils/playerAge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NFL_DEFENSE_TEAM_NAMES } from "@/constants/nflDefenses";
+import {
+  PLAYER_POOL_PRIOR_SEASON,
+  PLAYER_POOL_CURRENT_SEASON,
+} from "@/constants/playerPoolSeason";
+import { mergePlayerPoolAcrossSeasons } from "@/utils/playerDeduplication";
 import { useNflTeams } from "@/hooks/useNflTeams";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeagues } from "@/hooks/useLeagues";
@@ -425,7 +430,7 @@ export default function PlayersSpreadsheet() {
           const { data, error } = await supabase
             .from("players")
             .select("*")
-            .eq("season", 2025)
+            .in("season", [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
             .order("adp", { ascending: true })
             .range(from, from + pageSize - 1);
           if (error) throw error;
@@ -437,6 +442,12 @@ export default function PlayersSpreadsheet() {
             hasMore = false;
           }
         }
+
+        allPlayersData = mergePlayerPoolAcrossSeasons(
+          allPlayersData,
+          PLAYER_POOL_PRIOR_SEASON,
+          PLAYER_POOL_CURRENT_SEASON
+        );
 
         const defenseTeamAbbrByName = new Map(
           (nflTeams || [])
@@ -455,7 +466,7 @@ export default function PlayersSpreadsheet() {
               name: teamName,
               position: "D/ST",
               team: defenseTeamAbbrByName.get(teamName) ?? null,
-              season: 2025,
+              season: PLAYER_POOL_PRIOR_SEASON,
               adp: 160 + index,
               bye_week: null,
               jersey_number: null,

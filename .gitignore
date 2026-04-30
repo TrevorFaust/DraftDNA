@@ -1,3 +1,6 @@
+# Generated ranking spreadsheet (re-run npm run export:ranking-template)
+data/ranking_template*.csv
+
 .env
 .env.local
 .env.*.local

@@ -21,7 +21,7 @@ import {
   getRankingsDraftSessionStorageKey,
   rankingsDraftSessionStorage,
 } from '@/utils/temporaryStorage';
-import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
+import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import {
   DndContext,
@@ -53,6 +53,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { fetchRookiesRankings, filterPlayersToRookieIds } from '@/utils/rookiesFilter';
 import { useNflTeams } from '@/hooks/useNflTeams';
 import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
+import {
+  PLAYER_POOL_PRIOR_SEASON,
+  PLAYER_POOL_CURRENT_SEASON,
+} from '@/constants/playerPoolSeason';
 
 /** Disable dnd-kit built-in auto-scroll - we use custom ramp-up scroll instead */
 const autoScrollConfig = false;
@@ -487,7 +491,7 @@ const Rankings = () => {
         const { data, error: playersError } = await supabase
           .from('players')
           .select('*')
-          .eq('season', 2025)
+          .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
           .order('adp', { ascending: true })
           .range(from, from + pageSize - 1);
 
@@ -501,6 +505,12 @@ const Rankings = () => {
           hasMore = false;
         }
       }
+
+      allPlayersData = mergePlayerPoolAcrossSeasons(
+        allPlayersData,
+        PLAYER_POOL_PRIOR_SEASON,
+        PLAYER_POOL_CURRENT_SEASON
+      );
 
       // Use teams table for D/ST list when available; fallback to constant (see useNflTeams)
       const defenseNamesList = defenseTeamNames.length > 0 ? defenseTeamNames : NFL_DEFENSE_TEAM_NAMES;
@@ -523,7 +533,7 @@ const Rankings = () => {
             name: teamName,
             position: 'D/ST',
             team: defenseTeamAbbrByName.get(teamName) ?? null,
-            season: 2025,
+            season: PLAYER_POOL_PRIOR_SEASON,
             adp,
             bye_week: null,
           };

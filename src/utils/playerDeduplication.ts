@@ -1,3 +1,57 @@
+function isDefenseLikePosition(position: string | null | undefined): boolean {
+  if (position == null || position === '') return false;
+  const u = position.trim().toUpperCase();
+  return u === 'D/ST' || u === 'DEF' || u === 'DST';
+}
+
+type SeasonMergeRow = {
+  id: string;
+  name: string;
+  position?: string | null;
+  espn_id?: string | null;
+  season?: number | null;
+  adp?: number | null;
+};
+
+/**
+ * Merge `players` rows from two seasons: keep prior-season vets, add current-season-only rows,
+ * and prefer current season when the same `espn_id` exists in both (rookies / updated teams).
+ * D/ST: if both seasons have the same team name, keep the **prior** row so ids stay aligned
+ * with `get_player_2025_season_stats` until a 2026 defense stat pipeline exists.
+ */
+export function mergePlayerPoolAcrossSeasons<T extends SeasonMergeRow>(
+  rows: T[],
+  priorSeason: number,
+  currentSeason: number
+): T[] {
+  const current = rows.filter((r) => Number(r.season) === currentSeason);
+  const prior = rows.filter((r) => Number(r.season) === priorSeason);
+
+  const currentEspn = new Set(
+    current.map((p) => p.espn_id).filter((id): id is string => !!id).map(String)
+  );
+
+  const priorKept = prior.filter((p) => {
+    if (isDefenseLikePosition(p.position)) return true;
+    const eid = p.espn_id ? String(p.espn_id) : null;
+    if (eid && currentEspn.has(eid)) return false;
+    return true;
+  });
+
+  const priorDefenseNames = new Set(
+    priorKept
+      .filter((p) => isDefenseLikePosition(p.position))
+      .map((p) => String(p.name).trim().toLowerCase())
+  );
+
+  const currentFiltered = current.filter((p) => {
+    if (!isDefenseLikePosition(p.position)) return true;
+    return !priorDefenseNames.has(String(p.name).trim().toLowerCase());
+  });
+
+  return deduplicatePlayersByIdentity([...priorKept, ...currentFiltered]);
+}
+
 /**
  * Deduplicates players who appear multiple times due to multi-position roles
  * (e.g. Taysom Hill as QB/TE/RB, Connor Heyward as RB/TE).

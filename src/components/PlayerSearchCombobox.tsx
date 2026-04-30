@@ -18,6 +18,11 @@ import { ChevronsUpDown } from 'lucide-react';
 import type { Player } from '@/types/database';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import { PositionBadge } from '@/components/PositionBadge';
+import {
+  PLAYER_POOL_PRIOR_SEASON,
+  PLAYER_POOL_CURRENT_SEASON,
+} from '@/constants/playerPoolSeason';
+import { mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { Button } from '@/components/ui/button';
 
 const VALID_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'D/ST']);
@@ -77,9 +82,10 @@ export function PlayerSearchCombobox({
     let queryBuilder = supabase
       .from('players')
       .select('*')
+      .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
       .or(`name.ilike.%${searchLower}%,team.ilike.%${searchLower}%`)
       .order('adp', { ascending: true })
-      .limit(25);
+      .limit(60);
     if (positionFilter) {
       queryBuilder = queryBuilder.eq('position', positionFilter);
     } else {
@@ -91,7 +97,12 @@ export function PlayerSearchCombobox({
       console.error('Error searching players:', error);
       setPlayers([]);
     } else {
-      setPlayers(dedupeDefenses(data || []));
+      const merged = mergePlayerPoolAcrossSeasons(
+        data || [],
+        PLAYER_POOL_PRIOR_SEASON,
+        PLAYER_POOL_CURRENT_SEASON
+      );
+      setPlayers(dedupeDefenses(merged).slice(0, 25));
     }
     setLoading(false);
   }, [positionFilter]);

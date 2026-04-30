@@ -22,9 +22,13 @@ import type { Player, MockDraft, DraftPick, RankedPlayer } from '@/types/databas
 import { fetchRookiesRankings } from '@/utils/rookiesFilter';
 import { useNflTeams } from '@/hooks/useNflTeams';
 import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
+import {
+  PLAYER_POOL_PRIOR_SEASON,
+  PLAYER_POOL_CURRENT_SEASON,
+} from '@/constants/playerPoolSeason';
 import { cn, capitalizeSentenceStart } from '@/lib/utils';
 import { tempDraftStorage, tempSettingsStorage } from '@/utils/temporaryStorage';
-import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
+import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { selectCpuPick, assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
 import {
@@ -264,12 +268,34 @@ const DraftRoom = () => {
       }
 
       if (allPlayersData.length === 0 && !isRookiesOnly) {
-        // Fetch all players (including defenses) - they're just regular players with position 'D/ST'
-        const { data } = await supabase
-          .from('players')
-          .select('*')
-          .order('adp', { ascending: true });
-        allPlayersData = data || [];
+        let seedRows: any[] = [];
+        let fromSeed = 0;
+        const pageSizeSeed = 1000;
+        let moreSeed = true;
+        while (moreSeed) {
+          const { data, error } = await supabase
+            .from('players')
+            .select('*')
+            .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
+            .order('adp', { ascending: true })
+            .range(fromSeed, fromSeed + pageSizeSeed - 1);
+          if (error) {
+            console.error('DraftRoom: Error seeding players:', error);
+            break;
+          }
+          if (data && data.length > 0) {
+            seedRows = [...seedRows, ...data];
+            fromSeed += pageSizeSeed;
+            moreSeed = data.length === pageSizeSeed;
+          } else {
+            moreSeed = false;
+          }
+        }
+        allPlayersData = mergePlayerPoolAcrossSeasons(
+          seedRows,
+          PLAYER_POOL_PRIOR_SEASON,
+          PLAYER_POOL_CURRENT_SEASON
+        );
       }
 
       if (!isRookiesOnly) {
@@ -302,6 +328,7 @@ const DraftRoom = () => {
             name: teamName,
             position: 'D/ST',
             team: defenseTeamAbbrByName.get(teamName) ?? null,
+            season: PLAYER_POOL_PRIOR_SEASON,
             adp: adp,
             bye_week: null,
           };
@@ -342,6 +369,7 @@ const DraftRoom = () => {
         const { data, error } = await supabase
           .from('players')
           .select('*')
+          .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
           .neq('position', 'D/ST')
           .order('adp', { ascending: true })
           .range(from, from + pageSize - 1);
@@ -360,16 +388,29 @@ const DraftRoom = () => {
           hasMore = false;
         }
       }
+
+      nonDefensePlayers = mergePlayerPoolAcrossSeasons(
+        nonDefensePlayers,
+        PLAYER_POOL_PRIOR_SEASON,
+        PLAYER_POOL_CURRENT_SEASON
+      );
       
       // Then, separately query all defenses (they should be 32, well under any limit)
       const { data: allDefensePlayersRaw, error: defenseError } = await supabase
         .from('players')
         .select('*')
+        .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
         .eq('position', 'D/ST')
         .order('created_at', { ascending: false }); // Get most recent first
+
+      const mergedDefenseRows = mergePlayerPoolAcrossSeasons(
+        allDefensePlayersRaw || [],
+        PLAYER_POOL_PRIOR_SEASON,
+        PLAYER_POOL_CURRENT_SEASON
+      );
       
       // Keep only canonical 32 teams (drop legacy rows like Oakland Raiders, San Diego Chargers, St. Louis Rams)
-      const allDefensePlayers = (allDefensePlayersRaw || []).filter((d: { name: string }) => canonicalDefenseSet.has(d.name));
+      const allDefensePlayers = mergedDefenseRows.filter((d: { name: string }) => canonicalDefenseSet.has(d.name));
       
       if (nonDefenseError) {
         console.error('DraftRoom: Error re-fetching non-defense players:', nonDefenseError);

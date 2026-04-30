@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useScoringFormat } from '@/hooks/useScoringFormat';
@@ -16,6 +16,7 @@ import {
 } from '@/utils/kickerFantasyPoints';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { PositionBadge } from './PositionBadge';
 import { supabase } from '@/integrations/supabase/client';
@@ -107,6 +108,9 @@ interface WeeklyStats {
   fg_att: number | null;
   pat_made: number | null;
   pat_att: number | null;
+  /** Weekly distance lists from `weekly_stats_2025` (text, JSON array, or jsonb). */
+  fg_made_list?: unknown;
+  fg_missed_list?: unknown;
   // Defense stats
   def_pa: number | null;
   def_total_yards: number | null;
@@ -133,6 +137,94 @@ interface WeeklyStats {
   sack_fumbles: number | null;
   fumble_recovery_opp: number | null;
   [key: string]: any;
+}
+
+/** Turn `fg_made_list` / `fg_missed_list` (string, JSON text, array, object) into tooltip body text. */
+function fgDistanceListTooltipText(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (!t) return null;
+    if ((t.startsWith('[') && t.endsWith(']')) || (t.startsWith('{') && t.endsWith('}'))) {
+      try {
+        return fgDistanceListTooltipText(JSON.parse(t));
+      } catch {
+        return t;
+      }
+    }
+    return t;
+  }
+  if (Array.isArray(raw)) {
+    const parts = raw
+      .map((item) => {
+        if (item == null) return '';
+        if (typeof item === 'object') return JSON.stringify(item);
+        return String(item);
+      })
+      .filter(Boolean);
+    return parts.length ? parts.join(', ') : null;
+  }
+  if (typeof raw === 'object') {
+    return JSON.stringify(raw);
+  }
+  return String(raw);
+}
+
+function KickerFgHoverBox({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="space-y-1.5 text-center">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <p className="text-sm font-medium tabular-nums whitespace-pre-wrap leading-snug">{body}</p>
+    </div>
+  );
+}
+
+/** Weekly Game Log: hover FGM → made distances; hover FGA → missed distances only if FGA &gt; FGM that week. */
+function kickerWeeklyFgStatCell(
+  game: WeeklyStats,
+  statKey: 'fg_made' | 'fg_att',
+  displayValue: ReactNode
+): ReactNode {
+  if (game.opponent_team === 'BYE') return displayValue;
+
+  const fgm = toFiniteNumber(game.fg_made);
+  const fga = toFiniteNumber(game.fg_att);
+
+  if (statKey === 'fg_made') {
+    const listText = fgDistanceListTooltipText(game.fg_made_list);
+    if (!listText) return displayValue;
+    return (
+      <Tooltip delayDuration={200}>
+        <TooltipTrigger asChild>
+          <span className="cursor-help border-b border-dotted border-muted-foreground/60">
+            {displayValue}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[min(22rem,calc(100vw-2rem))] px-3 py-2">
+          <KickerFgHoverBox title="Field goals made" body={listText} />
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  // FGA: only after a miss (FGA &gt; FGM); show missed distances when the list exists.
+  if (fga == null || fgm == null || fga <= fgm) {
+    return displayValue;
+  }
+  const listText = fgDistanceListTooltipText(game.fg_missed_list);
+  if (!listText) return displayValue;
+  return (
+    <Tooltip delayDuration={200}>
+      <TooltipTrigger asChild>
+        <span className="cursor-help border-b border-dotted border-muted-foreground/60">
+          {displayValue}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[min(22rem,calc(100vw-2rem))] px-3 py-2">
+        <KickerFgHoverBox title="Field goals missed" body={listText} />
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 function isDefensePosition(position: string | null | undefined): boolean {
@@ -792,6 +884,9 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
             rushing_fumbles: s.rushing_fumbles,
             sack_fumbles: s.sack_fumbles,
             fumble_recovery_opp: s.fumble_recovery_opp,
+            // Distance lists for kicker hover (weekly row; snake_case or camelCase from API).
+            fg_made_list: s.fg_made_list ?? s.fgMadeList,
+            fg_missed_list: s.fg_missed_list ?? s.fgMissedList,
           };
           };
 
@@ -1023,7 +1118,7 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
               <DialogTitle className="flex items-center gap-3 flex-wrap">
                 <PlayerJerseyWithNumber
                   team={jerseyTeamAbbr}
-                  jerseyNumber={player.jersey_number}
+                  jerseyNumber={player.jersey_number ?? 0}
                   numberFillColor={numberFill}
                   size="dialog"
                   position={player.position}
@@ -1292,7 +1387,14 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
                         </TableCell>
                         {statsForView.map((stat) => (
                           <TableCell key={stat.key} className="text-right">
-                            {getStatValue(game, stat.key)}
+                            {player.position === 'K' &&
+                            (stat.key === 'fg_made' || stat.key === 'fg_att')
+                              ? kickerWeeklyFgStatCell(
+                                  game,
+                                  stat.key,
+                                  getStatValue(game, stat.key)
+                                )
+                              : getStatValue(game, stat.key)}
                           </TableCell>
                         ))}
                       </TableRow>

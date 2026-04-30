@@ -69,7 +69,7 @@ export function PlayerJerseyWithNumber({
     ? '?'
     : isDefensePosition(position)
       ? 'X'
-      : numStr;
+      : numStr ?? '0';
 
   const frame =
     size === 'dialog' ? 'h-28 w-20' : 'h-[4.25rem] w-[3.25rem]';
@@ -90,7 +90,7 @@ export function PlayerJerseyWithNumber({
 
   const letterSpacing =
     overlayStr != null && overlayStr.length >= 2 ? '0.035em' : '0';
-  const usesPlainZero = Boolean(numStr?.includes('0'));
+  const usesPlainZero = overlayStr.includes('0');
 
   const textProps = {
     x: numX,

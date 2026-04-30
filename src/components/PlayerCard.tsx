@@ -71,7 +71,7 @@ export const PlayerCard = ({
 
       <PlayerJerseyWithNumber
         team={jerseyTeamAbbr}
-        jerseyNumber={player.jersey_number}
+        jerseyNumber={player.jersey_number ?? 0}
         numberFillColor={numberFill}
         size="card"
         position={player.position}
