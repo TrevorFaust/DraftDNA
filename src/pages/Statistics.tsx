@@ -42,6 +42,10 @@ import {
   PLAYER_POOL_PRIOR_SEASON,
   PLAYER_POOL_CURRENT_SEASON,
 } from '@/constants/playerPoolSeason';
+import {
+  applyUserRankingsBucketMatch,
+  userRankingBucketFromDisplayBucket,
+} from '@/utils/userRankingsBucket';
 
 /** Build community RankedPlayer list from RPC results. Uses RPC order as source of truth. */
 /** ADP = bucket-specific community rank (rank_position) for this scoring/league type. */
@@ -221,6 +225,13 @@ const Statistics = () => {
 
       const bucketAdpMap = new Map(communityData.map((r) => [r.player_id, Number(r.rank_position)]));
 
+      const rankingBucketCols = userRankingBucketFromDisplayBucket({
+        scoringFormat: bucket.scoringFormat,
+        leagueType: bucket.leagueType,
+        isSuperflex: bucket.isSuperflex,
+        rookiesOnly: bucket.rookiesOnly,
+      });
+
       if (!user) {
         const adpPlayers: RankedPlayer[] = updatedPlayersData.map((p, index) => ({
           ...p,
@@ -274,12 +285,16 @@ const Statistics = () => {
         let allLeagueRankingsData: any[] = [];
         
         if (leagueIds.length > 0) {
-          const { data, error: allLeagueRankingsError } = await supabase
-            .from('user_rankings')
-            .select('*')
-            .eq('user_id', user.id)
-            .not('league_id', 'is', null)
-            .in('league_id', leagueIds);
+          const qAll = applyUserRankingsBucketMatch(
+            supabase
+              .from('user_rankings')
+              .select('*')
+              .eq('user_id', user.id)
+              .not('league_id', 'is', null)
+              .in('league_id', leagueIds),
+            rankingBucketCols
+          );
+          const { data, error: allLeagueRankingsError } = await qAll;
 
           if (allLeagueRankingsError) throw allLeagueRankingsError;
           allLeagueRankingsData = data || [];
@@ -321,11 +336,15 @@ const Statistics = () => {
           : updatedPlayersData.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
         setCommunityPlayers(allLeaguesCommunity);
       } else {
-        const { data: rankingsData, error: rankingsError } = await supabase
-          .from('user_rankings')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('league_id', selectedLeague.id);
+        const qLeague = applyUserRankingsBucketMatch(
+          supabase
+            .from('user_rankings')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('league_id', selectedLeague.id),
+          rankingBucketCols
+        );
+        const { data: rankingsData, error: rankingsError } = await qLeague;
 
         if (rankingsError) throw rankingsError;
 
@@ -344,11 +363,11 @@ const Statistics = () => {
             rank: rankingsMap.get(p.id) ?? bucketAdpMap.get(p.id) ?? Number(p.adp) ?? index + 1,
           }));
         } else {
-          const { data: allLeaguesRankings, error: allLeaguesError } = await supabase
-            .from('user_rankings')
-            .select('*')
-            .eq('user_id', user.id)
-            .is('league_id', null);
+          const qNullLeague = applyUserRankingsBucketMatch(
+            supabase.from('user_rankings').select('*').eq('user_id', user.id).is('league_id', null),
+            rankingBucketCols
+          );
+          const { data: allLeaguesRankings, error: allLeaguesError } = await qNullLeague;
 
           if (allLeaguesError) throw allLeaguesError;
 

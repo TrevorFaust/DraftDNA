@@ -109,11 +109,20 @@ export const migrateTemporaryRankings = async (userId: string): Promise<boolean>
     }
 
     // Check if user already has rankings
+    const sf = settings?.scoringFormat || 'ppr';
+    const lt = settings?.leagueType || 'season';
+    const flex = Boolean(settings?.isSuperflex);
+    const rook = Boolean(settings?.rookiesOnly);
+
     const { data: existingRankings } = await supabase
       .from('user_rankings')
       .select('*')
       .eq('user_id', userId)
       .is('league_id', null)
+      .eq('scoring_format', sf)
+      .eq('league_type', lt)
+      .eq('is_superflex', flex)
+      .eq('rookies_only', rook)
       .limit(1);
 
     // Only migrate if user doesn't have existing rankings
@@ -129,6 +138,10 @@ export const migrateTemporaryRankings = async (userId: string): Promise<boolean>
       player_id: p.id,
       rank: index + 1,
       league_id: null,
+      scoring_format: sf,
+      league_type: lt,
+      is_superflex: flex,
+      rookies_only: rook,
     }));
 
     const BATCH_SIZE = 500;

@@ -64,8 +64,8 @@ export function deduplicatePlayersByIdentity<T extends { id: string; name: strin
   const byName = new Map<string, T[]>();
 
   for (const p of players) {
-    // D/ST and K: keep as-is, identified by name (already deduped earlier in the pipeline)
-    if (p.position === 'D/ST' || p.position === 'K') {
+    // D/ST (any stored variant) and K: keep as-is, identified by name (already deduped earlier in the pipeline)
+    if (isDefenseLikePosition(p.position) || p.position?.trim().toUpperCase() === 'K') {
       const key = `def:${p.name}`;
       const list = byName.get(key) ?? [];
       list.push(p);
