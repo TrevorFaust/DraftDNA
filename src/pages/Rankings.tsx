@@ -11,7 +11,7 @@ import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { RotateCcw, Search, Filter, Loader2, Users, User, Save, Edit } from 'lucide-react';
+import { RotateCcw, Search, Loader2, Users, User, Save, Edit, LayoutTemplate } from 'lucide-react';
 import type { RankedPlayer } from '@/types/database';
 import {
   tempRankingsStorage,
@@ -22,16 +22,23 @@ import {
   rankingsDraftSessionStorage,
 } from '@/utils/temporaryStorage';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
-import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
+import {
+  TEAM_ABBREV_TO_FULL_NAME,
+  canonicalTeamAbbr,
+  displayTeamAbbrevOrFa,
+  resolveTeamAbbrForDisplay,
+} from '@/utils/teamMapping';
+import type { CollisionDetection } from '@dnd-kit/core';
 import {
   DndContext,
-  closestCenter,
+  closestCorners,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   DragEndEvent,
-  DragOverlay,
+  DragStartEvent,
 } from '@dnd-kit/core';
 import { useRampUpAutoScroll } from '@/hooks/useRampUpAutoScroll';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
@@ -43,14 +50,25 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { fetchRookiesRankings, filterPlayersToRookieIds } from '@/utils/rookiesFilter';
+import {
+  applyUserRankingsBucketMatch,
+  userRankingBucketFromDisplayBucket,
+  formatRankingBucketLabel,
+  userRankingBucketsEqual,
+  fetchUserRankingImportSources,
+  rankingImportPlayerPoolsMatch,
+} from '@/utils/userRankingsBucket';
+import type { UserRankingBucketDb } from '@/utils/userRankingsBucket';
 import { useNflTeams } from '@/hooks/useNflTeams';
 import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
 import {
@@ -60,6 +78,82 @@ import {
 
 /** Disable dnd-kit built-in auto-scroll - we use custom ramp-up scroll instead */
 const autoScrollConfig = false;
+
+/** Select value for players with no NFL team (label: Free Agents). */
+const TEAM_SELECT_FA = 'FA' as const;
+
+/** Select value meaning no position / team restriction. */
+const FILTER_ALL = 'all' as const;
+
+const RANKINGS_TEAM_FILTER_OPTIONS: { value: string; label: string }[] = (() => {
+  const list = Object.entries(TEAM_ABBREV_TO_FULL_NAME).map(([abbr, full]) => ({
+    value: canonicalTeamAbbr(abbr) ?? abbr,
+    label: full,
+  }));
+  list.sort((a, b) => a.label.localeCompare(b.label));
+  return list;
+})();
+
+type TeamFilterable = {
+  team: string | null | undefined;
+  position: string | null | undefined;
+  name: string | null | undefined;
+};
+
+function playerIsFreeAgent(p: TeamFilterable): boolean {
+  const raw = (p.team ?? '').trim();
+  if (!raw) return true;
+  const u = raw.toUpperCase();
+  if (u === 'FA' || u === 'FREE AGENT' || u === 'FREE AGENTS') return true;
+  const abbr = resolveTeamAbbrForDisplay(p.team, p.position, p.name);
+  return abbr == null || abbr === 'FA';
+}
+
+function playerMatchesTeamSelection(p: TeamFilterable, selectedTeam: string): boolean {
+  if (selectedTeam === FILTER_ALL || !selectedTeam) return true;
+  if (selectedTeam === TEAM_SELECT_FA) return playerIsFreeAgent(p);
+  const abbr = resolveTeamAbbrForDisplay(p.team, p.position, p.name);
+  if (playerIsFreeAgent(p)) return false;
+  return canonicalTeamAbbr(abbr) === canonicalTeamAbbr(selectedTeam);
+}
+
+/**
+ * closestCenter vs tall PlayerCards: the dragged item's bounding-box center stays "nearer" the row
+ * above even when most of the card visually sits below it. Prefer pointer (handle follows cursor),
+ * then corner distance for gaps between rows.
+ */
+const rankingsListCollisionDetection: CollisionDetection = (args) => {
+  const pointerHits = pointerWithin(args);
+  if (pointerHits.length > 0) return pointerHits;
+  return closestCorners(args);
+};
+
+/**
+ * Build a new id order: drop relative to `over`'s row using pointer Y vs row midpoint.
+ * arrayMove(from, overIndex) always splices *before* that index after removal, which feels wrong
+ * when the cursor is in the lower half of a tall card (user expects "below this row").
+ */
+function reorderIdsWithPointerBias(
+  orderedIds: readonly string[],
+  activeId: string,
+  overId: string,
+  pointerY: number,
+  overRect: { top: number; height: number }
+): string[] {
+  if (activeId === overId) return [...orderedIds];
+  const without = orderedIds.filter((id) => id !== activeId);
+  const overPosInWithout = without.indexOf(overId);
+  if (overPosInWithout < 0) return [...orderedIds];
+
+  // Bias toward "insert before" so moving a row upward doesn't require crossing a strict 50% midpoint.
+  // With tall cards + fast pointer updates, a 50/50 split can feel like drops revert.
+  const splitY = overRect.top + overRect.height * 0.7;
+  const placeAfter = pointerY >= splitY;
+
+  let insertAt = placeAfter ? overPosInWithout + 1 : overPosInWithout;
+  insertAt = Math.max(0, Math.min(without.length, insertAt));
+  return [...without.slice(0, insertAt), activeId, ...without.slice(insertAt)];
+}
 
 function RampUpScrollHandler({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
   useRampUpAutoScroll(containerRef);
@@ -148,28 +242,37 @@ function mergeLiveCommunity(
   return result;
 }
 
-/** Rounds midpoint ADP: nearest integer, but exactly .5 rounds down. */
-function roundAdpMidpoint(n: number): number {
-  const frac = Math.abs(n % 1);
-  if (Math.abs(frac - 0.5) < 1e-9) return Math.floor(n);
-  return Math.round(n);
-}
-
-/** Target rank when dropping between two neighbors in a filtered list (by their current ranks). */
-function rankFromFilteredNeighbors(rankAbove: number | undefined, rankBelow: number | undefined): number {
-  if (rankAbove != null && rankBelow != null) {
-    return roundAdpMidpoint((rankAbove + rankBelow) / 2);
-  }
-  if (rankBelow != null) return Math.max(1, rankBelow - 1);
-  if (rankAbove != null) return rankAbove + 1;
-  return 1;
-}
-
 /**
- * When reordering inside a position (or filtered) list, set the moved player's rank to the midpoint
- * between the neighbors' ranks and shift other players' ranks so order stays unique integers.
+ * After reordering the filtered subset (position/team/search), reassign integer ranks so that
+ * subset keeps the same multiset of global rank slots. Avoids midpoint ties with the old rank
+ * (which caused the list to snap back after drop).
  */
-function applyFilteredMidpointRankDrag(
+function applySlotReorderAfterFilteredPermutation(
+  allPlayers: RankedPlayer[],
+  reorderedFiltered: RankedPlayer[]
+): RankedPlayer[] {
+  if (reorderedFiltered.length === 0) return allPlayers;
+  const filteredSet = new Set(reorderedFiltered.map((p) => p.id));
+  const fullOrder = [...allPlayers].sort((a, b) => a.rank - b.rank);
+  const slots = fullOrder.filter((p) => filteredSet.has(p.id)).map((p) => p.rank);
+  slots.sort((a, b) => a - b);
+  if (slots.length !== reorderedFiltered.length) {
+    console.warn(
+      'Rankings: slot reorder length mismatch',
+      slots.length,
+      reorderedFiltered.length
+    );
+    return allPlayers;
+  }
+  const byId = new Map(allPlayers.map((p) => [p.id, { ...p }]));
+  reorderedFiltered.forEach((p, i) => {
+    const row = byId.get(p.id);
+    if (row) row.rank = slots[i]!;
+  });
+  return Array.from(byId.values()).sort((a, b) => a.rank - b.rank);
+}
+
+function applyFilteredListReorderByArrayMove(
   allPlayers: RankedPlayer[],
   filteredOrdered: RankedPlayer[],
   activeId: string,
@@ -178,36 +281,21 @@ function applyFilteredMidpointRankDrag(
   const oldF = filteredOrdered.findIndex((p) => p.id === activeId);
   const newF = filteredOrdered.findIndex((p) => p.id === overId);
   if (oldF < 0 || newF < 0) return allPlayers;
-
   const reorderedF = arrayMove(filteredOrdered, oldF, newF);
-  const newIdx = reorderedF.findIndex((p) => p.id === activeId);
-  const above = reorderedF[newIdx - 1];
-  const below = reorderedF[newIdx + 1];
+  return applySlotReorderAfterFilteredPermutation(allPlayers, reorderedF);
+}
 
-  const movedEntry = allPlayers.find((p) => p.id === activeId);
-  if (!movedEntry) return allPlayers;
-  const oldPRank = movedEntry.rank;
-  const newMid = rankFromFilteredNeighbors(above?.rank, below?.rank);
-
-  const updated = allPlayers.map((p) => ({ ...p }));
-
-  if (newMid < oldPRank) {
-    for (const q of updated) {
-      if (q.id === activeId) continue;
-      if (q.rank >= newMid && q.rank < oldPRank) q.rank += 1;
-    }
-  } else if (newMid > oldPRank) {
-    for (const q of updated) {
-      if (q.id === activeId) continue;
-      if (q.rank > oldPRank && q.rank <= newMid) q.rank -= 1;
-    }
-  }
-
-  const moved = updated.find((p) => p.id === activeId);
-  if (moved) moved.rank = newMid;
-
-  updated.sort((a, b) => a.rank - b.rank);
-  return updated;
+/** Move by ids in the full list so global ranks shift naturally (no sparse-slot swapping). */
+function movePlayersByIds(
+  allPlayers: RankedPlayer[],
+  activeId: string,
+  overId: string
+): RankedPlayer[] {
+  const oldIndex = allPlayers.findIndex((item) => item.id === activeId);
+  const newIndex = allPlayers.findIndex((item) => item.id === overId);
+  if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return allPlayers;
+  const newItems = arrayMove(allPlayers, oldIndex, newIndex);
+  return newItems.map((item, index) => ({ ...item, rank: index + 1 }));
 }
 
 /** Reapply in-session draft order onto a freshly fetched list (new players append by rank). */
@@ -226,6 +314,22 @@ function mergeRankingsWithDraftOrder(fetched: RankedPlayer[], draftIds: string[]
   for (const p of rest) ordered.push({ ...p });
   return ordered.map((p, i) => ({ ...p, rank: i + 1 }));
 }
+
+function parseGuestRankingBucketKey(bucketKey: string): UserRankingBucketDb {
+  const parts = bucketKey.split('/');
+  return {
+    scoring_format: parts[0] || 'ppr',
+    league_type: parts[1] === 'dynasty' ? 'dynasty' : 'season',
+    is_superflex: parts[2] === 'true',
+    rookies_only: parts[3] === 'true',
+  };
+}
+
+type RankingTemplateOption =
+  | { kind: 'guest'; bucketKey: string; label: string }
+  | { kind: 'account'; league_id: string | null; bucket: UserRankingBucketDb; label: string };
+
+type ImportListEmptyKind = 'no-saves' | 'rookies-mismatch' | 'only-this-list';
 
 // Sortable player with grab handle on the right and position-colored rank
 const SortablePlayerWithHandle = ({ 
@@ -306,12 +410,15 @@ const Rankings = () => {
   const [saving, setSaving] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [positionFilter, setPositionFilter] = useState<string[]>([]);
+  const [selectedPosition, setSelectedPosition] = useState<string>(FILTER_ALL);
+  const [selectedTeam, setSelectedTeam] = useState<string>(FILTER_ALL);
   const [selectedPlayer, setSelectedPlayer] = useState<RankedPlayer | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [hasExistingRankings, setHasExistingRankings] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  /** Last pointer Y during rankings drag — used with over row midpoint so drops match visual half of row */
+  const rankingsDragPointerYRef = useRef<number | null>(null);
   const [hasCommunityConsensus, setHasCommunityConsensus] = useState(false);
   const [allLeaguesBucketScoring, setAllLeaguesBucketScoring] = useState<'standard' | 'ppr' | 'half_ppr'>('ppr');
   const [allLeaguesBucketLeagueType, setAllLeaguesBucketLeagueType] = useState<'season' | 'dynasty'>('season');
@@ -348,6 +455,11 @@ const Rankings = () => {
   // When we skip applying state due to stale fetch, finally should only clear loading (no refetch)
   const staleFetchReturnedRef = useRef(false);
 
+  const [importTemplateDialogOpen, setImportTemplateDialogOpen] = useState(false);
+  const [templateOptions, setTemplateOptions] = useState<RankingTemplateOption[]>([]);
+  const [loadingTemplateOptions, setLoadingTemplateOptions] = useState(false);
+  const [importListEmptyKind, setImportListEmptyKind] = useState<ImportListEmptyKind | null>(null);
+
   const handlePlayerClick = (player: RankedPlayer) => {
     setSelectedPlayer(player);
     setDetailDialogOpen(true);
@@ -365,6 +477,15 @@ const Rankings = () => {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  useEffect(() => {
+    if (activeId == null) return;
+    const onPointerMove = (e: PointerEvent) => {
+      rankingsDragPointerYRef.current = e.clientY;
+    };
+    window.addEventListener('pointermove', onPointerMove, { capture: true });
+    return () => window.removeEventListener('pointermove', onPointerMove, { capture: true });
+  }, [activeId]);
 
   // Don't redirect - allow non-authenticated users to view rankings (read-only)
 
@@ -385,9 +506,23 @@ const Rankings = () => {
         }
       : { ...bucket, rookiesOnly: bucket.rookiesOnly };
   const player2025Stats = usePlayer2025Stats(displayBucket.scoringFormat as 'standard' | 'ppr' | 'half_ppr');
-  const positions = displayBucket.rookiesOnly ? ['QB', 'RB', 'WR', 'TE'] : ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
+  const positionsAlphabetical = useMemo(() => {
+    const base = displayBucket.rookiesOnly ? ['QB', 'RB', 'WR', 'TE'] : ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
+    return [...base].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [displayBucket.rookiesOnly]);
+
+  useEffect(() => {
+    if (selectedPosition === FILTER_ALL) return;
+    if (!positionsAlphabetical.includes(selectedPosition)) {
+      setSelectedPosition(FILTER_ALL);
+    }
+  }, [positionsAlphabetical, selectedPosition]);
   const bucketKey = `${displayBucket.scoringFormat}/${displayBucket.leagueType}/${displayBucket.isSuperflex}/${displayBucket.rookiesOnly || false}`;
   bucketRef.current = bucketKey;
+
+  /** Import control: edit mode only; signed-in needs a league (not All Leagues); guests use bucket temp saves. */
+  const showImportRankingControl =
+    isEditMode && (user ? !isAllLeagues && selectedLeague != null : true);
   communityBucketRef.current = displayBucket;
   const defenseTeamAbbrByName = useMemo(
     () =>
@@ -420,6 +555,145 @@ const Rankings = () => {
       });
     },
     [rankingsSessionDraftKey]
+  );
+
+  const loadTemplateOptions = useCallback(async () => {
+    if (!showImportRankingControl) {
+      setTemplateOptions([]);
+      setImportListEmptyKind(null);
+      return;
+    }
+    setLoadingTemplateOptions(true);
+    setImportListEmptyKind(null);
+    try {
+      const destBucket = userRankingBucketFromDisplayBucket(displayBucket);
+      const destRookiesOnly = Boolean(displayBucket.rookiesOnly);
+
+      if (user) {
+        const rows = await fetchUserRankingImportSources(supabase, user.id, leagues);
+        if (rows.length === 0) {
+          setTemplateOptions([]);
+          setImportListEmptyKind('no-saves');
+          return;
+        }
+
+        const poolOk = rows.filter((row) =>
+          rankingImportPlayerPoolsMatch(destRookiesOnly, row.bucket.rookies_only)
+        );
+        if (poolOk.length === 0) {
+          setTemplateOptions([]);
+          setImportListEmptyKind('rookies-mismatch');
+          return;
+        }
+
+        const options: RankingTemplateOption[] = [];
+        for (const row of poolOk) {
+          if (
+            selectedLeague &&
+            row.league_id === selectedLeague.id &&
+            userRankingBucketsEqual(row.bucket, destBucket)
+          ) {
+            continue;
+          }
+          const leagueName =
+            row.league_id === null
+              ? 'All leagues'
+              : leagues.find((l) => l.id === row.league_id)?.name ?? 'League';
+          const label = `${leagueName} · ${formatRankingBucketLabel(row.bucket)}`;
+          options.push({
+            kind: 'account',
+            league_id: row.league_id,
+            bucket: row.bucket,
+            label,
+          });
+        }
+        options.sort((a, b) => a.label.localeCompare(b.label));
+        setTemplateOptions(options);
+        if (options.length === 0) {
+          setImportListEmptyKind('only-this-list');
+        }
+      } else {
+        const keys = tempRankingsStorage
+          .listGuestRankingBucketKeysWithData()
+          .filter((k) => k !== bucketKey)
+          .filter((k) =>
+            rankingImportPlayerPoolsMatch(destRookiesOnly, parseGuestRankingBucketKey(k).rookies_only)
+          );
+        if (keys.length === 0) {
+          const anyGuestKeys = tempRankingsStorage
+            .listGuestRankingBucketKeysWithData()
+            .filter((k) => k !== bucketKey);
+          setTemplateOptions([]);
+          setImportListEmptyKind(anyGuestKeys.length === 0 ? 'no-saves' : 'rookies-mismatch');
+          return;
+        }
+        const options: RankingTemplateOption[] = keys.map((bucketKeyStr) => ({
+          kind: 'guest' as const,
+          bucketKey: bucketKeyStr,
+          label: formatRankingBucketLabel(parseGuestRankingBucketKey(bucketKeyStr)),
+        }));
+        options.sort((a, b) => a.label.localeCompare(b.label));
+        setTemplateOptions(options);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Could not load rankings to use as templates.');
+      setTemplateOptions([]);
+      setImportListEmptyKind('no-saves');
+    } finally {
+      setLoadingTemplateOptions(false);
+    }
+  }, [showImportRankingControl, user, displayBucket, selectedLeague, leagues, bucketKey]);
+
+  const applyRankingTemplate = useCallback(
+    async (opt: RankingTemplateOption) => {
+      try {
+        let ids: string[];
+        if (opt.kind === 'guest') {
+          const list = tempRankingsStorage.get(opt.bucketKey);
+          if (!list?.length) {
+            toast.error('That ranking set is no longer available.');
+            return;
+          }
+          ids = list.map((p) => p.id);
+        } else {
+          if (!user) return;
+          let q = supabase
+            .from('user_rankings')
+            .select('player_id, rank')
+            .eq('user_id', user.id)
+            .order('rank', { ascending: true });
+          if (opt.league_id === null) q = q.is('league_id', null);
+          else q = q.eq('league_id', opt.league_id);
+          q = applyUserRankingsBucketMatch(q, opt.bucket);
+          const { data, error } = await q;
+          if (error) throw error;
+          if (!data?.length) {
+            toast.error('No players found for that template.');
+            return;
+          }
+          ids = data.map((r) => r.player_id);
+        }
+        const next = mergeRankingsWithDraftOrder(players, ids);
+        setPlayers(next);
+        setIsEditMode(true);
+        persistRankingsSessionDraft(next, true);
+        setImportTemplateDialogOpen(false);
+        toast.success('Imported order from template. Adjust as needed, then finalize.');
+      } catch (e) {
+        console.error(e);
+        toast.error('Could not import that template.');
+      }
+    },
+    [user, players, persistRankingsSessionDraft]
+  );
+
+  const onImportTemplateDialogOpenChange = useCallback(
+    (open: boolean) => {
+      setImportTemplateDialogOpen(open);
+      if (open) void loadTemplateOptions();
+    },
+    [loadTemplateOptions]
   );
 
   // Guest only: persist bucket to League Settings so Rankings dropdown and League Settings always match
@@ -474,6 +748,12 @@ const Rankings = () => {
 
     // Use ref so we always have the latest bucket (avoids stale closure when refetching after bucket change)
     const effectiveBucket = { ...communityBucketRef.current };
+    const rankingBucketCols = userRankingBucketFromDisplayBucket({
+      scoringFormat: effectiveBucket.scoringFormat,
+      leagueType: effectiveBucket.leagueType,
+      isSuperflex: effectiveBucket.isSuperflex,
+      rookiesOnly: effectiveBucket.rookiesOnly,
+    });
     const effectiveBucketKey = `${effectiveBucket.scoringFormat}/${effectiveBucket.leagueType}/${effectiveBucket.isSuperflex}/${effectiveBucket.rookiesOnly || false}`;
     // Capture context so we can ignore this fetch's result if league/bucket changed before it completed (e.g. stale deferred fetch)
     fetchContextRef.current = { leagueId: selectedLeague?.id ?? null, bucketKey: effectiveBucketKey };
@@ -816,12 +1096,16 @@ const Rankings = () => {
         // Signed-in All Leagues: always use rankings from each league (average or selected league), never a single "All Leagues" saved list
         let allLeagueRankingsData: any[] = [];
         if (leagueIdsToFetch.length > 0) {
-          const { data, error: allLeagueRankingsError } = await supabase
-            .from('user_rankings')
-            .select('*')
-            .eq('user_id', user.id)
-            .not('league_id', 'is', null)
-            .in('league_id', leagueIdsToFetch);
+          const qAll = applyUserRankingsBucketMatch(
+            supabase
+              .from('user_rankings')
+              .select('*')
+              .eq('user_id', user.id)
+              .not('league_id', 'is', null)
+              .in('league_id', leagueIdsToFetch),
+            rankingBucketCols
+          );
+          const { data, error: allLeagueRankingsError } = await qAll;
 
           if (allLeagueRankingsError) throw allLeagueRankingsError;
           allLeagueRankingsData = data || [];
@@ -889,11 +1173,15 @@ const Rankings = () => {
         setCommunityRawExcludingMe(null);
       } else {
         // Fetch league-specific rankings
-        const { data: rankingsData, error: rankingsError } = await supabase
-          .from('user_rankings')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('league_id', selectedLeague.id);
+        const qLeague = applyUserRankingsBucketMatch(
+          supabase
+            .from('user_rankings')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('league_id', selectedLeague.id),
+          rankingBucketCols
+        );
+        const { data: rankingsData, error: rankingsError } = await qLeague;
 
         if (rankingsError) throw rankingsError;
 
@@ -1130,27 +1418,30 @@ const Rankings = () => {
   const saveRankings = useCallback(async (
     playersToSave: RankedPlayer[],
     leagueId: string | null,
+    rankingBucket: ReturnType<typeof userRankingBucketFromDisplayBucket>,
     onSuccess?: () => void
   ) => {
     if (!user) return;
     setSaving(true);
 
     try {
-      // Delete existing rankings first
+      // Delete existing rankings first (only this league-settings bucket)
       let deleteError;
       if (leagueId) {
-        const { error } = await supabase
-          .from('user_rankings')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('league_id', leagueId);
+        const { error } = await applyUserRankingsBucketMatch(
+          supabase
+            .from('user_rankings')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('league_id', leagueId),
+          rankingBucket
+        );
         deleteError = error;
       } else {
-        const { error } = await supabase
-          .from('user_rankings')
-          .delete()
-          .eq('user_id', user.id)
-          .is('league_id', null);
+        const { error } = await applyUserRankingsBucketMatch(
+          supabase.from('user_rankings').delete().eq('user_id', user.id).is('league_id', null),
+          rankingBucket
+        );
         deleteError = error;
       }
 
@@ -1169,6 +1460,7 @@ const Rankings = () => {
         player_id: p.id,
         rank: index + 1,
         league_id: leagueId,
+        ...rankingBucket,
       }));
 
       // Insert in batches of 500 to avoid potential timeout issues
@@ -1203,46 +1495,65 @@ const Rankings = () => {
         p.name.toLowerCase().split(' ').some((part) => part.includes(searchLower));
 
       const matchesPosition =
-        positionFilter.length === 0 || positionFilter.includes(p.position);
+        selectedPosition === FILTER_ALL || p.position === selectedPosition;
 
-      if (positionFilter.includes('D/ST') && p.position === 'D/ST') {
-        console.log(
-          `Rankings: D/ST player found: ${p.name}, matchesSearch: ${matchesSearch}, matchesPosition: ${matchesPosition}`
-        );
-      }
+      const matchesTeam = playerMatchesTeamSelection(p, selectedTeam);
 
-      return matchesSearch && matchesPosition;
+      return matchesSearch && matchesPosition && matchesTeam;
     });
-  }, [players, searchTerm, positionFilter]);
+  }, [players, searchTerm, selectedPosition, selectedTeam]);
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
+    const { active, over, collisions } = event;
     setActiveId(null);
 
-    if (!over || active.id === over.id) return;
+    if (!over) {
+      rankingsDragPointerYRef.current = null;
+      return;
+    }
 
-    const useMidpointDrag = positionFilter.length > 0;
-    if (useMidpointDrag) {
-      const updated = applyFilteredMidpointRankDrag(players, filteredPlayers, String(active.id), String(over.id));
+    const activeId = String(active.id);
+    let effectiveOverId = String(over.id);
+    // dnd-kit can report `over` as the active row at drop time even when the preview showed
+    // insertion before/after another row. Use first non-active collision as fallback target.
+    if (effectiveOverId === activeId) {
+      const fallback = (collisions ?? []).find((c) => String(c.id) !== activeId);
+      if (fallback) effectiveOverId = String(fallback.id);
+    }
+    if (effectiveOverId === activeId) {
+      rankingsDragPointerYRef.current = null;
+      return;
+    }
+
+    rankingsDragPointerYRef.current = null;
+
+    const useFilteredDrag =
+      selectedPosition !== FILTER_ALL ||
+      selectedTeam !== FILTER_ALL ||
+      searchTerm.trim() !== '';
+    if (useFilteredDrag) {
+      const updated = movePlayersByIds(players, activeId, effectiveOverId);
       setPlayers(updated);
       persistRankingsSessionDraft(updated, isEditMode);
       return;
     }
 
-    const oldIndex = players.findIndex((item) => item.id === active.id);
-    const newIndex = players.findIndex((item) => item.id === over.id);
-    const newItems = arrayMove(players, oldIndex, newIndex);
-    const updatedPlayers = newItems.map((item, index) => ({ ...item, rank: index + 1 }));
+    const updatedPlayers = movePlayersByIds(players, activeId, effectiveOverId);
     setPlayers(updatedPlayers);
     persistRankingsSessionDraft(updatedPlayers, isEditMode);
   };
 
-  const handleDragStart = (event: any) => {
-    setActiveId(event.active.id as string);
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+    const ae = event.activatorEvent;
+    if (ae && 'clientY' in ae && typeof (ae as PointerEvent).clientY === 'number') {
+      rankingsDragPointerYRef.current = (ae as PointerEvent).clientY;
+    }
   };
 
   const handleDragCancel = () => {
     setActiveId(null);
+    rankingsDragPointerYRef.current = null;
   };
 
   const finalizeRankings = async () => {
@@ -1278,7 +1589,7 @@ const Rankings = () => {
     if (!selectedLeague) return;
     setIsFinalizing(true);
     try {
-      await saveRankings(players, selectedLeague.id);
+      await saveRankings(players, selectedLeague.id, userRankingBucketFromDisplayBucket(displayBucket));
       rankingsDraftSessionStorage.clear(rankingsSessionDraftKey);
       setHasExistingRankings(true);
       setIsEditMode(false);
@@ -1301,7 +1612,9 @@ const Rankings = () => {
     const resetPlayers = sorted.map((p, index) => ({ ...p, rank: index + 1 }));
     setPlayers(resetPlayers);
     if (isAllLeagues && user) {
-      void saveRankings(resetPlayers, null).then(() => rankingsDraftSessionStorage.clear(rankingsSessionDraftKey));
+      void saveRankings(resetPlayers, null, userRankingBucketFromDisplayBucket(displayBucket)).then(() =>
+        rankingsDraftSessionStorage.clear(rankingsSessionDraftKey)
+      );
     } else {
       persistRankingsSessionDraft(resetPlayers, isEditMode);
     }
@@ -1326,8 +1639,9 @@ const Rankings = () => {
       p.name.toLowerCase().split(' ').some(part => part.includes(searchLower));
     
     const matchesPosition =
-      positionFilter.length === 0 || positionFilter.includes(p.position);
-    return matchesSearch && matchesPosition;
+      selectedPosition === FILTER_ALL || p.position === selectedPosition;
+    const matchesTeam = playerMatchesTeamSelection(p, selectedTeam);
+    return matchesSearch && matchesPosition && matchesTeam;
   });
 
   if (authLoading || loading) {
@@ -1429,7 +1743,7 @@ const Rankings = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
             {isEditMode && (
               <Button
                 variant="outline"
@@ -1439,6 +1753,24 @@ const Rankings = () => {
               >
                 <RotateCcw className="w-4 h-4" />
                 Reset to ADP
+              </Button>
+            )}
+            {showImportRankingControl && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setImportTemplateDialogOpen(true)}
+                className="h-auto min-h-9 flex-col gap-0.5 py-2 px-4 min-w-[13rem] border-border/80 justify-center"
+                aria-label="Import rankings: copy player order from another saved list"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <LayoutTemplate className="w-4 h-4 shrink-0" />
+                  <span className="text-sm font-medium leading-none">Import rankings</span>
+                </span>
+                <span className="text-[10px] font-normal text-muted-foreground leading-tight text-center">
+                  From another league or format
+                </span>
               </Button>
             )}
             {((!user && isEditMode) || (!isAllLeagues && isEditMode)) && (
@@ -1480,8 +1812,8 @@ const Rankings = () => {
           </div>
         </div>
 
-        <div className="flex gap-3 mb-6">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap gap-3 mb-6">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search players..."
@@ -1491,36 +1823,35 @@ const Rankings = () => {
             />
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0">
-                <Filter className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuCheckboxItem
-                checked={positionFilter.length === 0}
-                onCheckedChange={() => setPositionFilter([])}
-              >
-                All
-              </DropdownMenuCheckboxItem>
-              {positions.map((pos) => (
-                <DropdownMenuCheckboxItem
-                  key={pos}
-                  checked={positionFilter.includes(pos)}
-                  onCheckedChange={(checked) => {
-                    setPositionFilter((prev) =>
-                      checked
-                        ? [...prev, pos]
-                        : prev.filter((p) => p !== pos)
-                    );
-                  }}
-                >
-                  {pos}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Select value={selectedPosition} onValueChange={setSelectedPosition}>
+              <SelectTrigger className="w-[min(100vw-3rem,200px)] sm:w-[180px] h-10 bg-secondary/50 border-border/50">
+                <SelectValue placeholder="All positions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={FILTER_ALL}>All positions</SelectItem>
+                {positionsAlphabetical.map((pos) => (
+                  <SelectItem key={pos} value={pos}>
+                    {pos}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+              <SelectTrigger className="w-[min(100vw-3rem,260px)] sm:w-[240px] h-10 bg-secondary/50 border-border/50">
+                <SelectValue placeholder="All teams" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={FILTER_ALL}>All teams</SelectItem>
+                {RANKINGS_TEAM_FILTER_OPTIONS.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+                <SelectItem value={TEAM_SELECT_FA}>Free Agents</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {((!user && !isEditMode) || (user && isAllLeagues && !isEditMode)) ? (
@@ -1579,7 +1910,7 @@ const Rankings = () => {
                 <div ref={myRankingsScrollRef1} className="h-[480px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin" style={{ touchAction: 'pan-y' }}>
                   <DndContext
                     sensors={sensors}
-                    collisionDetection={closestCenter}
+                    collisionDetection={rankingsListCollisionDetection}
                     modifiers={[restrictToVerticalAxis, restrictToParentElement]}
                     onDragEnd={handleDragEnd}
                     onDragStart={handleDragStart}
@@ -1702,7 +2033,7 @@ const Rankings = () => {
           <div ref={myRankingsScrollRef2} className="h-[70vh] min-h-[500px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin" style={{ touchAction: 'pan-y' }}>
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={rankingsListCollisionDetection}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
             onDragEnd={handleDragEnd}
             onDragStart={handleDragStart}
@@ -1785,7 +2116,7 @@ const Rankings = () => {
                 <div ref={myRankingsScrollRef3} className="h-[480px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin" style={{ touchAction: 'pan-y' }}>
                   <DndContext
                     sensors={sensors}
-                    collisionDetection={closestCenter}
+                    collisionDetection={rankingsListCollisionDetection}
                     modifiers={[restrictToVerticalAxis, restrictToParentElement]}
                     onDragEnd={handleDragEnd}
                     onDragStart={handleDragStart}
@@ -1926,11 +2257,70 @@ const Rankings = () => {
           </ul>
         </div>
 
-        {filteredPlayers.length === 0 && (
+        {filteredPlayers.length === 0 && filteredCommunityPlayers.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
-            No players found matching your criteria
+            No players found matching your search, position, or team filters
           </div>
         )}
+
+        <Dialog open={importTemplateDialogOpen} onOpenChange={onImportTemplateDialogOpenChange}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-center sm:text-left">Import rankings</DialogTitle>
+              <DialogDescription className="text-center sm:text-left">
+                Copy player order from any other list you saved that uses the same player pool (for example Standard,
+                PPR, Dynasty, or Superflex). Players who only exist in this view are added after the import. Rookie-only
+                lists can only import from other rookie-only lists. Then drag to adjust and finalize to save.
+              </DialogDescription>
+            </DialogHeader>
+            {loadingTemplateOptions ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : templateOptions.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-4 space-y-3">
+                {importListEmptyKind === 'rookies-mismatch' ? (
+                  <p>
+                    There are no saved lists with the same player pool as this screen. Full rankings and rookie-only use
+                    different pools — switch rookie mode or finalize a list in the matching pool first.
+                  </p>
+                ) : importListEmptyKind === 'only-this-list' ? (
+                  <p>
+                    Your saved rankings for other formats are already this list. Import another league or scoring type
+                    first, or use <span className="text-foreground">Reset to ADP</span> / drag to reorder.
+                  </p>
+                ) : (
+                  <p>
+                    No saved lists found to import from yet. Finalize rankings in another league or format first, or use{' '}
+                    <span className="text-foreground">Reset to ADP</span> for the community order.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="max-h-[min(60vh,320px)] overflow-y-auto space-y-2 pr-1">
+                {templateOptions.map((opt, idx) => (
+                  <Button
+                    key={
+                      opt.kind === 'guest'
+                        ? opt.bucketKey
+                        : `${opt.league_id ?? 'null'}-${opt.bucket.scoring_format}-${opt.bucket.league_type}-${opt.bucket.is_superflex}-${opt.bucket.rookies_only}-${idx}`
+                    }
+                    variant="secondary"
+                    className="w-full justify-start text-left h-auto py-3 whitespace-normal"
+                    onClick={() => void applyRankingTemplate(opt)}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setImportTemplateDialogOpen(false)}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
 
       <PlayerDetailDialog

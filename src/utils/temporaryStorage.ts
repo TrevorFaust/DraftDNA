@@ -120,6 +120,21 @@ export const tempRankingsStorage = {
       keysToRemove.forEach((k) => localStorage.removeItem(k));
     }
   },
+
+  /** Bucket keys (e.g. `half_ppr/season/false/false`) that have saved guest rankings. */
+  listGuestRankingBucketKeysWithData(): string[] {
+    if (typeof window === 'undefined') return [];
+    const prefix = `${TEMP_RANKINGS_KEY}_`;
+    const out: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(prefix)) continue;
+      const bucketKey = k.slice(prefix.length);
+      const rows = tempRankingsStorage.get(bucketKey);
+      if (rows && rows.length > 0) out.push(bucketKey);
+    }
+    return out;
+  },
 };
 
 // Temporary Settings Storage
