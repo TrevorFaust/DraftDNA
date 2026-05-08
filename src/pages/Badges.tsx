@@ -17,8 +17,9 @@ import { getArchetypeByName } from '@/constants/archetypeMappings.generated';
 import { getArchetypeDescription } from '@/constants/archetypeDescriptions';
 import { BADGE_MASTER_SORT_ID_BY_NAME, getArchetypeBadgePublicUrl } from '@/constants/archetypeBadgeAssets.generated';
 import { CHAOS_ARCHETYPES, getChaosArchetypeByName } from '@/constants/chaosArchetypes';
-import { Loader2, Award, RefreshCw } from 'lucide-react';
+import { Award, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BrandedLoader } from '@/components/BrandedLoader';
 import {
   Dialog,
   DialogContent,
@@ -447,8 +448,8 @@ const Badges = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="max-w-4xl mx-auto px-4 py-12 flex justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <main className="max-w-4xl mx-auto px-4 py-12 min-h-[70vh] flex items-center justify-center">
+          <BrandedLoader />
         </main>
       </div>
     );
@@ -533,8 +534,8 @@ const Badges = () => {
               <div>
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">Your roster</h3>
                 {detailLoading ? (
-                  <div className="flex justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <div className="flex items-center justify-center min-h-[300px] pt-10">
+                    <BrandedLoader size={80} />
                   </div>
                 ) : detailRoster.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Could not load roster for this draft.</p>

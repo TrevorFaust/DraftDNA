@@ -9,7 +9,7 @@ import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Search, Check, Loader2, Trophy, LogOut, Timer, Pause, Play } from 'lucide-react';
+import { Search, Check, Trophy, LogOut, Timer, Pause, Play } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
   Select,
@@ -22,6 +22,7 @@ import type { Player, MockDraft, DraftPick, RankedPlayer } from '@/types/databas
 import { fetchRookiesRankings } from '@/utils/rookiesFilter';
 import { useNflTeams } from '@/hooks/useNflTeams';
 import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
+import { BrandedLoader } from '@/components/BrandedLoader';
 import {
   PLAYER_POOL_PRIOR_SEASON,
   PLAYER_POOL_CURRENT_SEASON,
@@ -319,7 +320,6 @@ const DraftRoom = () => {
       });
       
       if (missingDefenses.length > 0) {
-        console.log(`DraftRoom: Creating ${missingDefenses.length} missing defenses...`);
         // Insert missing defenses - distribute ADPs between 150-200
         const defenseInserts = missingDefenses.map((teamName, index) => {
           // Distribute evenly across ADP 150-200 (50 point range)
@@ -341,13 +341,8 @@ const DraftRoom = () => {
         
         if (insertError) {
           console.error('DraftRoom: Error inserting defenses:', insertError);
-        } else {
-          console.log(`DraftRoom: Successfully inserted ${insertData?.length || 0} defenses`);
-          if (insertData && insertData.length > 0) {
-            console.log(`DraftRoom: Inserted defense sample:`, insertData[0]);
-            // Add the newly inserted defenses to allPlayersData immediately
-            allPlayersData = [...(allPlayersData || []), ...insertData];
-          }
+        } else if (insertData && insertData.length > 0) {
+          allPlayersData = [...(allPlayersData || []), ...insertData];
         }
       }
       
@@ -449,8 +444,6 @@ const DraftRoom = () => {
       
       // Update defenses in database if needed
       if (defensesToUpdate.length > 0) {
-        console.log(`DraftRoom: Updating ADPs for ${defensesToUpdate.length} defenses to range 150-200`);
-        // Update each defense's ADP in the database
         for (const defenseUpdate of defensesToUpdate) {
           await supabase
             .from('players')
@@ -458,19 +451,13 @@ const DraftRoom = () => {
             .eq('id', defenseUpdate.id);
         }
       }
-      
-      console.log(`DraftRoom: Found ${allDefensePlayers?.length || 0} total defenses, deduplicated to ${defensePlayers.length} unique defenses`);
-      
+
       // Filter to standard fantasy positions only - exclude IDP (DL, LB, DB, DE, DT, etc.) that aren't in Rankings
       const VALID_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K']);
       const filteredNonDefense = (nonDefensePlayers || []).filter((p) =>
         p.position && VALID_POSITIONS.has(String(p.position).toUpperCase())
       );
-      const excludedCount = (nonDefensePlayers || []).length - filteredNonDefense.length;
-      if (excludedCount > 0) {
-        console.log(`DraftRoom: Excluded ${excludedCount} IDP/non-fantasy players (DL, LB, DB, etc.)`);
-      }
-      
+
       // Merge the two queries and deduplicate multi-position players
       // (e.g. Taysom Hill QB/TE/RB, Connor Heyward RB/TE) who appear as separate rows
       const merged = [
@@ -482,45 +469,9 @@ const DraftRoom = () => {
         return adpA - adpB;
       });
       const updatedPlayersData = deduplicatePlayersByIdentity(merged);
-      
-      console.log(`DraftRoom: Merged ${nonDefensePlayers?.length || 0} non-defense players with ${defensePlayers.length} unique defenses`);
-      
+
       if (updatedPlayersData && updatedPlayersData.length > 0) {
-        // Debug: Check what positions exist in the returned data
-        const uniquePositions = [...new Set(updatedPlayersData.map(p => p.position))];
-        console.log(`DraftRoom: Unique positions in query result:`, uniquePositions);
-        console.log(`DraftRoom: Total players returned: ${updatedPlayersData.length}`);
-        
-        // Check for D/ST with different casing or variations
-        const allDefenseVariations = updatedPlayersData.filter(p => 
-          p.position && (
-            p.position === 'D/ST' || 
-            p.position === 'DST' || 
-            p.position === 'DEF' ||
-            p.position.toLowerCase() === 'd/st' ||
-            p.position.toLowerCase() === 'def'
-          )
-        );
-        console.log(`DraftRoom: Players with defense-like positions:`, allDefenseVariations.length);
-        if (allDefenseVariations.length > 0) {
-          console.log(`DraftRoom: Defense-like position values:`, [...new Set(allDefenseVariations.map(p => p.position))]);
-        }
-        
         allPlayersData = updatedPlayersData;
-        const defensesAfterRefetch = (allPlayersData || []).filter(p => p.position === 'D/ST');
-        console.log(`DraftRoom: After refetch, found ${defensesAfterRefetch.length} defenses in database`);
-        console.log(`DraftRoom: Defense names:`, defensesAfterRefetch.map(d => d.name));
-        if (defensesAfterRefetch.length !== 32) {
-          console.warn(`DraftRoom: Expected 32 defenses but found ${defensesAfterRefetch.length}`);
-          // Try to find defenses by name instead
-          const defensesByName = (allPlayersData || []).filter(p => 
-            defenseNamesList.includes(p.name)
-          );
-          console.log(`DraftRoom: Found ${defensesByName.length} defenses by name matching`);
-          if (defensesByName.length > 0) {
-            console.log(`DraftRoom: Defense positions in DB:`, [...new Set(defensesByName.map(d => d.position))]);
-          }
-        }
       }
       }
 
@@ -573,13 +524,6 @@ const DraftRoom = () => {
       });
       rankedPlayers.sort((a, b) => a.rank - b.rank);
       const sortedRankedPlayers = rankedPlayers.map((p, index) => ({ ...p, rank: index + 1 }));
-      
-      // Debug: Log defenses before setting players
-      const defensesInRanked = sortedRankedPlayers.filter(p => p.position === 'D/ST');
-      console.log(`DraftRoom: Defenses in rankedPlayers before setPlayers: ${defensesInRanked.length}`);
-      if (defensesInRanked.length > 0) {
-        console.log(`DraftRoom: Defense names in rankedPlayers:`, defensesInRanked.map(d => d.name));
-      }
 
       // Load picks before capping rounds so we never schedule more full rounds than the loaded pool supports
       let loadedPicks: DraftPick[] = existingPicks;
@@ -1899,10 +1843,7 @@ const DraftRoom = () => {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading draft...</p>
-        </div>
+        <BrandedLoader label="Loading draft..." />
       </div>
     );
   }
@@ -2016,7 +1957,7 @@ const DraftRoom = () => {
             <div className="flex flex-col items-center gap-4 mb-4 w-full max-w-5xl mx-auto">
               {isFinalizingBadge ? (
                 <div className="flex flex-col items-center gap-3 py-6">
-                  <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+                  <BrandedLoader size={52} />
                   <p className="text-muted-foreground text-sm text-center max-w-sm">
                     Assigning your archetype and any chaos badges from this draft…
                   </p>

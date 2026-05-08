@@ -12,7 +12,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     storage: localStorage,
     persistSession: true,
-    autoRefreshToken: true,
+    // Default true runs refresh before our app can clear a dead refresh_token → 400 spam in the console.
+    // useAuth calls startAutoRefresh() after getUser() succeeds.
+    autoRefreshToken: false,
     detectSessionInUrl: true,
   },
 });

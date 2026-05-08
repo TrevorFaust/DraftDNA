@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,9 +8,10 @@ import { PositionBadge } from '@/components/PositionBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Calendar, Users, Layers, ChevronRight, ChevronLeft, Trash2, Loader2, Folder, List, Grid, Star, Search, Filter } from 'lucide-react';
+import { Calendar, Users, Layers, ChevronRight, ChevronLeft, Trash2, Folder, List, Grid, Star, Search, Filter } from 'lucide-react';
 import type { MockDraft, DraftPick, Player, RankedPlayer } from '@/types/database';
 import { useLeagues } from '@/hooks/useLeagues';
+import { BrandedLoader } from '@/components/BrandedLoader';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,7 @@ import { cn } from '@/lib/utils';
 import { getArchetypeForTeam } from '@/utils/archetypeDetection';
 import { ArchetypeBadge } from '@/components/ArchetypeBadge';
 import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
+import { getArchetypeByName } from '@/constants/archetypeMappings.generated';
 
 interface DraftWithPicks extends MockDraft {
   picks: (DraftPick & { player: Player })[];
@@ -57,6 +59,20 @@ const History = () => {
   const [selectedCpuTeam, setSelectedCpuTeam] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [cpuArchetypePreviewName, setCpuArchetypePreviewName] = useState<string | null>(null);
+
+  const unlockedArchetypeNames = useMemo(() => {
+    const unlocked = new Set<string>();
+    drafts.forEach((d) => {
+      const main = (d as { user_detected_archetype?: string | null }).user_detected_archetype?.trim();
+      const chaos = (d as { user_detected_chaos_archetype?: string | null }).user_detected_chaos_archetype?.trim();
+      if (d.status === 'completed') {
+        if (main) unlocked.add(main);
+        if (chaos) unlocked.add(chaos);
+      }
+    });
+    return unlocked;
+  }, [drafts]);
 
   // Don't redirect - allow viewing the page without auth
 
@@ -498,7 +514,7 @@ const History = () => {
   if (authLoading || (user && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <BrandedLoader />
       </div>
     );
   }
@@ -848,17 +864,7 @@ const History = () => {
                         const replaceChaos = !!(chaosNm && isChaosReplace(chaosNm));
                         const stored = (draft as { user_detected_archetype?: string | null }).user_detected_archetype?.trim();
                         const storedIdx = (draft as { user_detected_archetype_index?: number | null }).user_detected_archetype_index;
-                        let archetype: string | null = stored || null;
-                        if (!archetype && draft.picks.length > 0) {
-                          const limits = selectedDraft?.id === draft.id ? draftLeagueSettings?.positionLimits : undefined;
-                          const flex = limits?.FLEX ?? 1;
-                          const bench = limits?.BENCH ?? 6;
-                          archetype = getArchetypeForTeam(draft.picks, draft.user_pick_position, {
-                            flexSlots: flex,
-                            benchSize: bench,
-                            numTeams: draft.num_teams,
-                          });
-                        }
+                        const archetype: string | null = stored || null;
                         const useStoredIndex =
                           !!(stored && archetype === stored && typeof storedIdx === 'number' && storedIdx >= 0);
                         const chaosFlavor = chaosMeta?.flavorText;
@@ -1027,6 +1033,7 @@ const History = () => {
           </DialogHeader>
 
             {selectedDraft && (
+              <>
             <Tabs defaultValue="your-team" className="flex-1 overflow-hidden flex flex-col">
               <TabsList className="grid w-full grid-cols-3 bg-secondary/50">
                 <TabsTrigger value="draft-order">Draft Order</TabsTrigger>
@@ -1131,17 +1138,7 @@ const History = () => {
                     const replaceChaos = !!(chaosNm && isChaosReplace(chaosNm));
                     const storedArchetype = (selectedDraft as { user_detected_archetype?: string | null }).user_detected_archetype?.trim();
                     const storedIdx = (selectedDraft as { user_detected_archetype_index?: number | null }).user_detected_archetype_index;
-                    const flex = draftLeagueSettings?.positionLimits?.FLEX ?? 1;
-                    const bench = draftLeagueSettings?.positionLimits?.BENCH ?? 6;
-                    const mainArchetype: string =
-                      storedArchetype ||
-                      (userPicks.length > 0
-                        ? getArchetypeForTeam(userPicks, selectedDraft.user_pick_position, {
-                            flexSlots: flex,
-                            benchSize: bench,
-                            numTeams: selectedDraft.num_teams,
-                          })
-                        : '');
+                    const mainArchetype: string = storedArchetype || '';
                     const mainArchetypeIndex =
                       storedArchetype &&
                       mainArchetype === storedArchetype &&
@@ -1152,7 +1149,7 @@ const History = () => {
                     const chaosFlavor = chaosMeta?.flavorText;
                     return (
                       <div>
-                        <div className="mb-3 flex items-center gap-3 flex-wrap">
+                        <div className="mb-3 flex items-center justify-center gap-3 flex-wrap">
                           {replaceChaos && chaosNm ? (
                             <ArchetypeBadge
                               archetypeName={chaosNm}
@@ -1160,6 +1157,7 @@ const History = () => {
                               size="md"
                               flavorText={chaosFlavor}
                               earnedFromDraft={selectedDraft.name}
+                              className="cursor-help"
                             />
                           ) : (
                             <>
@@ -1170,6 +1168,7 @@ const History = () => {
                                   iconOnly
                                   size="md"
                                   earnedFromDraft={selectedDraft.name}
+                                  className="cursor-help"
                                 />
                               ) : null}
                               {chaosNm ? (
@@ -1179,6 +1178,7 @@ const History = () => {
                                   size="md"
                                   flavorText={chaosFlavor}
                                   earnedFromDraft={selectedDraft.name}
+                                  className="cursor-help"
                                 />
                               ) : null}
                             </>
@@ -1251,6 +1251,7 @@ const History = () => {
                     benchSize: cpuBench,
                     numTeams: selectedDraft.num_teams,
                   });
+                  const showCpuArchetype = unlockedArchetypeNames.has(cpuArchetype);
 
                   return (
                     <>
@@ -1283,7 +1284,19 @@ const History = () => {
                               <ChevronRight className="w-4 h-4" />
                             </Button>
                           </div>
-                          <span className="text-xs text-accent text-center">{cpuArchetype}</span>
+                          <div className="min-h-[28px] flex items-center justify-center">
+                            {showCpuArchetype ? (
+                              <button
+                                type="button"
+                                onClick={() => setCpuArchetypePreviewName(cpuArchetype)}
+                                className="text-xs text-accent text-center hover:underline"
+                              >
+                                {cpuArchetype}
+                              </button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground text-center">???</span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex gap-2">
                           <Button
@@ -1442,6 +1455,26 @@ const History = () => {
                 })()}
               </TabsContent>
             </Tabs>
+
+            <Dialog open={!!cpuArchetypePreviewName} onOpenChange={(open) => !open && setCpuArchetypePreviewName(null)}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{cpuArchetypePreviewName}</DialogTitle>
+                </DialogHeader>
+                {cpuArchetypePreviewName ? (
+                  <div className="space-y-3 py-2">
+                    <div className="flex justify-center">
+                      <ArchetypeBadge archetypeName={cpuArchetypePreviewName} iconOnly={false} disableTooltip />
+                    </div>
+                    <p className="text-sm text-muted-foreground text-center leading-relaxed">
+                      {getArchetypeByName(cpuArchetypePreviewName)?.flavorText ??
+                        'Complete drafts with this roster construction to unlock more details about this archetype.'}
+                    </p>
+                  </div>
+                ) : null}
+              </DialogContent>
+            </Dialog>
+              </>
           )}
         </DialogContent>
       </Dialog>

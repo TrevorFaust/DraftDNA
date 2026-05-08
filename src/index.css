@@ -274,6 +274,35 @@
     animation: crown-spin-y 2.5s linear infinite;
   }
 
+  /* DNA logo loader: pseudo-3D spin for flat PNG assets */
+  @keyframes dna-loader-3d-spin {
+    0% {
+      transform: rotateX(8deg) rotateY(0deg) translateZ(0);
+      filter: drop-shadow(0 0 10px hsl(var(--primary) / 0.25));
+    }
+    25% {
+      transform: rotateX(8deg) rotateY(90deg) translateZ(6px) scale(0.98);
+      filter: drop-shadow(0 0 6px hsl(var(--primary) / 0.18));
+    }
+    50% {
+      transform: rotateX(8deg) rotateY(180deg) translateZ(0);
+      filter: drop-shadow(0 0 12px hsl(var(--primary) / 0.3));
+    }
+    75% {
+      transform: rotateX(8deg) rotateY(270deg) translateZ(6px) scale(0.98);
+      filter: drop-shadow(0 0 6px hsl(var(--primary) / 0.18));
+    }
+    100% {
+      transform: rotateX(8deg) rotateY(360deg) translateZ(0);
+      filter: drop-shadow(0 0 10px hsl(var(--primary) / 0.25));
+    }
+  }
+  .animate-dna-loader-3d {
+    animation: dna-loader-3d-spin 1.8s linear infinite;
+    transform-style: preserve-3d;
+    will-change: transform, filter;
+  }
+
   /* Custom scrollbar (Rankings / Badges / site-wide via .scrollbar-thin) — dark-theme friendly */
   .scrollbar-thin {
     scrollbar-width: thin;

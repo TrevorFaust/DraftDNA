@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { isSyncAdminUser } from '@/constants/adminSync';
+import { BrandedLoader } from '@/components/BrandedLoader';
 
 /** Response shape from supabase/functions/sync-player-teams */
 export type SyncPlayerTeamsResult = {
@@ -19,6 +20,7 @@ export type SyncPlayerTeamsResult = {
 
 type Status = 'idle' | 'loading' | 'done' | 'error';
 
+/** Keep in sync with season JSON in `supabase/migrations/20260502103000_player_teams_daily_pg_cron.sql` when bumping years. */
 const DEFAULT_SEASON = 2025;
 
 type Props = { userId: string };
@@ -94,7 +96,7 @@ export function SyncPlayersButton({ userId }: Props) {
         className="gap-2 w-fit"
       >
         {status === 'loading' ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <BrandedLoader size={20} />
         ) : (
           <RefreshCw className="h-4 w-4" />
         )}

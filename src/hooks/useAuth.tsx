@@ -10,8 +10,23 @@ import {
   readPasswordRecoveryFromUrl,
 } from '@/lib/passwordRecoveryToken';
 import { migrateAllTemporaryData } from '@/utils/migrateTempData';
+import { wipeLocalSupabaseAuthTokens } from '@/lib/supabaseAuthStorage';
 
 const PASSWORD_RECOVERY_STORAGE_KEY = 'draftdna_password_recovery';
+
+/** Kept off until we validate the session (see client `autoRefreshToken: false`). */
+function setAuthAutoRefresh(enabled: boolean): void {
+  try {
+    const a = supabase.auth as {
+      startAutoRefresh?: () => void;
+      stopAutoRefresh?: () => void;
+    };
+    if (enabled && typeof a.startAutoRefresh === 'function') a.startAutoRefresh();
+    else if (!enabled && typeof a.stopAutoRefresh === 'function') a.stopAutoRefresh();
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Supabase puts email-link failures in the URL hash, often on the project Site URL root (e.g. localhost:3000). */
 function consumeSupabaseAuthFragmentError(): void {
@@ -68,6 +83,16 @@ function readPasswordRecoveryPending(): boolean {
   } catch {
     return false;
   }
+}
+
+/** Supabase keeps refresh tokens in localStorage; if the server revoked them, refresh returns 400 and queries stay anonymous until we clear storage. */
+function isStaleRefreshTokenError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    msg.includes('refresh token') ||
+    msg.includes('invalid refresh') ||
+    msg.includes('refresh_token_not_found')
+  );
 }
 
 /**
@@ -132,6 +157,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
 
+        if (event === 'SIGNED_IN' && session?.user) {
+          setAuthAutoRefresh(true);
+        }
+        if (event === 'SIGNED_OUT') {
+          setAuthAutoRefresh(false);
+          wipeLocalSupabaseAuthTokens();
+        }
+
         // Migrate temporary data when user signs in (transition from no user to user)
         if (event === 'SIGNED_IN' && session?.user && !previousUser && !hasMigratedRef.current) {
           hasMigratedRef.current = true;
@@ -154,14 +187,58 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // THEN check for existing session (handle errors so we don't get stuck with bad state)
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
+    // Validate session with the server (getSession alone can return a cached row while refresh_token in storage is dead).
+    void (async () => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+
+      if (userError) {
+        if (isStaleRefreshTokenError(userError)) {
+          setAuthAutoRefresh(false);
+          await supabase.auth.signOut({ scope: 'local' });
+          wipeLocalSupabaseAuthTokens();
+          toast.info('Your session expired. Please sign in again.');
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        // Offline or transient server error: keep cached session so the app still works without network.
+        const {
+          data: { session: cached },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+        if (sessionError || !cached) {
+          setAuthAutoRefresh(false);
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        if (cached.access_token && accessTokenIsPasswordRecovery(cached.access_token)) {
+          markPasswordRecoveryPending();
+          setPasswordRecoveryActive(true);
+        }
+        previousUserRef.current = cached.user ?? null;
+        setSession(cached);
+        setUser(cached.user);
+        setLoading(false);
+        setAuthAutoRefresh(true);
+        return;
+      }
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        setAuthAutoRefresh(false);
         setSession(null);
         setUser(null);
         setLoading(false);
         return;
       }
+
       if (!session && readPasswordRecoveryPending()) {
         clearPasswordRecoveryPending();
         setPasswordRecoveryActive(false);
@@ -170,11 +247,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         markPasswordRecoveryPending();
         setPasswordRecoveryActive(true);
       }
-      previousUserRef.current = session?.user ?? null;
+      previousUserRef.current = userData.user ?? session?.user ?? null;
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(userData.user ?? session?.user ?? null);
       setLoading(false);
-    });
+      if (userData.user ?? session?.user) setAuthAutoRefresh(true);
+      else setAuthAutoRefresh(false);
+    })();
 
     // When user returns to tab after long idle, do a full page reload for a clean state
     const IDLE_MS_BEFORE_RELOAD = 30 * 60 * 1000; // 30 minutes
@@ -218,7 +297,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    setAuthAutoRefresh(false);
     const { error } = await supabase.auth.signOut({ scope: 'global' });
+    wipeLocalSupabaseAuthTokens();
     // Always clear local state so UI updates even if revoke fails (e.g. right after account delete).
     previousUserRef.current = null;
     hasMigratedRef.current = false;

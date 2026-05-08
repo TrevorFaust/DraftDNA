@@ -8,11 +8,15 @@ import { Navbar } from '@/components/Navbar';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { BarChart3, Loader2, Lock, HelpCircle } from 'lucide-react';
+import { BarChart3, Lock, HelpCircle } from 'lucide-react';
 import type { RankedPlayer, Player, MockDraft, DraftPick } from '@/types/database';
 import { tempDraftStorage, tempRankingsStorage } from '@/utils/temporaryStorage';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { cn } from '@/lib/utils';
+import { BrandedLoader } from '@/components/BrandedLoader';
+import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
+import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
+import { resolveTeamAbbrForDisplay } from '@/utils/teamMapping';
 import {
   Select,
   SelectContent,
@@ -136,6 +140,7 @@ const Statistics = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState<RankedPlayer | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const { data: jerseyColorsByAbbr } = useNflTeamJerseyColors();
   const [roundBreakdownData, setRoundBreakdownData] = useState<{
     playerName: string;
     roundCounts: Array<{ round: number; count: number }>;
@@ -1184,7 +1189,7 @@ const Statistics = () => {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <BrandedLoader />
       </div>
     );
   }
@@ -1242,7 +1247,7 @@ const Statistics = () => {
             </div>
             {statsLoading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <BrandedLoader size={36} />
               </div>
             ) : (() => {
               if (selectedRound === 'all') {
@@ -1307,9 +1312,18 @@ const Statistics = () => {
                           >
                             {/* Top section: Card, Name, Count (fixed height ~25% of total) */}
                             <div className="w-full flex flex-col items-center mb-2 flex-shrink-0">
-                              {/* Card placeholder */}
-                              <div className="w-16 h-20 sm:w-20 sm:h-24 bg-secondary/40 border border-border/50 rounded-md flex items-center justify-center mb-2 group-hover:bg-secondary/60 transition-colors">
-                                <span className="text-xs text-muted-foreground">Card</span>
+                              <div className="mb-2">
+                                <PlayerJerseyWithNumber
+                                  team={resolveTeamAbbrForDisplay(item.player.team, item.player.position, item.player.name)}
+                                  jerseyNumber={item.player.jersey_number ?? 0}
+                                  numberFillColor={lookupJerseyNumberFill(
+                                    jerseyColorsByAbbr,
+                                    resolveTeamAbbrForDisplay(item.player.team, item.player.position, item.player.name)
+                                  )}
+                                  size="card"
+                                  position={item.player.position}
+                                  className="scale-110 origin-bottom"
+                                />
                               </div>
                               {/* Player name */}
                               <p className="font-medium text-xs text-center truncate w-full px-1 mb-1">{item.player.name}</p>
@@ -1411,9 +1425,18 @@ const Statistics = () => {
                             >
                               {/* Top section: Card, Name, Count (fixed height ~25% of total) */}
                               <div className="w-full flex flex-col items-center mb-2 flex-shrink-0">
-                                {/* Card placeholder */}
-                                <div className="w-16 h-20 sm:w-20 sm:h-24 bg-secondary/40 border border-border/50 rounded-md flex items-center justify-center mb-2 group-hover:bg-secondary/60 transition-colors">
-                                  <span className="text-xs text-muted-foreground">Card</span>
+                                <div className="mb-2">
+                                  <PlayerJerseyWithNumber
+                                    team={resolveTeamAbbrForDisplay(item.player.team, item.player.position, item.player.name)}
+                                    jerseyNumber={item.player.jersey_number ?? 0}
+                                    numberFillColor={lookupJerseyNumberFill(
+                                      jerseyColorsByAbbr,
+                                      resolveTeamAbbrForDisplay(item.player.team, item.player.position, item.player.name)
+                                    )}
+                                    size="card"
+                                    position={item.player.position}
+                                    className="scale-110 origin-bottom"
+                                  />
                                 </div>
                                 {/* Player name */}
                                 <p className="font-medium text-xs text-center truncate w-full px-1 mb-1">{item.player.name}</p>
@@ -1515,7 +1538,7 @@ const Statistics = () => {
             </div>
             {statsLoading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <BrandedLoader size={36} />
               </div>
             ) : (() => {
               if (selectedAvoidedRound === 'all') {
@@ -1637,9 +1660,18 @@ const Statistics = () => {
                           >
                             {/* Top section: Card, Name, Fade Score (fixed height ~25% of total) */}
                             <div className="w-full flex flex-col items-center mb-2 flex-shrink-0">
-                              {/* Card placeholder */}
-                              <div className="w-16 h-20 sm:w-20 sm:h-24 bg-secondary/40 border border-red-500/50 rounded-md flex items-center justify-center mb-2 group-hover:bg-secondary/60 transition-colors">
-                                <span className="text-xs text-muted-foreground">Card</span>
+                              <div className="mb-2">
+                                <PlayerJerseyWithNumber
+                                  team={resolveTeamAbbrForDisplay(item.player.team, item.player.position, item.player.name)}
+                                  jerseyNumber={item.player.jersey_number ?? 0}
+                                  numberFillColor={lookupJerseyNumberFill(
+                                    jerseyColorsByAbbr,
+                                    resolveTeamAbbrForDisplay(item.player.team, item.player.position, item.player.name)
+                                  )}
+                                  size="card"
+                                  position={item.player.position}
+                                  className="scale-110 origin-bottom"
+                                />
                               </div>
                               {/* Player name */}
                               <p className="font-medium text-xs text-center truncate w-full px-1 mb-1">{item.player.name}</p>
@@ -1837,9 +1869,18 @@ const Statistics = () => {
                             >
                               {/* Top section: Card, Name, Fade Score (fixed height ~25% of total) */}
                               <div className="w-full flex flex-col items-center mb-2 flex-shrink-0">
-                                {/* Card placeholder */}
-                                <div className="w-16 h-20 sm:w-20 sm:h-24 bg-secondary/40 border border-red-500/50 rounded-md flex items-center justify-center mb-2 group-hover:bg-secondary/60 transition-colors">
-                                  <span className="text-xs text-muted-foreground">Card</span>
+                                <div className="mb-2">
+                                  <PlayerJerseyWithNumber
+                                    team={resolveTeamAbbrForDisplay(item.player.team, item.player.position, item.player.name)}
+                                    jerseyNumber={item.player.jersey_number ?? 0}
+                                    numberFillColor={lookupJerseyNumberFill(
+                                      jerseyColorsByAbbr,
+                                      resolveTeamAbbrForDisplay(item.player.team, item.player.position, item.player.name)
+                                    )}
+                                    size="card"
+                                    position={item.player.position}
+                                    className="scale-110 origin-bottom"
+                                  />
                                 </div>
                                 {/* Player name */}
                                 <p className="font-medium text-xs text-center truncate w-full px-1 mb-1">{item.player.name}</p>
@@ -1908,7 +1949,7 @@ const Statistics = () => {
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                   {statsLoading ? (
                     <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-5 h-5 animate-spin text-green-400" />
+                      <BrandedLoader size={30} />
                     </div>
                   ) : draftStats.studs.length > 0 ? (
                     draftStats.studs.map(({ player, myRank, communityRank, diff }) => (
@@ -1918,6 +1959,17 @@ const Statistics = () => {
                         onClick={() => handlePlayerClick(player)}
                       >
                         <div className="flex items-center gap-3">
+                          <PlayerJerseyWithNumber
+                            team={resolveTeamAbbrForDisplay(player.team, player.position, player.name)}
+                            jerseyNumber={player.jersey_number ?? 0}
+                            numberFillColor={lookupJerseyNumberFill(
+                              jerseyColorsByAbbr,
+                              resolveTeamAbbrForDisplay(player.team, player.position, player.name)
+                            )}
+                            size="card"
+                            position={player.position}
+                            className="scale-110 origin-bottom"
+                          />
                           <span className="text-lg font-bold text-green-400">+{diff}</span>
                           <div>
                             <p className="font-medium">{player.name}</p>
@@ -1949,7 +2001,7 @@ const Statistics = () => {
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                   {statsLoading ? (
                     <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-5 h-5 animate-spin text-red-400" />
+                      <BrandedLoader size={30} />
                     </div>
                   ) : draftStats.duds.length > 0 ? (
                     draftStats.duds.map(({ player, myRank, communityRank, diff }) => (
@@ -1959,6 +2011,17 @@ const Statistics = () => {
                         onClick={() => handlePlayerClick(player)}
                       >
                         <div className="flex items-center gap-3">
+                          <PlayerJerseyWithNumber
+                            team={resolveTeamAbbrForDisplay(player.team, player.position, player.name)}
+                            jerseyNumber={player.jersey_number ?? 0}
+                            numberFillColor={lookupJerseyNumberFill(
+                              jerseyColorsByAbbr,
+                              resolveTeamAbbrForDisplay(player.team, player.position, player.name)
+                            )}
+                            size="card"
+                            position={player.position}
+                            className="scale-110 origin-bottom"
+                          />
                           <span className="text-lg font-bold text-red-400">{diff}</span>
                           <div>
                             <p className="font-medium">{player.name}</p>

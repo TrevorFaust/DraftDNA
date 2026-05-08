@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { PlayerSearchCombobox } from '@/components/PlayerSearchCombobox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Player } from '@/types/database';
+import { BrandedLoader } from '@/components/BrandedLoader';
 
 interface PositionLimits {
   QB: number;
@@ -991,7 +992,7 @@ export default function LeagueSettings() {
   if (authLoading || leaguesLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <BrandedLoader />
       </div>
     );
   }

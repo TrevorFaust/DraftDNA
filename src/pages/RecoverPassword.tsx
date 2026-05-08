@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { accessTokenIsPasswordRecovery } from '@/lib/passwordRecoveryToken';
 import { PasswordRecoveryForm } from '@/components/PasswordRecoveryForm';
 import { Button } from '@/components/ui/button';
+import { BrandedLoader } from '@/components/BrandedLoader';
 
 /**
  * Dedicated landing path for password-reset emails (see resetPassword redirectTo).
@@ -17,7 +17,7 @@ const RecoverPassword = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" aria-hidden />
+        <BrandedLoader />
       </div>
     );
   }

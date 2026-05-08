@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/Navbar';
-import { ListOrdered, History, ArrowRight, Loader2 } from 'lucide-react';
+import { ListOrdered, History, ArrowRight } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
 import { ClipboardList } from 'lucide-react';
+import { BrandedLoader } from '@/components/BrandedLoader';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -12,7 +13,7 @@ const Index = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <BrandedLoader />
       </div>
     );
   }
@@ -33,7 +34,7 @@ const Index = () => {
         <div className="max-w-6xl mx-auto px-4 pt-20 pb-32 relative">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6 animate-fade-in">
-              <SiteLogo size={16} className="w-4 h-4" />
+              <SiteLogo size={22} className="w-[22px] h-[22px]" />
               <span className="text-sm text-primary">Fantasy Football Draft Tool</span>
             </div>
             

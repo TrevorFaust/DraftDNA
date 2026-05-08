@@ -11,7 +11,7 @@ import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { RotateCcw, Search, Loader2, Users, User, Save, Edit, LayoutTemplate } from 'lucide-react';
+import { RotateCcw, Search, Users, User, Save, Edit, LayoutTemplate } from 'lucide-react';
 import type { RankedPlayer } from '@/types/database';
 import {
   tempRankingsStorage,
@@ -22,6 +22,7 @@ import {
   rankingsDraftSessionStorage,
 } from '@/utils/temporaryStorage';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
+import { BrandedLoader } from '@/components/BrandedLoader';
 import {
   TEAM_ABBREV_TO_FULL_NAME,
   canonicalTeamAbbr,
@@ -63,9 +64,12 @@ import { fetchRookiesRankings, filterPlayersToRookieIds } from '@/utils/rookiesF
 import {
   applyUserRankingsBucketMatch,
   userRankingBucketFromDisplayBucket,
-  formatRankingBucketLabel,
+  formatRankingBucketImportSubtitle,
   userRankingBucketsEqual,
-  fetchUserRankingImportSources,
+  scanUserRankingsImportPoolByLeague,
+  fetchUserRankingsPlayerIdsFlexibleForLeague,
+  fetchUserRankingsPlayerIdsFlexibleForNullLeague,
+  fetchUserRankingsPlayerIdsFlexibleAny,
   rankingImportPlayerPoolsMatch,
 } from '@/utils/userRankingsBucket';
 import type { UserRankingBucketDb } from '@/utils/userRankingsBucket';
@@ -326,10 +330,54 @@ function parseGuestRankingBucketKey(bucketKey: string): UserRankingBucketDb {
 }
 
 type RankingTemplateOption =
-  | { kind: 'guest'; bucketKey: string; label: string }
-  | { kind: 'account'; league_id: string | null; bucket: UserRankingBucketDb; label: string };
+  | { kind: 'guest'; bucketKey: string; title: string; subtitle: string }
+  | { kind: 'account-league-flex'; league_id: string; title: string; subtitle: string }
+  | { kind: 'account-null-flex'; title: string; subtitle: string }
+  | { kind: 'account-any-flex'; title: string; subtitle: string };
 
 type ImportListEmptyKind = 'no-saves' | 'rookies-mismatch' | 'only-this-list';
+
+const GUEST_IMPORT_DEVICE_LINE =
+  'This device only · local board (not synced to your leagues until you finalize there)';
+
+function guestRankingImportOptionFromKey(bucketKeyStr: string): RankingTemplateOption {
+  const gk = parseGuestRankingBucketKey(bucketKeyStr);
+  return {
+    kind: 'guest',
+    bucketKey: bucketKeyStr,
+    title: formatRankingBucketImportSubtitle(gk),
+    subtitle: GUEST_IMPORT_DEVICE_LINE,
+  };
+}
+
+/** Same ordering as Settings → Your Leagues (`orderedLeagues`): display_order, then created_at fallback, then name. */
+function sortLeagueRowsLikeYourLeaguesSettings<
+  T extends { id: string; display_order?: number | null; created_at?: string | null; name?: string | null },
+>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const orderA = a.display_order ?? (a.created_at ? new Date(a.created_at).getTime() : 0);
+    const orderB = b.display_order ?? (b.created_at ? new Date(b.created_at).getTime() : 0);
+    if (orderA !== orderB) return Number(orderA) - Number(orderB);
+    return (a.name ?? '').localeCompare(b.name ?? '');
+  });
+}
+
+function compareRankingTemplateOptions(
+  a: RankingTemplateOption,
+  b: RankingTemplateOption,
+  leagueOrderIndex: Map<string, number>
+): number {
+  const rank = (o: RankingTemplateOption) =>
+    o.kind === 'account-league-flex' ? 0 : o.kind === 'account-null-flex' ? 1 : o.kind === 'guest' ? 2 : 3;
+  const d = rank(a) - rank(b);
+  if (d !== 0) return d;
+  if (a.kind === 'account-league-flex' && b.kind === 'account-league-flex') {
+    const ia = leagueOrderIndex.get(a.league_id) ?? 1_000_000;
+    const ib = leagueOrderIndex.get(b.league_id) ?? 1_000_000;
+    if (ia !== ib) return ia - ib;
+  }
+  return a.title.localeCompare(b.title) || a.subtitle.localeCompare(b.subtitle);
+}
 
 // Sortable player with grab handle on the right and position-colored rank
 const SortablePlayerWithHandle = ({ 
@@ -558,9 +606,21 @@ const Rankings = () => {
   );
 
   const loadTemplateOptions = useCallback(async () => {
+    const debugBase = {
+      signedIn: Boolean(user),
+      showImportRankingControl,
+      isAllLeagues,
+      selectedLeagueId: selectedLeague?.id ?? null,
+      bucketKey,
+      destRookiesOnly: Boolean(displayBucket.rookiesOnly),
+      displayBucket,
+    };
+    console.warn('[Import rankings] loadTemplateOptions start', debugBase);
+
     if (!showImportRankingControl) {
       setTemplateOptions([]);
       setImportListEmptyKind(null);
+      console.warn('[Import rankings] Aborted: import control hidden for current page state', debugBase);
       return;
     }
     setLoadingTemplateOptions(true);
@@ -570,47 +630,144 @@ const Rankings = () => {
       const destRookiesOnly = Boolean(displayBucket.rookiesOnly);
 
       if (user) {
-        const rows = await fetchUserRankingImportSources(supabase, user.id, leagues);
-        if (rows.length === 0) {
-          setTemplateOptions([]);
-          setImportListEmptyKind('no-saves');
-          return;
+        const { data: leagueRows, error: leaguesFetchError } = await supabase
+          .from('leagues')
+          .select('id, name, display_order, created_at')
+          .eq('user_id', user.id);
+        console.warn('[Import rankings] leagues query result', {
+          count: leagueRows?.length ?? 0,
+          error: leaguesFetchError?.message ?? null,
+        });
+        if (leaguesFetchError) {
+          console.error('[Import rankings] Could not load leagues:', leaguesFetchError);
         }
+        const profileLeagueIds = new Set((leagueRows ?? []).map((r) => r.id as string));
+        const leagueNameById = new Map((leagueRows ?? []).map((r) => [r.id as string, r.name as string]));
 
-        const poolOk = rows.filter((row) =>
-          rankingImportPlayerPoolsMatch(destRookiesOnly, row.bucket.rookies_only)
-        );
-        if (poolOk.length === 0) {
-          setTemplateOptions([]);
-          setImportListEmptyKind('rookies-mismatch');
-          return;
-        }
+        const scan = await scanUserRankingsImportPoolByLeague(supabase, user.id, destRookiesOnly);
+        console.warn('[Import rankings] scanUserRankingsImportPoolByLeague', {
+          leagueCount: scan.leagueIds.length,
+          nullLeagueRowCount: scan.nullLeagueRowCount,
+          destRookiesOnly,
+        });
+
+        const guestKeysFiltered = tempRankingsStorage
+          .listGuestRankingBucketKeysWithData()
+          .filter((k) => k !== bucketKey)
+          .filter((k) =>
+            rankingImportPlayerPoolsMatch(destRookiesOnly, parseGuestRankingBucketKey(k).rookies_only)
+          );
 
         const options: RankingTemplateOption[] = [];
-        for (const row of poolOk) {
+
+        for (const lid of scan.leagueIds) {
+          if (!profileLeagueIds.has(lid)) continue;
+          const best = scan.bestBucketByLeagueId.get(lid);
+          if (!best) continue;
           if (
             selectedLeague &&
-            row.league_id === selectedLeague.id &&
-            userRankingBucketsEqual(row.bucket, destBucket)
+            selectedLeague.id === lid &&
+            userRankingBucketsEqual(best, destBucket)
           ) {
             continue;
           }
           const leagueName =
-            row.league_id === null
-              ? 'All leagues'
-              : leagues.find((l) => l.id === row.league_id)?.name ?? 'League';
-          const label = `${leagueName} · ${formatRankingBucketLabel(row.bucket)}`;
+            leagueNameById.get(lid) ?? leagues.find((l) => l.id === lid)?.name ?? 'League';
           options.push({
-            kind: 'account',
-            league_id: row.league_id,
-            bucket: row.bucket,
-            label,
+            kind: 'account-league-flex',
+            league_id: lid,
+            title: leagueName,
+            subtitle: formatRankingBucketImportSubtitle(best),
           });
         }
-        options.sort((a, b) => a.label.localeCompare(b.label));
-        setTemplateOptions(options);
+
+        if (scan.nullLeagueRowCount > 0 && scan.bestBucketNullLeague) {
+          const nb = scan.bestBucketNullLeague;
+          const skipNullAsCurrentList =
+            isAllLeagues && userRankingBucketsEqual(nb, destBucket);
+          if (!skipNullAsCurrentList) {
+            options.push({
+              kind: 'account-null-flex',
+              title: 'All leagues (saved)',
+              subtitle: formatRankingBucketImportSubtitle(nb),
+            });
+          }
+        }
+
+        for (const bucketKeyStr of guestKeysFiltered) {
+          options.push(guestRankingImportOptionFromKey(bucketKeyStr));
+        }
+
         if (options.length === 0) {
-          setImportListEmptyKind('only-this-list');
+          const anyIds = await fetchUserRankingsPlayerIdsFlexibleAny(supabase, user.id);
+          console.warn('[Import rankings] account-any-flex probe', {
+            resolvedCount: anyIds?.length ?? 0,
+          });
+          if (anyIds?.length) {
+            options.push({
+              kind: 'account-any-flex',
+              title: 'Largest saved list',
+              subtitle: 'Across your account (same player pool)',
+            });
+          }
+        }
+
+        const leagueRowsForOrder =
+          leagues.length > 0
+            ? leagues.map((l) => ({
+                id: l.id,
+                name: l.name,
+                display_order: l.display_order,
+                created_at: l.created_at,
+              }))
+            : (leagueRows ?? []).map((r) => ({
+                id: r.id as string,
+                name: r.name as string,
+                display_order: r.display_order as number | null | undefined,
+                created_at: r.created_at as string | null | undefined,
+              }));
+        const leagueOrderIndex = new Map(
+          sortLeagueRowsLikeYourLeaguesSettings(leagueRowsForOrder).map((l, i) => [l.id, i])
+        );
+        options.sort((a, b) => compareRankingTemplateOptions(a, b, leagueOrderIndex));
+        setTemplateOptions(options);
+        console.warn('[Import rankings] final signed-in options', {
+          optionsCount: options.length,
+          optionKinds: options.map((o) => o.kind),
+        });
+
+        if (options.length === 0) {
+          const profileLeaguesWithScanData = scan.leagueIds.filter((id) => profileLeagueIds.has(id)).length;
+          const accountSourcesInPool = profileLeaguesWithScanData + (scan.nullLeagueRowCount > 0 ? 1 : 0);
+          if (accountSourcesInPool > 0) {
+            setImportListEmptyKind('only-this-list');
+          } else {
+            const anyGuestKeys = tempRankingsStorage
+              .listGuestRankingBucketKeysWithData()
+              .filter((k) => k !== bucketKey);
+            const scanHadRows = scan.leagueIds.length > 0 || scan.nullLeagueRowCount > 0;
+            if (!scanHadRows && anyGuestKeys.length === 0) {
+              console.error('[Import rankings] No user_rankings rows in this pool and no temp_rankings_* keys', {
+                userId: user.id,
+              });
+              toast.info(
+                'No saved lists found to import. Open the console (F12), set level to Verbose / All levels, click Import again — look for lines starting with [Import rankings].'
+              );
+              setImportListEmptyKind('no-saves');
+            } else if (!scanHadRows) {
+              console.warn('[Import rankings] Empty list due to pool mismatch', {
+                guestKeysAnyPool: anyGuestKeys.length,
+                destRookiesOnly,
+              });
+              setImportListEmptyKind('rookies-mismatch');
+            } else {
+              console.warn(
+                '[Import rankings] Rows exist in this pool but none under your profile leagues (check league_id on saves).',
+                { userId: user.id, scanLeagueIdCount: scan.leagueIds.length }
+              );
+              setImportListEmptyKind('no-saves');
+            }
+          }
         }
       } else {
         const keys = tempRankingsStorage
@@ -623,27 +780,52 @@ const Rankings = () => {
           const anyGuestKeys = tempRankingsStorage
             .listGuestRankingBucketKeysWithData()
             .filter((k) => k !== bucketKey);
+          console.warn('[Import rankings] Guest empty options', {
+            matchingPoolKeys: keys.length,
+            anyPoolKeys: anyGuestKeys.length,
+          });
           setTemplateOptions([]);
           setImportListEmptyKind(anyGuestKeys.length === 0 ? 'no-saves' : 'rookies-mismatch');
           return;
         }
-        const options: RankingTemplateOption[] = keys.map((bucketKeyStr) => ({
-          kind: 'guest' as const,
-          bucketKey: bucketKeyStr,
-          label: formatRankingBucketLabel(parseGuestRankingBucketKey(bucketKeyStr)),
-        }));
-        options.sort((a, b) => a.label.localeCompare(b.label));
+        const options: RankingTemplateOption[] = keys.map((bucketKeyStr) =>
+          guestRankingImportOptionFromKey(bucketKeyStr)
+        );
+        options.sort((a, b) => compareRankingTemplateOptions(a, b, new Map()));
         setTemplateOptions(options);
+        console.warn('[Import rankings] final guest options', {
+          optionsCount: options.length,
+        });
       }
     } catch (e) {
-      console.error(e);
+      console.error('[Import rankings] loadTemplateOptions threw', e);
       toast.error('Could not load rankings to use as templates.');
       setTemplateOptions([]);
       setImportListEmptyKind('no-saves');
     } finally {
       setLoadingTemplateOptions(false);
     }
-  }, [showImportRankingControl, user, displayBucket, selectedLeague, leagues, bucketKey]);
+  }, [showImportRankingControl, user, displayBucket, selectedLeague, leagues, bucketKey, isAllLeagues]);
+
+  // Always point at the latest loader without subscribing the dialog effect to this callback's identity.
+  // (Including `loadTemplateOptions` in an effect deps caused an infinite loop: setTemplateOptions →
+  // re-render → new callback → effect re-runs while the dialog stays open → heavy refetch storm.)
+  const loadTemplateOptionsRef = useRef(loadTemplateOptions);
+  loadTemplateOptionsRef.current = loadTemplateOptions;
+  const importDialogLoadOnceRef = useRef(false);
+
+  // Radix Dialog does not call onOpenChange(true) when open is toggled from outside (e.g. Import button),
+  // so load once each time the dialog opens — not on every `loadTemplateOptions` identity change.
+  useEffect(() => {
+    if (!importTemplateDialogOpen) {
+      importDialogLoadOnceRef.current = false;
+      return;
+    }
+    if (!showImportRankingControl) return;
+    if (importDialogLoadOnceRef.current) return;
+    importDialogLoadOnceRef.current = true;
+    void loadTemplateOptionsRef.current();
+  }, [importTemplateDialogOpen, showImportRankingControl]);
 
   const applyRankingTemplate = useCallback(
     async (opt: RankingTemplateOption) => {
@@ -656,23 +838,42 @@ const Rankings = () => {
             return;
           }
           ids = list.map((p) => p.id);
-        } else {
+        } else if (opt.kind === 'account-league-flex') {
           if (!user) return;
-          let q = supabase
-            .from('user_rankings')
-            .select('player_id, rank')
-            .eq('user_id', user.id)
-            .order('rank', { ascending: true });
-          if (opt.league_id === null) q = q.is('league_id', null);
-          else q = q.eq('league_id', opt.league_id);
-          q = applyUserRankingsBucketMatch(q, opt.bucket);
-          const { data, error } = await q;
-          if (error) throw error;
-          if (!data?.length) {
-            toast.error('No players found for that template.');
+          const resolved = await fetchUserRankingsPlayerIdsFlexibleForLeague(
+            supabase,
+            user.id,
+            opt.league_id,
+            Boolean(displayBucket.rookiesOnly)
+          );
+          if (!resolved?.length) {
+            toast.error('No saved rankings found for that league (same rookie/full pool as this screen).');
             return;
           }
-          ids = data.map((r) => r.player_id);
+          ids = resolved;
+        } else if (opt.kind === 'account-null-flex') {
+          if (!user) return;
+          const resolved = await fetchUserRankingsPlayerIdsFlexibleForNullLeague(
+            supabase,
+            user.id,
+            Boolean(displayBucket.rookiesOnly)
+          );
+          if (!resolved?.length) {
+            toast.error('No saved rankings found for that list (same rookie/full pool as this screen).');
+            return;
+          }
+          ids = resolved;
+        } else if (opt.kind === 'account-any-flex') {
+          if (!user) return;
+          const resolved = await fetchUserRankingsPlayerIdsFlexibleAny(
+            supabase,
+            user.id
+          );
+          if (!resolved?.length) {
+            toast.error('No saved finalized rankings found in your account.');
+            return;
+          }
+          ids = resolved;
         }
         const next = mergeRankingsWithDraftOrder(players, ids);
         setPlayers(next);
@@ -685,16 +886,12 @@ const Rankings = () => {
         toast.error('Could not import that template.');
       }
     },
-    [user, players, persistRankingsSessionDraft]
+    [user, players, persistRankingsSessionDraft, displayBucket.rookiesOnly]
   );
 
-  const onImportTemplateDialogOpenChange = useCallback(
-    (open: boolean) => {
-      setImportTemplateDialogOpen(open);
-      if (open) void loadTemplateOptions();
-    },
-    [loadTemplateOptions]
-  );
+  const onImportTemplateDialogOpenChange = useCallback((open: boolean) => {
+    setImportTemplateDialogOpen(open);
+  }, []);
 
   // Guest only: persist bucket to League Settings so Rankings dropdown and League Settings always match
   const saveGuestBucketToTempSettings = useCallback((scoringFormat: 'standard' | 'ppr' | 'half_ppr', leagueType: 'season' | 'dynasty', isSuperflex: boolean, rookiesOnly: boolean) => {
@@ -742,7 +939,6 @@ const Rankings = () => {
     const currentBucketKey = bucketRef.current;
     // If a fetch is in progress for the same bucket, skip (allow refetch when bucket changed)
     if (fetchInProgressRef.current) {
-      console.log('Rankings: Fetch in progress, skipping (bucket may have changed)');
       return;
     }
 
@@ -853,9 +1049,7 @@ const Rankings = () => {
       });
       
       // Do not persist defense ADP updates - RLS blocks anon update on players; in-memory is enough
-      
-      console.log(`Rankings: Found ${allDefensePlayers?.length || 0} total defenses, deduplicated to ${defensePlayers.length} unique defenses`);
-      
+
       // Merge non-defense players with processed defenses, then deduplicate multi-position players
       // (e.g. Taysom Hill QB/TE/RB, Connor Heyward RB/TE) who appear as separate rows
       const merged = [
@@ -867,61 +1061,13 @@ const Rankings = () => {
         return adpA - adpB;
       });
       const updatedPlayersData = deduplicatePlayersByIdentity(merged);
-      
-      console.log(`Rankings: Merged ${nonDefensePlayers?.length || 0} non-defense + ${defensePlayers.length} defenses, deduped to ${updatedPlayersData.length}`);
-      console.log(`Rankings: Total players after merge: ${updatedPlayersData.length}`);
-      
-      // If we got no players, log a warning
+
       if (updatedPlayersData.length === 0) {
-        console.warn('Rankings: WARNING - No players found in database!');
-        console.warn('Rankings: nonDefensePlayers:', nonDefensePlayers?.length || 0);
-        console.warn('Rankings: defensePlayers:', defensePlayers.length);
-      }
-      
-      // Debug: Check what positions exist in the returned data
-      if (updatedPlayersData) {
-        const uniquePositions = [...new Set(updatedPlayersData.map(p => p.position))];
-        console.log(`Rankings: Unique positions in query result:`, uniquePositions);
-        console.log(`Rankings: Total players returned: ${updatedPlayersData.length}`);
-        
-        // Check for D/ST with different casing or variations
-        const allDefenseVariations = updatedPlayersData.filter(p => 
-          p.position && (
-            p.position === 'D/ST' || 
-            p.position === 'DST' || 
-            p.position === 'DEF' ||
-            p.position.toLowerCase() === 'd/st' ||
-            p.position.toLowerCase() === 'def'
-          )
-        );
-        console.log(`Rankings: Players with defense-like positions:`, allDefenseVariations.length);
-        if (allDefenseVariations.length > 0) {
-          console.log(`Rankings: Defense-like position values:`, [...new Set(allDefenseVariations.map(p => p.position))]);
-        }
-      }
-      
-      if (updatedPlayersData) {
-        allPlayersData = updatedPlayersData;
-        allPlayersDataRef.current = allPlayersData;
-        const defensesAfterRefetch = (allPlayersData || []).filter(p => p.position === 'D/ST');
-        console.log(`Rankings: After refetch, found ${defensesAfterRefetch.length} defenses in database`);
-        console.log(`Rankings: Defense names:`, defensesAfterRefetch.map(d => d.name));
-        if (defensesAfterRefetch.length !== 32) {
-          console.warn(`Rankings: Expected 32 defenses but found ${defensesAfterRefetch.length}`);
-          // Try to find defenses by name instead
-          const defensesByName = (allPlayersData || []).filter(p => 
-            defenseNamesList.includes(p.name)
-          );
-          console.log(`Rankings: Found ${defensesByName.length} defenses by name matching`);
-          if (defensesByName.length > 0) {
-            console.log(`Rankings: Defense positions in DB:`, [...new Set(defensesByName.map(d => d.position))]);
-          }
-        }
+        console.warn('Rankings: No players returned after merge.');
       }
 
-      // Debug: Check defenses before processing
-      const defensesBeforeProcessing = (allPlayersData || []).filter(p => p.position === 'D/ST');
-      console.log(`Rankings: Defenses in allPlayersData before processing: ${defensesBeforeProcessing.length}`);
+      allPlayersData = updatedPlayersData;
+      allPlayersDataRef.current = allPlayersData;
 
       // When rookies-only, filter to rookies and exclude D/ST, K
       if (effectiveBucket.rookiesOnly) {
@@ -1005,9 +1151,7 @@ const Rankings = () => {
           adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
           rank: index + 1,
         }));
-        const defensesInAdp = adpPlayers.filter(p => p.position === 'D/ST');
-        console.log(`Rankings: Defenses in adpPlayers: ${defensesInAdp.length}`);
-        
+
         // Set community rankings (bucket-based, or ADP for dynasty/empty)
         const guestCommunity = communityData.length > 0
           ? buildCommunityFromRpc(allPlayersData, communityData)
@@ -1091,8 +1235,6 @@ const Rankings = () => {
           ? [allLeaguesSelectedMatchingLeagueId!]
           : matchingLeagues.map((l) => l.id);
 
-        console.log(`Rankings (All Leagues): Found ${matchingLeagues.length} leagues matching bucket; ${allLeaguesSelectedMatchingLeagueId ? 'showing single league' : 'averaging all'}`);
-
         // Signed-in All Leagues: always use rankings from each league (average or selected league), never a single "All Leagues" saved list
         let allLeagueRankingsData: any[] = [];
         if (leagueIdsToFetch.length > 0) {
@@ -1109,9 +1251,6 @@ const Rankings = () => {
 
           if (allLeagueRankingsError) throw allLeagueRankingsError;
           allLeagueRankingsData = data || [];
-          console.log(`Rankings (All Leagues): Fetched ${allLeagueRankingsData.length} rankings from ${leagueIdsToFetch.length} league(s)`);
-        } else {
-          console.log(`Rankings (All Leagues): No leagues match selected bucket, using community seed`);
         }
 
         const playerRankingsMap = new Map<string, number[]>();
@@ -1121,8 +1260,6 @@ const Rankings = () => {
           }
           playerRankingsMap.get(ranking.player_id)!.push(ranking.rank);
         });
-        console.log(`Rankings (All Leagues): Found rankings for ${playerRankingsMap.size} unique players`);
-
         let sortedPersonal: RankedPlayer[];
         if (playerRankingsMap.size === 0) {
           sortedPersonal = communityData.length > 0
@@ -1146,9 +1283,6 @@ const Rankings = () => {
           personalPlayers.sort((a, b) => a.rank - b.rank);
           sortedPersonal = personalPlayers.map((p, index) => ({ ...p, rank: index + 1 }));
         }
-        console.log(`Rankings (All Leagues): Sorted ${sortedPersonal.length} players by average rank across leagues for this bucket`);
-        const defensesInPersonal = sortedPersonal.filter(p => p.position === 'D/ST');
-        console.log(`Rankings: Defenses in sortedPersonal: ${defensesInPersonal.length}`);
         const allLeaguesDraftKey = getRankingsDraftSessionStorageKey({
           userId: user.id,
           guestSessionId: null,
@@ -1227,12 +1361,6 @@ const Rankings = () => {
           rank: index + 1,
         }));
         
-        const defensesInSorted = sortedPlayers.filter(p => p.position === 'D/ST');
-        console.log(`Rankings: Defenses in sortedPlayers: ${defensesInSorted.length}`);
-        if (defensesInSorted.length === 0) {
-          console.error(`Rankings: WARNING - No defenses found in sortedPlayers! Total players: ${sortedPlayers.length}`);
-        }
-
         const leagueDraftKey = getRankingsDraftSessionStorageKey({
           userId: user.id,
           guestSessionId: null,
@@ -1313,7 +1441,6 @@ const Rankings = () => {
       // If bucket changed while we were fetching, refetch once with current bucket; mark so that refetch doesn't loop
       const nowKey = bucketRef.current;
       if (nowKey !== currentBucketKey) {
-        console.log(`Rankings: Bucket changed during fetch (${currentBucketKey} -> ${nowKey}), refetching`);
         isRefetchAfterBucketChangeRef.current = true;
         setLoading(true);
         fetchPlayersRef.current();
@@ -1621,14 +1748,6 @@ const Rankings = () => {
     toast.info('Rankings reset to community consensus');
   };
 
-  // Debug: Log total defenses in players array (only warn when we have players but no D/ST — skip during initial load)
-  const totalDefenses = players.filter(p => p.position === 'D/ST').length;
-  if (totalDefenses > 0) {
-    console.log(`Rankings: Total D/ST players in players array: ${totalDefenses}`);
-  } else if (!loading && players.length > 0) {
-    console.warn(`Rankings: No D/ST players found in players array! Total players: ${players.length}`);
-  }
-
   const filteredCommunityPlayers = displayedCommunityPlayers.filter((p) => {
     // Improved search: search in full name (handles "Travis Hunter" when searching "hunter")
     const searchLower = searchTerm.toLowerCase().trim();
@@ -1647,7 +1766,7 @@ const Rankings = () => {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <BrandedLoader />
       </div>
     );
   }
@@ -1691,7 +1810,7 @@ const Rankings = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="season">Season</SelectItem>
+                    <SelectItem value="season">Redraft</SelectItem>
                     <SelectItem value="dynasty">Dynasty</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1705,8 +1824,8 @@ const Rankings = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="non-sf">Non-Superflex</SelectItem>
-                    <SelectItem value="sf">Superflex</SelectItem>
+                    <SelectItem value="non-sf">1 QB</SelectItem>
+                    <SelectItem value="sf">2QB</SelectItem>
                   </SelectContent>
                 </Select>
                 {allLeaguesBucketLeagueType === 'dynasty' && (
@@ -1734,8 +1853,8 @@ const Rankings = () => {
               {!(isAllLeagues || !user) && (
                 <span className={`text-xs bg-secondary px-2 py-0.5 rounded ${isEditMode ? 'ml-2' : ''}`}>
                   {displayBucket.scoringFormat.replace('_', '-').toUpperCase()}
-                  {displayBucket.leagueType === 'dynasty' ? ' Dynasty' : ''}
-                  {displayBucket.isSuperflex ? ' SF' : ''}
+                  {displayBucket.leagueType === 'dynasty' ? ' Dynasty' : ' Redraft'}
+                  {displayBucket.isSuperflex ? ' 2QB' : ''}
                   {displayBucket.rookiesOnly ? ' Rookies only' : ''}
                   {displayBucket.leagueType === 'dynasty' && !hasCommunityConsensus ? ' — Community rankings coming soon' : ''}
                 </span>
@@ -1780,7 +1899,7 @@ const Rankings = () => {
                 disabled={isFinalizing}
                 className="gap-2"
               >
-                {isFinalizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {isFinalizing ? <BrandedLoader size={22} /> : <Save className="w-4 h-4" />}
                 Finalize Rankings
               </Button>
             )}
@@ -2266,16 +2385,15 @@ const Rankings = () => {
         <Dialog open={importTemplateDialogOpen} onOpenChange={onImportTemplateDialogOpenChange}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-center sm:text-left">Import rankings</DialogTitle>
+              <DialogTitle className="text-center sm:text-left tracking-wide">Import rankings</DialogTitle>
               <DialogDescription className="text-center sm:text-left">
-                Copy player order from any other list you saved that uses the same player pool (for example Standard,
-                PPR, Dynasty, or Superflex). Players who only exist in this view are added after the import. Rookie-only
-                lists can only import from other rookie-only lists. Then drag to adjust and finalize to save.
+                Import player order from another saved list that uses the same player pool. Rookie-only lists can only
+                import from other rookie-only lists. Once imported, drag to make any adjustments and finalize to save.
               </DialogDescription>
             </DialogHeader>
             {loadingTemplateOptions ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                <BrandedLoader size={44} />
               </div>
             ) : templateOptions.length === 0 ? (
               <div className="text-sm text-muted-foreground py-4 space-y-3">
@@ -2290,26 +2408,48 @@ const Rankings = () => {
                     first, or use <span className="text-foreground">Reset to ADP</span> / drag to reorder.
                   </p>
                 ) : (
-                  <p>
-                    No saved lists found to import from yet. Finalize rankings in another league or format first, or use{' '}
-                    <span className="text-foreground">Reset to ADP</span> for the community order.
-                  </p>
+                  <div className="space-y-2">
+                    <p>
+                      No sources found: no other finalized league rankings in your account for this player pool, and no
+                      other saved boards in this browser for that pool. Open Rankings under another scoring/league type in
+                      this browser (your boards persist locally), finalize when ready, or use{' '}
+                      <span className="text-foreground">Reset to ADP</span>.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      When sources exist, each row shows your league name with the format on a second line; device-only
+                      boards show the format first, then a note that they are not saved to your account yet. For
+                      diagnostic logs, open DevTools →{' '}
+                      <span className="font-medium text-foreground">Console</span> (not Sources or Network), then
+                      filter for <code className="text-xs">[Import rankings]</code> — that line only appears when the
+                      import list is still empty after loading.
+                    </p>
+                  </div>
                 )}
               </div>
             ) : (
-              <div className="max-h-[min(60vh,320px)] overflow-y-auto space-y-2 pr-1">
+              <div
+                className="max-h-[min(60vh,320px)] min-h-0 overflow-y-auto overflow-x-hidden space-y-2 pr-2 scrollbar-thin rounded-md bg-muted/30 py-1.5"
+                style={{ touchAction: 'pan-y' }}
+              >
                 {templateOptions.map((opt, idx) => (
                   <Button
                     key={
                       opt.kind === 'guest'
                         ? opt.bucketKey
-                        : `${opt.league_id ?? 'null'}-${opt.bucket.scoring_format}-${opt.bucket.league_type}-${opt.bucket.is_superflex}-${opt.bucket.rookies_only}-${idx}`
+                        : opt.kind === 'account-any-flex'
+                          ? `any-flex-${idx}`
+                          : opt.kind === 'account-null-flex'
+                            ? `null-flex-${idx}`
+                            : `flex-${opt.league_id}-${idx}`
                     }
                     variant="secondary"
-                    className="w-full justify-start text-left h-auto py-3 whitespace-normal"
+                    className="w-full justify-start text-left h-auto py-3 px-3 whitespace-normal"
                     onClick={() => void applyRankingTemplate(opt)}
                   >
-                    {opt.label}
+                    <span className="flex w-full min-w-0 flex-col items-start gap-0.5 text-left">
+                      <span className="w-full truncate font-medium text-foreground">{opt.title}</span>
+                      <span className="w-full text-xs font-normal text-muted-foreground">{opt.subtitle}</span>
+                    </span>
                   </Button>
                 ))}
               </div>

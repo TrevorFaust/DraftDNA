@@ -20,7 +20,7 @@ import Settings from "./pages/Settings";
 import LeagueSettings from "./pages/LeagueSettings";
 import NotFound from "./pages/NotFound";
 import { Footer } from "./components/Footer";
-import { Loader2 } from "lucide-react";
+import { BrandedLoader } from "./components/BrandedLoader";
 
 const Statistics = lazy(() => import("./pages/Statistics").then((m) => ({ default: m.default })));
 const History = lazy(() => import("./pages/History").then((m) => ({ default: m.default })));
@@ -29,7 +29,7 @@ const Badges = lazy(() => import("./pages/Badges").then((m) => ({ default: m.def
 function PageFallback() {
   return (
     <div className="flex min-h-[40vh] items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
+      <BrandedLoader size={36} />
     </div>
   );
 }

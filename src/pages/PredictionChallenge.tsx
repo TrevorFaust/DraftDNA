@@ -30,7 +30,6 @@ import {
 } from '@/components/ui/collapsible';
 import {
   ArrowLeft,
-  Loader2,
   CheckCircle2,
   Target,
   ChevronUp,
@@ -49,6 +48,7 @@ import type { Player } from '@/types/database';
 import { toast } from 'sonner';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { OfficialRulesContent } from '@/components/OfficialRulesContent';
+import { BrandedLoader } from '@/components/BrandedLoader';
 import { SITE_NAME, SEASON } from '@/constants/contest';
 import { getSiteOriginForAuth } from '@/lib/siteOrigin';
 import { cn } from '@/lib/utils';
@@ -535,7 +535,7 @@ ${shareUrl}`;
   if (authLoading || (user && loading) || (user && termsAccepted === null)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <BrandedLoader />
       </div>
     );
   }
@@ -902,7 +902,7 @@ ${shareUrl}`;
                     >
                       {savingPosition === position ? (
                         <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          <BrandedLoader size={20} className="mr-2" />
                           Saving...
                         </>
                       ) : (
@@ -1008,7 +1008,7 @@ ${shareUrl}`;
               >
                 {termsSaving ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                    <BrandedLoader size={20} className="mr-2" />
                     Saving…
                   </>
                 ) : (

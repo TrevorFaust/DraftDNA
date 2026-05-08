@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Lock, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Lock, Eye, EyeOff } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
 import { validatePassword } from '@/lib/passwordPolicy';
+import { BrandedLoader } from '@/components/BrandedLoader';
 
 export function PasswordRecoveryForm() {
   const { user, completePasswordRecovery } = useAuth();
@@ -120,7 +121,7 @@ export function PasswordRecoveryForm() {
           </ul>
         </div>
         <Button type="submit" variant="hero" className="w-full" size="lg" disabled={recoverySubmitting}>
-          {recoverySubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save password and continue'}
+          {recoverySubmitting ? <BrandedLoader size={20} /> : 'Save password and continue'}
         </Button>
       </form>
     </div>

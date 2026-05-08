@@ -15,9 +15,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Users, Layers, Trophy, Loader2, Target, Timer } from 'lucide-react';
+import { Users, Layers, Trophy, Target, Timer } from 'lucide-react';
 import { ClipboardList } from 'lucide-react';
 import { tempDraftStorage, generateTempDraftId, tempSettingsStorage } from '@/utils/temporaryStorage';
+import { BrandedLoader } from '@/components/BrandedLoader';
 import type { MockDraft } from '@/types/database';
 import { assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
 import { fetchRookiesRankings } from '@/utils/rookiesFilter';
@@ -394,7 +395,7 @@ const MockDraft = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <BrandedLoader />
       </div>
     );
   }
@@ -628,7 +629,7 @@ const MockDraft = () => {
               disabled={loading}
             >
               {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <BrandedLoader size={34} force3D />
               ) : (
                 <>
                   <ClipboardList className="w-5 h-5" />

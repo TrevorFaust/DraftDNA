@@ -22,7 +22,8 @@ import { PositionBadge } from './PositionBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
 import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
-import { Loader2, Calendar, BarChart3 } from 'lucide-react';
+import { Calendar, BarChart3 } from 'lucide-react';
+import { BrandedLoader } from '@/components/BrandedLoader';
 import type { Player, NFLSchedule } from '@/types/database';
 import type { Player2025Stats } from '@/hooks/usePlayer2025Stats';
 import type { ScoringFormat } from '@/utils/fantasyPoints';
@@ -1235,7 +1236,7 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <BrandedLoader size={44} />
           </div>
         ) : (
           <Tabs defaultValue="stats" className="flex min-h-0 flex-1 flex-col overflow-hidden">

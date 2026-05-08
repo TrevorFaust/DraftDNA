@@ -5,7 +5,8 @@
 //   SUPABASE_ANON_KEY — validate caller JWT (auto-provided)
 //
 // Access (any one):
-//   1) Header `x-sync-secret` = SYNC_PLAYER_TEAMS_SECRET (cron / curl only — keep secret private)
+//   1) Header `x-sync-secret` = SYNC_PLAYER_TEAMS_SECRET (cron / curl / pg_net — keep secret private).
+//      Optional daily job: migration `20260502103000_player_teams_daily_pg_cron.sql` (pg_cron + Vault).
 //   2) Authorization: Bearer <user access_token> where JWT `sub` is in ADMIN_SYNC_USER_IDS (browser)
 //      Callers must send the user JWT, not the anon key (client uses getSession + explicit header).
 //

@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, Lock, Loader2, ArrowLeft, User, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, ArrowLeft, User, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
 import { PasswordRecoveryForm } from '@/components/PasswordRecoveryForm';
 import { validatePassword } from '@/lib/passwordPolicy';
+import { BrandedLoader } from '@/components/BrandedLoader';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -294,7 +295,7 @@ const Auth = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" aria-hidden />
+        <BrandedLoader />
       </div>
     );
   }
@@ -343,7 +344,7 @@ const Auth = () => {
                 onClick={handleResendVerification}
                 disabled={resendLoading || resendCooldown > 0}
               >
-                {resendLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
+                {resendLoading ? <BrandedLoader size={20} /> : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
               </Button>
               <button
                 type="button"
@@ -383,7 +384,7 @@ const Auth = () => {
                   autoComplete="off"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {usernameCheckLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                  {usernameCheckLoading && <BrandedLoader size={18} />}
                   {!usernameCheckLoading && username.trim().length >= 2 && usernameTaken === true && (
                     <XCircle className="w-4 h-4 text-destructive" aria-label="Username taken" />
                   )}
@@ -537,7 +538,7 @@ const Auth = () => {
                   >
                     {resetLoading ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <BrandedLoader size={20} className="mr-2" />
                         Sending...
                       </>
                     ) : (
@@ -567,7 +568,7 @@ const Auth = () => {
               )}
               <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
                 {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <BrandedLoader size={20} />
                 ) : isLogin ? (
                   'Sign In'
                 ) : (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type RefObject, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLeagues } from '@/hooks/useLeagues';
@@ -10,9 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Palette, HelpCircle, MessageSquare, User, Mail, ArrowLeft, Trophy, Plus, Trash2, Loader2, GripVertical, Lock, Eye, EyeOff, AlertTriangle, Database } from 'lucide-react';
+import { Bell, Palette, HelpCircle, MessageSquare, User, Mail, ArrowLeft, Trophy, Plus, Trash2, GripVertical, Lock, Eye, EyeOff, AlertTriangle, Database } from 'lucide-react';
 import { SyncPlayersButton } from '@/components/admin/SyncPlayersButton';
 import { isSyncAdminUser } from '@/constants/adminSync';
+import { BrandedLoader } from '@/components/BrandedLoader';
 import {
   Select,
   SelectContent,
@@ -52,15 +53,15 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Tables } from '@/integrations/supabase/types';
+import { useRampUpAutoScroll } from '@/hooks/useRampUpAutoScroll';
 
 type League = Tables<'leagues'>;
 
-/** Fast, smooth auto-scroll when dragging near edges */
-const autoScrollConfig = {
-  acceleration: 100,
-  interval: 1,
-  thresholds: { x: 0.1, y: 0.45 },
-};
+/** Same as Rankings player drag: disable dnd-kit auto-scroll; use thin-edge ramp-up scroll on the list container. */
+function YourLeaguesRampScroll({ containerRef }: { containerRef: RefObject<HTMLDivElement | null> }) {
+  useRampUpAutoScroll(containerRef);
+  return null;
+}
 
 // Sortable league component with drag handle
 const SortableLeague = ({ 
@@ -84,7 +85,7 @@ const SortableLeague = ({
     animateLayoutChanges: () => false,
   });
 
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: transform ? `translate3d(0px, ${transform.y || 0}px, 0)` : undefined,
     transition: isDragging ? 'none' : undefined,
     touchAction: 'none',
@@ -121,7 +122,7 @@ const SortableLeague = ({
         className="text-destructive hover:text-destructive hover:bg-destructive/10"
       >
         {deletingLeagueId === league.id ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <BrandedLoader size={20} />
         ) : (
           <Trash2 className="w-4 h-4" />
         )}
@@ -149,6 +150,7 @@ const Settings = () => {
   const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null);
   const [orderedLeagues, setOrderedLeagues] = useState<League[]>([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const yourLeaguesScrollRef = useRef<HTMLDivElement | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -653,7 +655,7 @@ const Settings = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <BrandedLoader />
       </div>
     );
   }
@@ -912,7 +914,7 @@ const Settings = () => {
                       className="w-full sm:w-auto"
                     >
                       {isCreatingLeague ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <BrandedLoader size={20} className="mr-2" />
                       ) : (
                         <Plus className="w-4 h-4 mr-2" />
                       )}
@@ -945,7 +947,7 @@ const Settings = () => {
                   <h4 className="font-medium">Your Leagues</h4>
                   {isSavingOrder && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <BrandedLoader size={20} />
                       Saving order...
                     </div>
                   )}
@@ -959,23 +961,30 @@ const Settings = () => {
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
-                    autoScroll={autoScrollConfig}
+                    autoScroll={false}
                   >
-                    <SortableContext
-                      items={orderedLeagues.map((l) => l.id)}
-                      strategy={verticalListSortingStrategy}
+                    <div
+                      ref={yourLeaguesScrollRef}
+                      className="max-h-[min(60vh,520px)] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin"
+                      style={{ touchAction: 'pan-y' }}
                     >
-                      <div className="space-y-2" style={{ touchAction: 'none' }}>
-                        {orderedLeagues.map((league) => (
-                          <SortableLeague
-                            key={league.id}
-                            league={league}
-                            onDelete={handleDeleteLeague}
-                            deletingLeagueId={deletingLeagueId}
-                          />
-                        ))}
-                      </div>
-                    </SortableContext>
+                      <YourLeaguesRampScroll containerRef={yourLeaguesScrollRef} />
+                      <SortableContext
+                        items={orderedLeagues.map((l) => l.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2" style={{ touchAction: 'none' }}>
+                          {orderedLeagues.map((league) => (
+                            <SortableLeague
+                              key={league.id}
+                              league={league}
+                              onDelete={handleDeleteLeague}
+                              deletingLeagueId={deletingLeagueId}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </div>
                   </DndContext>
                 )}
               </div>
@@ -1019,7 +1028,7 @@ const Settings = () => {
                     onClick={handleSaveUsername}
                     disabled={profileUsernameSaving || !profileUsername.trim()}
                   >
-                    {profileUsernameSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+                    {profileUsernameSaving ? <BrandedLoader size={20} /> : 'Save'}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">Letters, numbers, underscores, and hyphens. 2–30 characters.</p>
@@ -1136,7 +1145,7 @@ const Settings = () => {
                   >
                     {isChangingPassword ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <BrandedLoader size={20} className="mr-2" />
                         Changing Password...
                       </>
                     ) : (
@@ -1274,7 +1283,9 @@ const Settings = () => {
                   Refresh NFL team and jersey from Sleeper for players that have a{' '}
                   <code className="text-xs">sleeper_id</code>. Server checks{' '}
                   <code className="text-xs">ADMIN_SYNC_USER_IDS</code>; this card only shows for your
-                  account (<code className="text-xs">VITE_SYNC_ADMIN_USER_ID</code>).
+                  account (<code className="text-xs">VITE_SYNC_ADMIN_USER_ID</code>). If configured in
+                  Supabase (pg_cron + Vault), the same sync also runs automatically once per day at a
+                  fixed UTC time — the button is for on-demand runs.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1299,7 +1310,7 @@ const Settings = () => {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" className="gap-2" disabled={deleteAccountLoading}>
-                    {deleteAccountLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    {deleteAccountLoading ? <BrandedLoader size={20} /> : <Trash2 className="w-4 h-4" />}
                     Delete my account
                   </Button>
                 </AlertDialogTrigger>
@@ -1317,7 +1328,7 @@ const Settings = () => {
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       disabled={deleteAccountLoading}
                     >
-                      {deleteAccountLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Yes, delete my account'}
+                      {deleteAccountLoading ? <BrandedLoader size={20} /> : 'Yes, delete my account'}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

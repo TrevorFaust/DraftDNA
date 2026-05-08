@@ -11,7 +11,6 @@ import {
   Trophy, 
   Plus, 
   ArrowRight,
-  Loader2,
   Users,
   BarChart3,
   Target,
@@ -27,6 +26,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { PositionBadge } from '@/components/PositionBadge';
+import { BrandedLoader } from '@/components/BrandedLoader';
 
 type LeaderboardRow = {
   rank: number;
@@ -163,7 +163,7 @@ const Dashboard = () => {
   if (authLoading || (user && leaguesLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <BrandedLoader />
       </div>
     );
   }
@@ -278,7 +278,7 @@ const Dashboard = () => {
               </h3>
               {leaderboardLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <BrandedLoader size={32} force3D />
                   Loading…
                 </div>
               ) : leaderboard.length === 0 ? (
@@ -393,7 +393,7 @@ const Dashboard = () => {
             <div className="overflow-y-auto overflow-x-hidden flex-1 pr-2 -mr-2 scrollbar-thin">
               {userPicksLoading ? (
                 <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <BrandedLoader size={28} />
                   Loading picks…
                 </div>
               ) : userPicks.length === 0 ? (

@@ -60,6 +60,8 @@ interface ArchetypeBadgeProps {
   showUnlockedAppearance?: boolean;
   /** Override flavor text (e.g. for chaos badges) */
   flavorText?: string;
+  /** Disable hover tooltip for contexts that already show inline description. */
+  disableTooltip?: boolean;
   className?: string;
 }
 
@@ -72,6 +74,7 @@ export function ArchetypeBadge({
   locked = false,
   showUnlockedAppearance = false,
   flavorText: flavorTextOverride,
+  disableTooltip = false,
   className,
 }: ArchetypeBadgeProps) {
   const archetype = getArchetypeByName(archetypeName);
@@ -133,6 +136,24 @@ export function ArchetypeBadge({
     }
 
     if (showCustomArt && badgeAssetUrl) {
+      if (disableTooltip) {
+        return (
+          <div
+            className={cn('cursor-default flex items-center justify-center', customThumbClass, className)}
+            role="img"
+            aria-label={archetypeName}
+          >
+            <img
+              src={badgeAssetUrl}
+              alt={archetypeName}
+              className="max-h-full max-w-full w-full h-full object-contain object-center select-none pointer-events-none"
+              loading="lazy"
+              decoding="async"
+              onError={() => setAssetLoadFailed(true)}
+            />
+          </div>
+        );
+      }
       return (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -197,6 +218,20 @@ export function ArchetypeBadge({
   }
 
   if (showCustomArt && badgeAssetUrl) {
+    if (disableTooltip) {
+      return (
+        <div className={cn('inline-flex flex-col items-center max-w-[min(100vw-2rem,28rem)]', className)}>
+          <img
+            src={badgeAssetUrl}
+            alt={archetypeName}
+            className="w-full h-auto max-h-[min(75vh,36rem)] object-contain select-none"
+            loading="lazy"
+            decoding="async"
+            onError={() => setAssetLoadFailed(true)}
+          />
+        </div>
+      );
+    }
     return (
       <Tooltip>
         <TooltipTrigger asChild>

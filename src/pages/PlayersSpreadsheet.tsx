@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlayer2025Stats, type Player2025Stats } from "@/hooks/usePlayer2025Stats";
-import { ArrowDown, ArrowUp, Lightbulb, Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Lightbulb } from "lucide-react";
 import type { RankedPlayer } from "@/types/database";
 import { displayTeamAbbrevOrFa } from "@/utils/teamMapping";
 import { PlayerDetailDialog } from "@/components/PlayerDetailDialog";
@@ -26,6 +26,7 @@ import { useCommunityRankingsBucket } from "@/hooks/useCommunityRankingsBucket";
 import { allLeaguesBucketStorage } from "@/utils/temporaryStorage";
 import { fetchRookiesRankings, filterPlayersToRookieIds } from "@/utils/rookiesFilter";
 import type { ScoringFormat } from "@/utils/fantasyPoints";
+import { BrandedLoader } from "@/components/BrandedLoader";
 
 type CommunityRow = { player_id: string; rank_position: number };
 type AgeRow = { espn_id: string; birth_date: string | null };
@@ -704,7 +705,7 @@ export default function PlayersSpreadsheet() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <BrandedLoader />
       </div>
     );
   }
