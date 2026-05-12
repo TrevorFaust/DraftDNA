@@ -21,14 +21,70 @@ import { Button } from '@/components/ui/button';
 import { PositionBadge } from './PositionBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
+import { Input } from '@/components/ui/input';
 import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
-import { Calendar, BarChart3 } from 'lucide-react';
+import { GitCompareArrows, BarChart3 } from 'lucide-react';
 import { BrandedLoader } from '@/components/BrandedLoader';
-import type { Player, NFLSchedule } from '@/types/database';
+import type { Player } from '@/types/database';
 import type { Player2025Stats } from '@/hooks/usePlayer2025Stats';
 import type { ScoringFormat } from '@/utils/fantasyPoints';
 import { getAgeFromBirthDate } from '@/utils/playerAge';
-import { canonicalTeamAbbr, displayTeamAbbrevOrFa, resolveTeamAbbrForDisplay } from '@/utils/teamMapping';
+import {
+  canonicalTeamAbbr,
+  displayTeamAbbrevOrFa,
+  getFullTeamName,
+  resolveTeamAbbrForDisplay,
+} from '@/utils/teamMapping';
+import { useNfl2025TeamRankings, type TeamRankMetric } from '@/hooks/useNfl2025TeamRankings';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
+import { PLAYER_POOL_CURRENT_SEASON, PLAYER_POOL_PRIOR_SEASON } from '@/constants/playerPoolSeason';
+import {
+  formatOpponentWinPctDisplay,
+  formatSosCellDisplay,
+  getNfl2026SosOppWinPct,
+  getNfl2026SosRank,
+  NFL_2026_SOS_HELP_TEXT,
+  sosOrdinal,
+} from '@/constants/nfl2026StrengthOfSchedule';
+import { cn } from '@/lib/utils';
+
+/** Winner pill in player comparison — matches PositionBadge / `index.css` position colors */
+/** Full NFL club name for team-ranks comparison subtitle (e.g. Cincinnati Bengals). */
+function nflTeamSubtitleFullName(
+  team: string | null | undefined,
+  position: string | null | undefined,
+  name: string | null | undefined
+): string {
+  const abbr = resolveTeamAbbrForDisplay(team, position, name);
+  if (!abbr || abbr === 'FA') {
+    return displayTeamAbbrevOrFa(team, position, name, { faLabel: 'Free Agent' });
+  }
+  return getFullTeamName(abbr) ?? abbr;
+}
+
+function positionComparisonHighlightClass(position: string | null | undefined): string {
+  const p = (position || '').trim().toUpperCase();
+  switch (p) {
+    case 'QB':
+      return 'position-qb';
+    case 'RB':
+    case 'FB':
+      return 'position-rb';
+    case 'WR':
+      return 'position-wr';
+    case 'TE':
+      return 'position-te';
+    case 'K':
+      return 'position-k';
+    case 'DEF':
+    case 'DST':
+    case 'D/ST':
+      return 'position-def';
+    default:
+      return 'border border-primary/30 bg-primary/10 text-primary';
+  }
+}
 
 function FantasyPointsWithBreakdown({
   displayValue,
@@ -84,6 +140,7 @@ interface PlayerDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   /** 2025 season fantasy points and position rank (e.g. QB1, RB9) - shown next to name in header */
   stats2025?: Player2025Stats | null;
+  allStats2025?: Map<string, Player2025Stats>;
 }
 
 interface WeeklyStats {
@@ -169,6 +226,94 @@ function fgDistanceListTooltipText(raw: unknown): string | null {
     return JSON.stringify(raw);
   }
   return String(raw);
+}
+
+/** Max plausible FG distance (yards) parsed from `fg_made_list` text for a single week row. */
+function maxFgYardsFromMadeListRaw(raw: unknown): number | null {
+  const text = fgDistanceListTooltipText(raw);
+  if (!text) return null;
+  const nums =
+    text
+      .match(/\d+/g)
+      ?.map((x) => Number.parseInt(x, 10))
+      .filter((n) => Number.isFinite(n)) ?? [];
+  if (nums.length === 0) return null;
+  const plausible = nums.filter((n) => n >= 18 && n <= 66);
+  const pool = plausible.length > 0 ? plausible : nums;
+  return Math.max(...pool);
+}
+
+type ComparisonWeeklyExtras = {
+  rushAttempts: number | null;
+  passAttempts: number | null;
+  fumbles: number | null;
+  longestFgYards: number | null;
+};
+
+async function fetchWeeklyComparisonExtras(player: Player): Promise<ComparisonWeeklyExtras> {
+  const empty: ComparisonWeeklyExtras = {
+    rushAttempts: null,
+    passAttempts: null,
+    fumbles: null,
+    longestFgYards: null,
+  };
+  if (!player.espn_id) return empty;
+
+  let gsisId: string | null = null;
+  const { data: dc } = await supabase
+    .from('depth_charts_2025')
+    .select('gsis_id')
+    .eq('espn_id', player.espn_id)
+    .limit(1)
+    .maybeSingle();
+  if (dc?.gsis_id) gsisId = dc.gsis_id;
+  else {
+    const { data: r } = await supabase
+      .from('rosters_2025')
+      .select('gsis_id')
+      .eq('espn_id', player.espn_id)
+      .limit(1)
+      .maybeSingle();
+    if (r?.gsis_id) gsisId = r.gsis_id;
+  }
+
+  const statsId = gsisId || String(player.espn_id);
+  const { data: rows, error } = await supabase
+    .from('weekly_stats_2025')
+    .select('*')
+    .eq('player_id', statsId)
+    .lte('week', 18);
+
+  if (error || !rows?.length) return empty;
+
+  let rushAttempts = 0;
+  let passAttempts = 0;
+  let fumbles = 0;
+  let longestFg = 0;
+  const pos = (player.position || '').trim().toUpperCase();
+
+  for (const row of rows as Record<string, unknown>[]) {
+    rushAttempts += Number(row.carries ?? 0) || 0;
+    const pa = row.passing_attempts ?? row.pass_attempts ?? row.attempts;
+    if (pa != null && Number(pa) > 0) passAttempts += Number(pa) || 0;
+    fumbles +=
+      (Number(row.receiving_fumbles ?? 0) || 0) +
+      (Number(row.rushing_fumbles ?? 0) || 0) +
+      (Number(row.sack_fumbles ?? 0) || 0);
+
+    if (pos === 'K') {
+      const wkMax = maxFgYardsFromMadeListRaw(row.fg_made_list ?? row.fgMadeList);
+      if (wkMax != null && wkMax > longestFg) longestFg = wkMax;
+    }
+  }
+
+  const played = rows.length > 0;
+  return {
+    rushAttempts: played ? rushAttempts : null,
+    passAttempts: played ? passAttempts : null,
+    fumbles: played ? fumbles : null,
+    longestFgYards: longestFg > 0 ? longestFg : null,
+  };
 }
 
 function KickerFgHoverBox({ title, body }: { title: string; body: string }) {
@@ -382,11 +527,64 @@ function calculateDefenseFantasyPoints(game: WeeklyStats): number | null {
   );
 }
 
-export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: PlayerDetailDialogProps) => {
+async function fetchPlayerAgeFromEspn(espnId: string | null | undefined): Promise<number | null> {
+  if (!espnId) return null;
+  const id = String(espnId);
+  let birthDateFound: string | null = null;
+  const { data: nflHist } = await supabase
+    .from('nfl_players_historical')
+    .select('birth_date')
+    .eq('espn_id', id)
+    .not('birth_date', 'is', null)
+    .order('season', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (nflHist?.birth_date) birthDateFound = nflHist.birth_date;
+  if (!birthDateFound) {
+    const { data: pi } = await (supabase as any)
+      .from('players_info')
+      .select('birth_date')
+      .eq('espn_id', id)
+      .not('birth_date', 'is', null)
+      .limit(1)
+      .maybeSingle();
+    if (pi?.birth_date) birthDateFound = pi.birth_date;
+  }
+  if (!birthDateFound) {
+    const { data: pc } = await (supabase as any)
+      .from('players_clean')
+      .select('birth_date')
+      .eq('espn_id', id)
+      .not('birth_date', 'is', null)
+      .limit(1)
+      .maybeSingle();
+    if (pc?.birth_date) birthDateFound = pc.birth_date;
+  }
+  if (!birthDateFound) return null;
+  return getAgeFromBirthDate(birthDateFound);
+}
+
+function kickerFgPctNumber(made: number | undefined, att: number | undefined): number | null {
+  const m = made ?? 0;
+  const a = att ?? 0;
+  if (a <= 0) return null;
+  return (m / a) * 100;
+}
+
+export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allStats2025 }: PlayerDetailDialogProps) => {
   const scoringFormat = useScoringFormat();
   const [stats, setStats] = useState<WeeklyStats[]>([]);
-  const [schedule, setSchedule] = useState<NFLSchedule[]>([]);
+  const [comparisonPlayer, setComparisonPlayer] = useState<Player | null>(null);
+  const [comparisonQuery, setComparisonQuery] = useState('');
+  const [comparisonResults, setComparisonResults] = useState<Player[]>([]);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonWeeklyExtras, setComparisonWeeklyExtras] = useState<{
+    left: ComparisonWeeklyExtras | null;
+    right: ComparisonWeeklyExtras | null;
+  } | null>(null);
   const [playerAge, setPlayerAge] = useState<number | null>(null);
+  const [comparisonPlayerAge, setComparisonPlayerAge] = useState<number | null>(null);
+  const [comparisonStatSource, setComparisonStatSource] = useState<'player' | 'team'>('player');
   const [loading, setLoading] = useState(false);
   const selectedSeason: 2025 = 2025;
   // For RBs/WRs: 'rushing' or 'receiving', for QBs: 'passing' or 'rushing'
@@ -426,6 +624,12 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
 
   useEffect(() => {
     if (player && open) {
+      setComparisonPlayer(null);
+      setComparisonPlayerAge(null);
+      setComparisonWeeklyExtras(null);
+      setComparisonQuery('');
+      setComparisonResults([]);
+      setComparisonStatSource('player');
       // Set default stat view based on position
       if (player.position === 'WR' || player.position === 'TE') {
         setStatView('receiving');
@@ -448,41 +652,9 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
     try {
       // Fetch birth_date to calculate age (from nfl_players_historical or players_info)
       const espnId = player.espn_id != null ? String(player.espn_id) : null;
-      let birthDateFound: string | null = null;
       if (espnId) {
-        const { data: nflHist } = await supabase
-          .from('nfl_players_historical')
-          .select('birth_date')
-          .eq('espn_id', espnId)
-          .not('birth_date', 'is', null)
-          .order('season', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (nflHist?.birth_date) birthDateFound = nflHist.birth_date;
-        if (!birthDateFound) {
-          const { data: pi } = await (supabase as any)
-            .from('players_info')
-            .select('birth_date')
-            .eq('espn_id', espnId)
-            .not('birth_date', 'is', null)
-            .limit(1)
-            .maybeSingle();
-          if (pi?.birth_date) birthDateFound = pi.birth_date;
-        }
-        if (!birthDateFound) {
-          const { data: pc } = await (supabase as any)
-            .from('players_clean')
-            .select('birth_date')
-            .eq('espn_id', espnId)
-            .not('birth_date', 'is', null)
-            .limit(1)
-            .maybeSingle();
-          if (pc?.birth_date) birthDateFound = pc.birth_date;
-        }
-        if (birthDateFound) {
-          const age = getAgeFromBirthDate(birthDateFound);
-          if (age != null) setPlayerAge(age);
-        }
+        const age = await fetchPlayerAgeFromEspn(espnId);
+        if (age != null) setPlayerAge(age);
       }
       if (selectedSeason === 2025) {
         if (isDefense) {
@@ -720,7 +892,6 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
           }
 
           setStats(allWeeks);
-          setSchedule([]);
           return;
         }
 
@@ -974,32 +1145,11 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
 
         setStats(allWeeks);
       }
-      // Fetch future schedule for player's team
-      if (player.team) {
-        const currentWeek = getCurrentNFLWeek();
-        const { data: scheduleData } = await supabase
-          .from('nfl_schedule')
-          .select('*')
-          .or(`home_team.eq.${player.team},away_team.eq.${player.team}`)
-          .gte('week', currentWeek)
-          .order('week', { ascending: true })
-          .limit(10);
-
-        setSchedule((scheduleData as NFLSchedule[]) || []);
-      }
     } catch (error) {
       console.error('Failed to fetch player data:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const getCurrentNFLWeek = () => {
-    const seasonStart = new Date('2025-09-04');
-    const now = new Date();
-    const diffTime = now.getTime() - seasonStart.getTime();
-    const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
-    return Math.max(1, Math.min(diffWeeks, 18));
   };
 
   const getStatsForView = (position: string, view: string) => {
@@ -1102,9 +1252,725 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
     return value !== null && value !== undefined ? value : '-';
   };
 
+  /** Must run before any early return — comparison search depends on current `player`. */
+  const comparisonPositionFilter = player
+    ? isDefensePosition(player.position)
+      ? 'D/ST'
+      : (player.position || '').toUpperCase() === 'K'
+        ? 'K'
+        : undefined
+    : undefined;
+  const comparisonExcludedPositions =
+    player && comparisonPositionFilter == null ? ['K', 'D/ST', 'DEF', 'DST'] : [];
+  const comparisonExcludedPositionsKey = comparisonExcludedPositions.join('|');
+
+  useEffect(() => {
+    if (!open || !player) return;
+    const q = comparisonQuery.trim();
+    if (!q) {
+      setComparisonResults([]);
+      setComparisonLoading(false);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      setComparisonLoading(true);
+      const normalizedQ = q.toLowerCase();
+      let queryBuilder = supabase
+        .from('players')
+        .select('*')
+        .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
+        .or(`name.ilike.%${normalizedQ}%,team.ilike.%${normalizedQ}%`)
+        .order('adp', { ascending: true })
+        .limit(60);
+
+      if (comparisonPositionFilter) {
+        queryBuilder = queryBuilder.eq('position', comparisonPositionFilter);
+      } else {
+        queryBuilder = queryBuilder.in('position', ['QB', 'RB', 'WR', 'TE']);
+      }
+
+      const { data, error } = await queryBuilder;
+      if (error) {
+        console.error('Failed player comparison search:', error);
+        setComparisonResults([]);
+        setComparisonLoading(false);
+        return;
+      }
+
+      const merged = mergePlayerPoolAcrossSeasons(
+        data ?? [],
+        PLAYER_POOL_PRIOR_SEASON,
+        PLAYER_POOL_CURRENT_SEASON
+      );
+
+      const normalizePosition = (position: string) => {
+        const p = (position || '').toUpperCase();
+        if (p === 'DEF' || p === 'DST') return 'D/ST';
+        return p;
+      };
+      const excludedPositionsSet = new Set(
+        comparisonExcludedPositionsKey.split('|').filter(Boolean).map((p) => normalizePosition(p))
+      );
+      const filtered = merged.filter((p) => {
+        if (p.id === player.id) return false;
+        if (excludedPositionsSet.size > 0 && excludedPositionsSet.has(normalizePosition(p.position))) return false;
+        return true;
+      });
+      setComparisonResults(filtered.slice(0, 20));
+      setComparisonLoading(false);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [comparisonQuery, open, player, comparisonPositionFilter, comparisonExcludedPositionsKey]);
+
+  useEffect(() => {
+    if (!open || !player || !comparisonPlayer) {
+      setComparisonWeeklyExtras(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const [left, right] = await Promise.all([
+        fetchWeeklyComparisonExtras(player),
+        fetchWeeklyComparisonExtras(comparisonPlayer),
+      ]);
+      if (!cancelled) setComparisonWeeklyExtras({ left, right });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, player, comparisonPlayer]);
+
+  useEffect(() => {
+    if (!comparisonPlayer) {
+      setComparisonPlayerAge(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const age = await fetchPlayerAgeFromEspn(comparisonPlayer.espn_id);
+      if (!cancelled) setComparisonPlayerAge(age);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [comparisonPlayer]);
+
+  const nflTeamRanks = useNfl2025TeamRankings(open);
+
+  const teamComparisonRows = useMemo(() => {
+    if (!player || !comparisonPlayer) return [];
+    const cs = allStats2025?.get(comparisonPlayer.id);
+    if (!cs) return [];
+    const tl = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
+    const tr = resolveTeamAbbrForDisplay(comparisonPlayer.team, comparisonPlayer.position, comparisonPlayer.name);
+    const defs: { label: string; metric: TeamRankMetric }[] = [
+      { label: 'Off PPG', metric: 'offPpg' },
+      { label: 'Off Pass YPG', metric: 'offPassYpg' },
+      { label: 'Off Rush YPG', metric: 'offRushYpg' },
+      { label: 'Def YPG allowed', metric: 'defYpg' },
+      { label: 'Def PPG allowed', metric: 'defPpg' },
+    ];
+    const fromRanks = defs.map(({ label, metric }) => {
+      const lr = nflTeamRanks.getRank(tl, metric);
+      const rr = nflTeamRanks.getRank(tr, metric);
+      return {
+        label,
+        left: lr != null ? String(lr) : '—',
+        right: rr != null ? String(rr) : '—',
+        compareLeft: lr,
+        compareRight: rr,
+        lowerRankWins: true,
+      };
+    });
+    const sosLp = getNfl2026SosOppWinPct(tl);
+    const sosLr = getNfl2026SosRank(tl);
+    const sosRp = getNfl2026SosOppWinPct(tr);
+    const sosRr = getNfl2026SosRank(tr);
+    return [
+      ...fromRanks,
+      {
+        label: '2026 SOS',
+        left:
+          sosLp != null && sosLr != null ? formatSosCellDisplay(sosLp, sosLr) : '—',
+        right:
+          sosRp != null && sosRr != null ? formatSosCellDisplay(sosRp, sosRr) : '—',
+        compareLeft: sosLr,
+        compareRight: sosRr,
+        higherWins: true,
+        sosCells: {
+          leftPct: sosLp,
+          leftRank: sosLr,
+          rightPct: sosRp,
+          rightRank: sosRr,
+        },
+      },
+    ];
+  }, [player, comparisonPlayer, allStats2025, nflTeamRanks.getRank]);
+
   if (!player) return null;
 
+  const comparisonStats = comparisonPlayer ? allStats2025?.get(comparisonPlayer.id) ?? null : null;
+  const hasComparison = !!comparisonPlayer && !!comparisonStats;
+
+  const formatStat = (value: number | null | undefined, digits = 1) => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '-';
+    return digits === 0 ? Math.round(value).toLocaleString() : value.toFixed(digits);
+  };
+
+  const formatPosRank = (rank: string | null | undefined) => {
+    if (!rank) return '-';
+    const numericPart = rank.match(/\d+$/)?.[0];
+    return numericPart ?? rank;
+  };
+
+  function parseRankNumber(rank: string | null | undefined): number | null {
+    if (!rank) return null;
+    const m = rank.match(/(\d+)\s*$/);
+    if (!m) return null;
+    const n = Number(m[1]);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function normalizeSkillPos(position: string | null | undefined): string | null {
+    const p = (position || '').trim().toUpperCase();
+    if (p === 'FB') return 'RB';
+    if (p === 'DEF' || p === 'DST') return 'D/ST';
+    if (p === 'QB' || p === 'RB' || p === 'WR' || p === 'TE' || p === 'K' || p === 'D/ST') return p;
+    return null;
+  }
+
+  type ComparisonRow = {
+    label: string;
+    left: string;
+    right: string;
+    compareLeft?: number | null;
+    compareRight?: number | null;
+    /** Higher numeric value is better (default). */
+    higherWins?: boolean;
+    /** Lower rank number is better (QB1 vs QB12). */
+    lowerRankWins?: boolean;
+    /** Lower numeric value is better (e.g. interceptions). */
+    lowerIsBetter?: boolean;
+    /** Do not highlight a winner (e.g. Age). */
+    skipBold?: boolean;
+    /** 2026 SOS: pill highlights opponent win % only; rank follows in parentheses */
+    sosCells?: {
+      leftPct: number | null;
+      leftRank: number | null;
+      rightPct: number | null;
+      rightRank: number | null;
+    };
+  };
+
+  function pickBoldSide(row: ComparisonRow): 'left' | 'right' | null {
+    if (row.skipBold) return null;
+    const leftNum = row.compareLeft;
+    const rightNum = row.compareRight;
+    if (leftNum === undefined || rightNum === undefined) return null;
+    if (leftNum === null || rightNum === null) return null;
+    if (typeof leftNum !== 'number' || typeof rightNum !== 'number') return null;
+    if (Number.isNaN(leftNum) || Number.isNaN(rightNum)) return null;
+    if (leftNum === rightNum) return null;
+    if (row.lowerRankWins || row.lowerIsBetter) {
+      return leftNum < rightNum ? 'left' : 'right';
+    }
+    return leftNum > rightNum ? 'left' : 'right';
+  }
+
+  const offenseTotalTds = (s: Player2025Stats | null | undefined) =>
+    s ? s.totalPassTds + s.totalRushTds + s.totalRecTds : null;
+
+  const passYpg = (s: Player2025Stats | null | undefined): number | null =>
+    s && s.gamesPlayed > 0 ? s.totalPassYards / s.gamesPlayed : null;
+
+  const buildComparisonRows = (
+    posA: string,
+    posB: string,
+    a: Player2025Stats | null | undefined,
+    b: Player2025Stats | null | undefined,
+    exA: ComparisonWeeklyExtras | null | undefined,
+    exB: ComparisonWeeklyExtras | null | undefined,
+    ageA: number | null,
+    ageB: number | null
+  ): ComparisonRow[] => {
+    const ppgAndPosRankHead = (): ComparisonRow[] => [
+      {
+        label: 'PPG',
+        left: formatStat(a?.avgPointsPerGame, 2),
+        right: formatStat(b?.avgPointsPerGame, 2),
+        compareLeft: a?.avgPointsPerGame ?? null,
+        compareRight: b?.avgPointsPerGame ?? null,
+        higherWins: true,
+      },
+      {
+        label: 'Pos Rank',
+        left: formatPosRank(a?.positionRank),
+        right: formatPosRank(b?.positionRank),
+        compareLeft: parseRankNumber(a?.positionRank),
+        compareRight: parseRankNumber(b?.positionRank),
+        lowerRankWins: true,
+      },
+    ];
+
+    const headRows = (): ComparisonRow[] => [
+      ...ppgAndPosRankHead(),
+      {
+        label: 'Age',
+        left: ageA != null ? String(ageA) : '-',
+        right: ageB != null ? String(ageB) : '-',
+        skipBold: true,
+      },
+    ];
+
+    const gamesPlayedRow: ComparisonRow = {
+      label: 'Games Played',
+      left: formatStat(a?.gamesPlayed, 0),
+      right: formatStat(b?.gamesPlayed, 0),
+      compareLeft: a?.gamesPlayed ?? null,
+      compareRight: b?.gamesPlayed ?? null,
+      higherWins: true,
+    };
+
+    if (isDefensePosition(posA) && isDefensePosition(posB)) {
+      return [
+        ...ppgAndPosRankHead(),
+        {
+          label: 'Sacks',
+          left: formatStat(a?.totalDefSacks, 0),
+          right: formatStat(b?.totalDefSacks, 0),
+          compareLeft: a?.totalDefSacks ?? null,
+          compareRight: b?.totalDefSacks ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Interceptions',
+          left: formatStat(a?.totalDefInterceptions, 0),
+          right: formatStat(b?.totalDefInterceptions, 0),
+          compareLeft: a?.totalDefInterceptions ?? null,
+          compareRight: b?.totalDefInterceptions ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Fumble Recoveries',
+          left: formatStat(a?.totalDefFumbleRecoveries, 0),
+          right: formatStat(b?.totalDefFumbleRecoveries, 0),
+          compareLeft: a?.totalDefFumbleRecoveries ?? null,
+          compareRight: b?.totalDefFumbleRecoveries ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Total TDs',
+          left: formatStat(a?.totalDefTds, 0),
+          right: formatStat(b?.totalDefTds, 0),
+          compareLeft: a?.totalDefTds ?? null,
+          compareRight: b?.totalDefTds ?? null,
+          higherWins: true,
+        },
+      ];
+    }
+
+    if (posA === 'K' && posB === 'K') {
+      const fgPctL = kickerFgPctNumber(a?.kickerSeason?.fgMade, a?.kickerSeason?.fgAtt);
+      const fgPctR = kickerFgPctNumber(b?.kickerSeason?.fgMade, b?.kickerSeason?.fgAtt);
+      return [
+        ...headRows(),
+        {
+          label: 'XPM',
+          left: formatStat(a?.kickerSeason?.patMade, 0),
+          right: formatStat(b?.kickerSeason?.patMade, 0),
+          compareLeft: a?.kickerSeason?.patMade ?? null,
+          compareRight: b?.kickerSeason?.patMade ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'XPA',
+          left: formatStat(a?.kickerSeason?.patAtt, 0),
+          right: formatStat(b?.kickerSeason?.patAtt, 0),
+          compareLeft: a?.kickerSeason?.patAtt ?? null,
+          compareRight: b?.kickerSeason?.patAtt ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'FG Made',
+          left: formatStat(a?.kickerSeason?.fgMade, 0),
+          right: formatStat(b?.kickerSeason?.fgMade, 0),
+          compareLeft: a?.kickerSeason?.fgMade ?? null,
+          compareRight: b?.kickerSeason?.fgMade ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'FG Att',
+          left: formatStat(a?.kickerSeason?.fgAtt, 0),
+          right: formatStat(b?.kickerSeason?.fgAtt, 0),
+          compareLeft: a?.kickerSeason?.fgAtt ?? null,
+          compareRight: b?.kickerSeason?.fgAtt ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'FG%',
+          left: fgPctL != null ? `${fgPctL.toFixed(1)}%` : '-',
+          right: fgPctR != null ? `${fgPctR.toFixed(1)}%` : '-',
+          compareLeft: fgPctL,
+          compareRight: fgPctR,
+          higherWins: true,
+        },
+        {
+          label: 'FG Long',
+          left: formatStat(exA?.longestFgYards ?? null, 0),
+          right: formatStat(exB?.longestFgYards ?? null, 0),
+          compareLeft: exA?.longestFgYards ?? null,
+          compareRight: exB?.longestFgYards ?? null,
+          higherWins: true,
+        },
+        gamesPlayedRow,
+      ];
+    }
+
+    const skillA = normalizeSkillPos(posA);
+    const skillB = normalizeSkillPos(posB);
+    const sameSkillClass =
+      skillA != null &&
+      skillB != null &&
+      skillA === skillB &&
+      ['QB', 'RB', 'WR', 'TE'].includes(skillA);
+
+    const crossSkillOverlap = (): ComparisonRow[] => {
+      const rows: ComparisonRow[] = [...headRows()];
+      const ca = normalizeSkillPos(posA);
+      const cb = normalizeSkillPos(posB);
+      const isQbRbPair =
+        (ca === 'QB' && cb === 'RB') || (ca === 'RB' && cb === 'QB');
+      rows.push({
+        label: 'Total TDs',
+        left: formatStat(offenseTotalTds(a), 0),
+        right: formatStat(offenseTotalTds(b), 0),
+        compareLeft: offenseTotalTds(a),
+        compareRight: offenseTotalTds(b),
+        higherWins: true,
+      });
+      const showReceivingCross =
+        !isQbRbPair &&
+        (ca === 'WR' ||
+          ca === 'TE' ||
+          cb === 'WR' ||
+          cb === 'TE' ||
+          ca === 'RB' ||
+          cb === 'RB');
+      if (showReceivingCross) {
+        rows.push(
+          {
+            label: 'Rec Yards',
+            left: formatStat(a?.totalRecYards, 0),
+            right: formatStat(b?.totalRecYards, 0),
+            compareLeft: a?.totalRecYards ?? null,
+            compareRight: b?.totalRecYards ?? null,
+            higherWins: true,
+          },
+          {
+            label: 'Rec TDs',
+            left: formatStat(a?.totalRecTds, 0),
+            right: formatStat(b?.totalRecTds, 0),
+            compareLeft: a?.totalRecTds ?? null,
+            compareRight: b?.totalRecTds ?? null,
+            higherWins: true,
+          },
+          {
+            label: 'Receptions',
+            left: formatStat(a?.totalReceptions, 0),
+            right: formatStat(b?.totalReceptions, 0),
+            compareLeft: a?.totalReceptions ?? null,
+            compareRight: b?.totalReceptions ?? null,
+            higherWins: true,
+          },
+          {
+            label: 'Targets',
+            left: formatStat(a?.totalTargets, 0),
+            right: formatStat(b?.totalTargets, 0),
+            compareLeft: a?.totalTargets ?? null,
+            compareRight: b?.totalTargets ?? null,
+            higherWins: true,
+          }
+        );
+      }
+      rows.push(
+        {
+          label: 'Rush Yards',
+          left: formatStat(a?.totalRushYards, 0),
+          right: formatStat(b?.totalRushYards, 0),
+          compareLeft: a?.totalRushYards ?? null,
+          compareRight: b?.totalRushYards ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Rush TDs',
+          left: formatStat(a?.totalRushTds, 0),
+          right: formatStat(b?.totalRushTds, 0),
+          compareLeft: a?.totalRushTds ?? null,
+          compareRight: b?.totalRushTds ?? null,
+          higherWins: true,
+        }
+      );
+      rows.push(gamesPlayedRow);
+      return rows;
+    };
+
+    if (!sameSkillClass) {
+      return crossSkillOverlap();
+    }
+
+    const p = posA;
+    if (p === 'QB') {
+      return [
+        ...headRows(),
+        {
+          label: 'Pass Yards',
+          left: formatStat(a?.totalPassYards, 0),
+          right: formatStat(b?.totalPassYards, 0),
+          compareLeft: a?.totalPassYards ?? null,
+          compareRight: b?.totalPassYards ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'YPG',
+          left: formatStat(passYpg(a), 1),
+          right: formatStat(passYpg(b), 1),
+          compareLeft: passYpg(a),
+          compareRight: passYpg(b),
+          higherWins: true,
+        },
+        {
+          label: 'Pass Att',
+          left: formatStat(exA?.passAttempts ?? null, 0),
+          right: formatStat(exB?.passAttempts ?? null, 0),
+          compareLeft: exA?.passAttempts ?? null,
+          compareRight: exB?.passAttempts ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Pass TDs',
+          left: formatStat(a?.totalPassTds, 0),
+          right: formatStat(b?.totalPassTds, 0),
+          compareLeft: a?.totalPassTds ?? null,
+          compareRight: b?.totalPassTds ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Interceptions',
+          left: formatStat(a?.totalInterceptions, 0),
+          right: formatStat(b?.totalInterceptions, 0),
+          compareLeft: a?.totalInterceptions ?? null,
+          compareRight: b?.totalInterceptions ?? null,
+          lowerIsBetter: true,
+        },
+        {
+          label: 'Rush Yards',
+          left: formatStat(a?.totalRushYards, 0),
+          right: formatStat(b?.totalRushYards, 0),
+          compareLeft: a?.totalRushYards ?? null,
+          compareRight: b?.totalRushYards ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Fumbles',
+          left: formatStat(exA?.fumbles ?? null, 0),
+          right: formatStat(exB?.fumbles ?? null, 0),
+          compareLeft: exA?.fumbles ?? null,
+          compareRight: exB?.fumbles ?? null,
+          lowerIsBetter: true,
+        },
+        {
+          label: 'Rush TDs',
+          left: formatStat(a?.totalRushTds, 0),
+          right: formatStat(b?.totalRushTds, 0),
+          compareLeft: a?.totalRushTds ?? null,
+          compareRight: b?.totalRushTds ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Total TDs',
+          left: formatStat(offenseTotalTds(a), 0),
+          right: formatStat(offenseTotalTds(b), 0),
+          compareLeft: offenseTotalTds(a),
+          compareRight: offenseTotalTds(b),
+          higherWins: true,
+        },
+        gamesPlayedRow,
+      ];
+    }
+
+    if (p === 'RB' || p === 'FB') {
+      return [
+        ...headRows(),
+        {
+          label: 'Attempts',
+          left: formatStat(exA?.rushAttempts ?? null, 0),
+          right: formatStat(exB?.rushAttempts ?? null, 0),
+          compareLeft: exA?.rushAttempts ?? null,
+          compareRight: exB?.rushAttempts ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Rush Yards',
+          left: formatStat(a?.totalRushYards, 0),
+          right: formatStat(b?.totalRushYards, 0),
+          compareLeft: a?.totalRushYards ?? null,
+          compareRight: b?.totalRushYards ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Rush TDs',
+          left: formatStat(a?.totalRushTds, 0),
+          right: formatStat(b?.totalRushTds, 0),
+          compareLeft: a?.totalRushTds ?? null,
+          compareRight: b?.totalRushTds ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Receptions',
+          left: formatStat(a?.totalReceptions, 0),
+          right: formatStat(b?.totalReceptions, 0),
+          compareLeft: a?.totalReceptions ?? null,
+          compareRight: b?.totalReceptions ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Targets',
+          left: formatStat(a?.totalTargets, 0),
+          right: formatStat(b?.totalTargets, 0),
+          compareLeft: a?.totalTargets ?? null,
+          compareRight: b?.totalTargets ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Rec Yards',
+          left: formatStat(a?.totalRecYards, 0),
+          right: formatStat(b?.totalRecYards, 0),
+          compareLeft: a?.totalRecYards ?? null,
+          compareRight: b?.totalRecYards ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Rec TDs',
+          left: formatStat(a?.totalRecTds, 0),
+          right: formatStat(b?.totalRecTds, 0),
+          compareLeft: a?.totalRecTds ?? null,
+          compareRight: b?.totalRecTds ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Fumbles',
+          left: formatStat(exA?.fumbles ?? null, 0),
+          right: formatStat(exB?.fumbles ?? null, 0),
+          compareLeft: exA?.fumbles ?? null,
+          compareRight: exB?.fumbles ?? null,
+          lowerIsBetter: true,
+        },
+        {
+          label: 'Total TDs',
+          left: formatStat(offenseTotalTds(a), 0),
+          right: formatStat(offenseTotalTds(b), 0),
+          compareLeft: offenseTotalTds(a),
+          compareRight: offenseTotalTds(b),
+          higherWins: true,
+        },
+        gamesPlayedRow,
+      ];
+    }
+
+    if (p === 'WR' || p === 'TE') {
+      return [
+        ...headRows(),
+        {
+          label: 'Targets',
+          left: formatStat(a?.totalTargets, 0),
+          right: formatStat(b?.totalTargets, 0),
+          compareLeft: a?.totalTargets ?? null,
+          compareRight: b?.totalTargets ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Receptions',
+          left: formatStat(a?.totalReceptions, 0),
+          right: formatStat(b?.totalReceptions, 0),
+          compareLeft: a?.totalReceptions ?? null,
+          compareRight: b?.totalReceptions ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Rec Yards',
+          left: formatStat(a?.totalRecYards, 0),
+          right: formatStat(b?.totalRecYards, 0),
+          compareLeft: a?.totalRecYards ?? null,
+          compareRight: b?.totalRecYards ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Rec TDs',
+          left: formatStat(a?.totalRecTds, 0),
+          right: formatStat(b?.totalRecTds, 0),
+          compareLeft: a?.totalRecTds ?? null,
+          compareRight: b?.totalRecTds ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Rush Yards',
+          left: formatStat(a?.totalRushYards, 0),
+          right: formatStat(b?.totalRushYards, 0),
+          compareLeft: a?.totalRushYards ?? null,
+          compareRight: b?.totalRushYards ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Rush TDs',
+          left: formatStat(a?.totalRushTds, 0),
+          right: formatStat(b?.totalRushTds, 0),
+          compareLeft: a?.totalRushTds ?? null,
+          compareRight: b?.totalRushTds ?? null,
+          higherWins: true,
+        },
+        {
+          label: 'Total TDs',
+          left: formatStat(offenseTotalTds(a), 0),
+          right: formatStat(offenseTotalTds(b), 0),
+          compareLeft: offenseTotalTds(a),
+          compareRight: offenseTotalTds(b),
+          higherWins: true,
+        },
+        gamesPlayedRow,
+      ];
+    }
+
+    return crossSkillOverlap();
+  };
+
+  const comparisonRows =
+    comparisonPlayer && comparisonStats
+      ? buildComparisonRows(
+          player.position,
+          comparisonPlayer.position,
+          stats2025 ?? null,
+          comparisonStats,
+          comparisonWeeklyExtras?.left ?? null,
+          comparisonWeeklyExtras?.right ?? null,
+          playerAge,
+          comparisonPlayerAge
+        )
+      : [];
+
+  const activeComparisonRows =
+    comparisonStatSource === 'team' ? teamComparisonRows : comparisonRows;
+
   const statsForView = getStatsForView(player.position, statView);
+  const teamRankSubtitleLeft = nflTeamSubtitleFullName(player.team, player.position, player.name);
+  const teamRankSubtitleRight = comparisonPlayer
+    ? nflTeamSubtitleFullName(comparisonPlayer.team, comparisonPlayer.position, comparisonPlayer.name)
+    : '';
+  /** D/ST names already include the club; avoid duplicating the full team line under each name */
+  const showTeamRankHeaderSubtitle =
+    comparisonStatSource === 'team' &&
+    !(isDefensePosition(player.position) && comparisonPlayer && isDefensePosition(comparisonPlayer.position));
   const showStatTabs = (player.position === 'QB' || player.position === 'RB' || player.position === 'FB' || player.position === 'WR' || player.position === 'TE');
   const jerseyTeamAbbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
   const numberFill = lookupJerseyNumberFill(jerseyColorsByAbbr, jerseyTeamAbbr);
@@ -1245,9 +2111,9 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
                 <BarChart3 className="w-4 h-4" />
                 Game Stats
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="gap-2">
-                <Calendar className="w-4 h-4" />
-                Schedule
+              <TabsTrigger value="comparison" className="gap-2">
+                <GitCompareArrows className="w-4 h-4" />
+                Player Comparison
               </TabsTrigger>
             </TabsList>
 
@@ -1411,50 +2277,233 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025 }: Pl
               )}
             </TabsContent>
 
-            <TabsContent value="schedule" className="flex-1 min-h-0 overflow-auto mt-4 scrollbar-thin">
-              {schedule.length > 0 ? (
-                <Table disableInnerScroll>
-                  <TableHeader className="sticky top-0 z-20 bg-background shadow-[inset_0_-1px_0_0_hsl(var(--border))]">
-                    <TableRow className="border-b-0 hover:bg-transparent">
-                      <TableHead className="w-16 bg-background">Week</TableHead>
-                      <TableHead className="bg-background">Opponent</TableHead>
-                      <TableHead className="w-24 bg-background">Home/Away</TableHead>
-                      <TableHead className="bg-background text-right">Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {schedule.map((game) => {
-                      const isHome = game.home_team === player.team;
-                      const opponent = isHome ? game.away_team : game.home_team;
-                      return (
-                        <TableRow key={game.id}>
-                          <TableCell className="font-medium">W{game.week}</TableCell>
-                          <TableCell>
-                            {isHome ? '' : '@'}{opponent}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {isHome ? 'Home' : 'Away'}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {game.game_date
-                              ? new Date(game.game_date).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                })
-                              : 'TBD'}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No upcoming games scheduled</p>
-                  <p className="text-sm">Schedule will appear here when available</p>
+            <TabsContent value="comparison" className="flex-1 min-h-0 overflow-auto mt-4 scrollbar-thin">
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <p className="text-sm text-muted-foreground">Select another player to compare 2025 season stats side-by-side.</p>
+                  <Input
+                    value={comparisonQuery}
+                    onChange={(e) => setComparisonQuery(e.target.value)}
+                    placeholder={
+                      comparisonPositionFilter
+                        ? `Search ${comparisonPositionFilter}...`
+                        : 'Search any skill player...'
+                    }
+                  />
+                  {!!comparisonQuery.trim() && (
+                    <div className="max-h-52 overflow-auto rounded-md border bg-background scrollbar-thin">
+                      {comparisonLoading ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">Searching...</div>
+                      ) : comparisonResults.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">No players found</div>
+                      ) : (
+                        <div className="p-1">
+                          {comparisonResults.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className="w-full rounded-sm px-2 py-2 text-left hover:bg-muted transition-colors"
+                              onClick={() => {
+                                setComparisonPlayer(p);
+                                setComparisonQuery('');
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="truncate font-medium">{p.name}</span>
+                                <PositionBadge position={p.position} className="text-[10px] shrink-0" />
+                                {!isDefensePosition(p.position) && (
+                                  <span className="text-xs text-muted-foreground shrink-0">
+                                    {displayTeamAbbrevOrFa(p.team, p.position, p.name)}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {!hasComparison ? (
+                  <div className="text-center py-10 text-muted-foreground border rounded-lg">
+                    <GitCompareArrows className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                    <p>Select a player to start comparison</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      <Select
+                        value={comparisonStatSource}
+                        onValueChange={(v) => setComparisonStatSource(v as 'player' | 'team')}
+                      >
+                        <SelectTrigger className="w-full sm:w-[260px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="player">Player stats (2025)</SelectItem>
+                          <SelectItem value="team">Team ranks</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {comparisonStatSource === 'team' && (
+                        <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
+                          NFL team ranks use regular-season stats: the #1 offense leads in scoring and yards gained; the #1
+                          defense allows the fewest yards and points.
+                        </p>
+                      )}
+                    </div>
+
+                    <Table disableInnerScroll>
+                      <TableHeader className="sticky top-0 z-20 bg-background shadow-[inset_0_-1px_0_0_hsl(var(--border))]">
+                        <TableRow className="border-b-0 hover:bg-transparent">
+                          <TableHead className="bg-background text-right min-w-[7rem] align-bottom">
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="truncate max-w-[12rem]" title={player.name}>
+                                {player.name}
+                              </span>
+                              {showTeamRankHeaderSubtitle && (
+                                <span
+                                  className="text-xs font-normal text-muted-foreground text-right leading-snug max-w-[min(100%,14rem)]"
+                                  title={teamRankSubtitleLeft}
+                                >
+                                  {teamRankSubtitleLeft}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="bg-background text-center align-bottom">Stat</TableHead>
+                          <TableHead className="bg-background text-left min-w-[7rem] align-bottom">
+                            <div className="flex flex-col items-start gap-0.5">
+                              <span className="truncate max-w-[12rem]" title={comparisonPlayer.name}>
+                                {comparisonPlayer.name}
+                              </span>
+                              {showTeamRankHeaderSubtitle && (
+                                <span
+                                  className="text-xs font-normal text-muted-foreground text-left leading-snug max-w-[min(100%,14rem)]"
+                                  title={teamRankSubtitleRight}
+                                >
+                                  {teamRankSubtitleRight}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {comparisonStatSource === 'team' && nflTeamRanks.loading ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="py-12 text-center">
+                              <BrandedLoader />
+                            </TableCell>
+                          </TableRow>
+                        ) : comparisonStatSource === 'team' && nflTeamRanks.error ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="py-8 text-center text-sm text-destructive">
+                              {nflTeamRanks.error}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          activeComparisonRows.map((row) => {
+                            const bold = pickBoldSide(row);
+                            const hlLeft = positionComparisonHighlightClass(player.position);
+                            const hlRight = positionComparisonHighlightClass(comparisonPlayer.position);
+                            const leftCell =
+                              row.sosCells &&
+                              row.sosCells.leftPct != null &&
+                              row.sosCells.leftRank != null ? (
+                                <>
+                                  {bold === 'left' ? (
+                                    <span
+                                      className={cn(
+                                        'inline-block rounded-md px-1.5 py-0.5 font-semibold tabular-nums',
+                                        hlLeft
+                                      )}
+                                    >
+                                      {formatOpponentWinPctDisplay(row.sosCells.leftPct)}
+                                    </span>
+                                  ) : (
+                                    <span className="tabular-nums">{formatOpponentWinPctDisplay(row.sosCells.leftPct)}</span>
+                                  )}
+                                  <span className="text-muted-foreground tabular-nums text-sm">
+                                    {' '}
+                                    ({sosOrdinal(row.sosCells.leftRank)})
+                                  </span>
+                                </>
+                              ) : bold === 'left' ? (
+                                <span
+                                  className={cn(
+                                    'inline-block rounded-md px-1.5 py-0.5 font-semibold tabular-nums',
+                                    hlLeft
+                                  )}
+                                >
+                                  {row.left}
+                                </span>
+                              ) : (
+                                row.left
+                              );
+                            const rightCell =
+                              row.sosCells &&
+                              row.sosCells.rightPct != null &&
+                              row.sosCells.rightRank != null ? (
+                                <>
+                                  {bold === 'right' ? (
+                                    <span
+                                      className={cn(
+                                        'inline-block rounded-md px-1.5 py-0.5 font-semibold tabular-nums',
+                                        hlRight
+                                      )}
+                                    >
+                                      {formatOpponentWinPctDisplay(row.sosCells.rightPct)}
+                                    </span>
+                                  ) : (
+                                    <span className="tabular-nums">{formatOpponentWinPctDisplay(row.sosCells.rightPct)}</span>
+                                  )}
+                                  <span className="text-muted-foreground tabular-nums text-sm">
+                                    {' '}
+                                    ({sosOrdinal(row.sosCells.rightRank)})
+                                  </span>
+                                </>
+                              ) : bold === 'right' ? (
+                                <span
+                                  className={cn(
+                                    'inline-block rounded-md px-1.5 py-0.5 font-semibold tabular-nums',
+                                    hlRight
+                                  )}
+                                >
+                                  {row.right}
+                                </span>
+                              ) : (
+                                row.right
+                              );
+                            return (
+                              <TableRow key={row.label}>
+                                <TableCell className="text-right tabular-nums text-foreground align-middle">{leftCell}</TableCell>
+                                <TableCell className="text-center text-muted-foreground text-sm">
+                                  {row.label === '2026 SOS' ? (
+                                    <Tooltip delayDuration={200}>
+                                      <TooltipTrigger asChild>
+                                        <span className="cursor-help border-b border-dotted border-muted-foreground/55">
+                                          {row.label}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-[min(22rem,calc(100vw-2rem))] text-left leading-snug">
+                                        {NFL_2026_SOS_HELP_TEXT}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ) : (
+                                    row.label
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-left tabular-nums text-foreground align-middle">{rightCell}</TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         )}

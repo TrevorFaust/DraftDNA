@@ -2585,6 +2585,7 @@ const DraftRoom = () => {
         open={isStatsDialogOpen}
         onOpenChange={setIsStatsDialogOpen}
         stats2025={selectedPlayerForStats ? player2025Stats.get(selectedPlayerForStats.id) : undefined}
+        allStats2025={player2025Stats}
       />
     </div>
   );

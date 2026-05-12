@@ -6,13 +6,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { usePlayer2025Stats, type Player2025Stats } from "@/hooks/usePlayer2025Stats";
-import { ArrowDown, ArrowUp, Lightbulb } from "lucide-react";
+import { ArrowDown, ArrowUp, HelpCircle, Lightbulb } from "lucide-react";
 import type { RankedPlayer } from "@/types/database";
-import { displayTeamAbbrevOrFa } from "@/utils/teamMapping";
+import { displayTeamAbbrevOrFa, resolveTeamAbbrForDisplay } from "@/utils/teamMapping";
+import { useNfl2025TeamRankings, type TeamRankMetric } from "@/hooks/useNfl2025TeamRankings";
+import {
+  formatSosCellDisplay,
+  getNfl2026SosOppWinPct,
+  getNfl2026SosRank,
+  NFL_2026_SOS_HELP_TEXT,
+} from "@/constants/nfl2026StrengthOfSchedule";
 import { PlayerDetailDialog } from "@/components/PlayerDetailDialog";
 import { cn } from "@/lib/utils";
 import { getAgeFromBirthDate } from "@/utils/playerAge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NFL_DEFENSE_TEAM_NAMES } from "@/constants/nflDefenses";
 import {
   PLAYER_POOL_PRIOR_SEASON,
@@ -41,6 +49,50 @@ type StatColumn = {
 type SortDirection = "desc" | "asc";
 type SortConfig = { key: string; direction: SortDirection };
 const ALLOWED_POSITIONS = new Set(["QB", "RB", "WR", "TE", "K", "D/ST"]);
+
+/** Shown on column headers; rank is always among 32 NFL teams (same metrics as Player Comparison → Team ranks). */
+const NFL_TEAM_RANK_SCALE = " (1 is best 32 is worst)";
+
+const SOS_2026_SORT_KEY = "tmSos2026";
+
+/** NFL team season ranks; same metrics as Player Comparison → Team ranks */
+const NFL_TEAM_RANK_COLUMNS: {
+  sortKey: string;
+  label: string;
+  metric: TeamRankMetric;
+  tooltip: string;
+}[] = [
+  {
+    sortKey: "tmOffPpg",
+    label: "Off PPG",
+    metric: "offPpg",
+    tooltip: `NFL team offense: points per game rank. ${NFL_TEAM_RANK_SCALE}`,
+  },
+  {
+    sortKey: "tmPassYpg",
+    label: "Off Pass YPG",
+    metric: "offPassYpg",
+    tooltip: `NFL team offense: passing yards per game rank. ${NFL_TEAM_RANK_SCALE}`,
+  },
+  {
+    sortKey: "tmRushYpg",
+    label: "Off Rush YPG",
+    metric: "offRushYpg",
+    tooltip: `NFL team offense: rushing yards per game rank. ${NFL_TEAM_RANK_SCALE}`,
+  },
+  {
+    sortKey: "tmDefYpg",
+    label: "Def YPG",
+    metric: "defYpg",
+    tooltip: `NFL team defense: yards allowed per game rank. ${NFL_TEAM_RANK_SCALE}`,
+  },
+  {
+    sortKey: "tmDefPpg",
+    label: "Def PPG",
+    metric: "defPpg",
+    tooltip: `NFL team defense: points allowed per game rank. ${NFL_TEAM_RANK_SCALE}`,
+  },
+];
 
 type StatsBucket = {
   scoringFormat: ScoringFormat;
@@ -392,6 +444,7 @@ export default function PlayersSpreadsheet() {
   ]);
 
   const statsMap = usePlayer2025Stats(displayBucket.scoringFormat);
+  const nflTeamRanks = useNfl2025TeamRankings(true);
 
   const scoringPhrase = scoringFormatLabel(displayBucket.scoringFormat);
   const bucketBadgeLine = useMemo(() => {
@@ -596,6 +649,15 @@ export default function PlayersSpreadsheet() {
     if (sortKey === "age") return normalizedPosition === "D/ST" ? null : age;
     if (sortKey === "ppg") return stats?.avgPointsPerGame ?? null;
     if (sortKey === "gp") return stats?.gamesPlayed ?? null;
+    const teamRankCol = NFL_TEAM_RANK_COLUMNS.find((c) => c.sortKey === sortKey);
+    if (teamRankCol) {
+      const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
+      return nflTeamRanks.getRank(abbr, teamRankCol.metric);
+    }
+    if (sortKey === SOS_2026_SORT_KEY) {
+      const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
+      return getNfl2026SosRank(abbr);
+    }
     if (sortKey === "totalPoints") return stats?.totalFantasyPoints ?? null;
     if (sortKey === "posRank") {
       const match = normalizedPosRankByPlayerId.get(player.id)?.match(/(\d+)$/);
@@ -628,15 +690,29 @@ export default function PlayersSpreadsheet() {
       return sortConfig.direction === "asc" ? cmp : -cmp;
     });
     return filtered;
-  }, [players, searchTerm, positionFilter, teamFilter, sortConfig, statsMap, ageByEspnId, activeStatColumns, normalizedPosRankByPlayerId]);
+  }, [
+    players,
+    searchTerm,
+    positionFilter,
+    teamFilter,
+    sortConfig,
+    statsMap,
+    ageByEspnId,
+    activeStatColumns,
+    normalizedPosRankByPlayerId,
+    nflTeamRanks.getRank,
+  ]);
 
   const onSort = (key: string, sortable: boolean) => {
     if (!sortable) return;
+    const nflRankFirstAsc = NFL_TEAM_RANK_COLUMNS.some((c) => c.sortKey === key);
+    const sosFirstDesc = key === SOS_2026_SORT_KEY;
     setSortConfig((prev) => {
       if (prev.key === key) {
         return { key, direction: prev.direction === "desc" ? "asc" : "desc" };
       }
-      return { key, direction: "desc" };
+      if (sosFirstDesc) return { key, direction: "desc" };
+      return { key, direction: nflRankFirstAsc ? "asc" : "desc" };
     });
   };
 
@@ -809,6 +885,59 @@ export default function PlayersSpreadsheet() {
                 {!hideAgeGpForDstView && (
                   <SortableHeader label="GP" sortKey="gp" sortable className="text-center" tooltip="Regular season games played." />
                 )}
+                {NFL_TEAM_RANK_COLUMNS.map((col) => (
+                  <SortableHeader
+                    key={col.sortKey}
+                    label={col.label}
+                    sortKey={col.sortKey}
+                    sortable
+                    className="text-center whitespace-nowrap min-w-[4.25rem]"
+                    tooltip={col.tooltip}
+                  />
+                ))}
+                <TableHead
+                  className={cn(
+                    "sticky top-[var(--nav-sticky-offset)] z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
+                    "text-center whitespace-nowrap min-w-[10rem]"
+                  )}
+                >
+                  <div className="flex items-center justify-center gap-0.5">
+                    <Tooltip delayDuration={200}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 cursor-pointer select-none bg-transparent border-0 p-0 font-inherit hover:opacity-90 justify-center"
+                          onClick={() => onSort(SOS_2026_SORT_KEY, true)}
+                        >
+                          2026 SOS
+                          {sortConfig.key === SOS_2026_SORT_KEY && sortConfig.direction === "desc" && (
+                            <ArrowDown className="h-3.5 w-3.5 shrink-0" />
+                          )}
+                          {sortConfig.key === SOS_2026_SORT_KEY && sortConfig.direction === "asc" && (
+                            <ArrowUp className="h-3.5 w-3.5 shrink-0" />
+                          )}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[min(100vw-2rem,22rem)] text-left leading-snug">
+                        {NFL_2026_SOS_HELP_TEXT}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          aria-label="About 2026 strength of schedule"
+                        >
+                          <HelpCircle className="h-3.5 w-3.5 shrink-0" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="center" className="z-[750] w-80">
+                        <p className="text-sm leading-relaxed text-muted-foreground">{NFL_2026_SOS_HELP_TEXT}</p>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -819,6 +948,9 @@ export default function PlayersSpreadsheet() {
                 const normalizedPosition = normalizeFantasyPosition(player.position);
                 const age = normalizedPosition === "D/ST" ? null : (espnId ? ageByEspnId.get(espnId) ?? null : null);
                 const displayPosRank = normalizedPosRankByPlayerId.get(player.id) ?? "-";
+                const teamAbbrForSos = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
+                const sos2026Rank = getNfl2026SosRank(teamAbbrForSos);
+                const sos2026Pct = getNfl2026SosOppWinPct(teamAbbrForSos);
                 return (
                   <TableRow
                     key={player.id}
@@ -849,6 +981,28 @@ export default function PlayersSpreadsheet() {
                     {!hideAgeGpForDstView && (
                       <TableCell className="text-center">{formatWhole(stats?.gamesPlayed)}</TableCell>
                     )}
+                    {NFL_TEAM_RANK_COLUMNS.map((col) => {
+                      if (nflTeamRanks.loading) {
+                        return (
+                          <TableCell key={col.sortKey} className="text-center tabular-nums text-muted-foreground">
+                            –
+                          </TableCell>
+                        );
+                      }
+                      const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
+                      const rank =
+                        !abbr || abbr === "FA" ? null : nflTeamRanks.getRank(abbr, col.metric);
+                      return (
+                        <TableCell key={col.sortKey} className="text-center tabular-nums">
+                          {rank != null ? String(rank) : "-"}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className="text-center tabular-nums text-sm">
+                      {sos2026Pct != null && sos2026Rank != null
+                        ? formatSosCellDisplay(sos2026Pct, sos2026Rank)
+                        : "-"}
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -861,6 +1015,7 @@ export default function PlayersSpreadsheet() {
           open={detailDialogOpen}
           onOpenChange={setDetailDialogOpen}
           stats2025={selectedPlayer ? statsMap.get(selectedPlayer.id) : undefined}
+          allStats2025={statsMap}
         />
       </main>
     </div>

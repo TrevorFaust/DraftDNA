@@ -17,6 +17,7 @@ export const TEAM_ABBREV_TO_FULL_NAME: Record<string, string> = {
   'JAX': 'Jacksonville Jaguars',
   'KC': 'Kansas City Chiefs',
   'LA': 'Los Angeles Rams',
+  'LAR': 'Los Angeles Rams',
   'LAC': 'Los Angeles Chargers',
   'LV': 'Las Vegas Raiders',
   'MIA': 'Miami Dolphins',

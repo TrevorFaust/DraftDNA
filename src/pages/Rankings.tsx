@@ -2468,6 +2468,7 @@ const Rankings = () => {
         open={detailDialogOpen}
         onOpenChange={setDetailDialogOpen}
         stats2025={selectedPlayer ? player2025Stats.get(selectedPlayer.id) : undefined}
+        allStats2025={player2025Stats}
       />
     </div>
   );

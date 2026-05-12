@@ -51,8 +51,12 @@ interface PlayerSearchComboboxProps {
   value: Player | null;
   onChange: (player: Player | null) => void;
   excludePlayerIds?: Set<string>;
+  /** Positions to exclude from results (supports DEF/DST aliases). */
+  excludePositions?: string[];
   /** When set, only players with this position are shown (e.g. 'QB', 'WR', 'D/ST'). */
   positionFilter?: string;
+  /** Use modal popover when rendered inside a dialog/focus trap. */
+  popoverModal?: boolean;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
@@ -62,7 +66,9 @@ export function PlayerSearchCombobox({
   value,
   onChange,
   excludePlayerIds = new Set(),
+  excludePositions = [],
   positionFilter,
+  popoverModal = false,
   disabled = false,
   placeholder = 'Search player...',
   className,
@@ -114,12 +120,21 @@ export function PlayerSearchCombobox({
     return () => clearTimeout(debounce);
   }, [search, fetchPlayers]);
 
-  const filteredPlayers = players.filter(
-    (p) => !excludePlayerIds.has(p.id)
-  );
+  const normalizePosition = (position: string) => {
+    const p = (position || '').toUpperCase();
+    if (p === 'DEF' || p === 'DST') return 'D/ST';
+    return p;
+  };
+
+  const excludedPositionsSet = new Set(excludePositions.map(normalizePosition));
+  const filteredPlayers = players.filter((p) => {
+    if (excludePlayerIds.has(p.id)) return false;
+    if (excludedPositionsSet.size === 0) return true;
+    return !excludedPositionsSet.has(normalizePosition(p.position));
+  });
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={popoverModal}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
