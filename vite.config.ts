@@ -4,22 +4,6 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-const publicDir = path.resolve(__dirname, "public");
-const faviconPng = path.join(publicDir, "dna_image.png");
-const faviconIco = path.join(publicDir, "favicon.ico");
-/** Google often requests /favicon.ico; mirror the PNG so SERP icons match your DNA mark. */
-function syncFaviconIcoFromPng() {
-  try {
-    if (fs.existsSync(faviconPng)) {
-      fs.copyFileSync(faviconPng, faviconIco);
-    }
-  } catch (e) {
-    console.warn("[vite] Could not copy dna_image.png → favicon.ico:", e);
-  }
-}
-
-syncFaviconIcoFromPng();
-
 const SEO_PATHS = [
   "/",
   "/rankings",
@@ -44,7 +28,7 @@ function absoluteSeoHeadPlugin(mode: string, envDir: string): Plugin {
       const origin = siteOriginFromEnv(mode, envDir);
       if (!origin) return html;
 
-      const image = `${origin}/dna_image.png`;
+      const image = `${origin}/dna_image.png?v=3`;
       const websiteLd = {
         "@context": "https://schema.org",
         "@type": "WebSite",
