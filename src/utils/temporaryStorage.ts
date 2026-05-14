@@ -269,5 +269,6 @@ export const allLeaguesBucketStorage = {
   save(bucket: AllLeaguesBucket): void {
     if (typeof window === 'undefined') return;
     localStorage.setItem(ALL_LEAGUES_BUCKET_KEY, JSON.stringify(bucket));
+    window.dispatchEvent(new Event('all-leagues-bucket-changed'));
   },
 };

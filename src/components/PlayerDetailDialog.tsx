@@ -47,6 +47,8 @@ import {
   NFL_2026_SOS_HELP_TEXT,
   sosOrdinal,
 } from '@/constants/nfl2026StrengthOfSchedule';
+import { getNflOlinePassOverallRank, getNflOlineRunOverallRank, getNflOlineUnitOverallRank } from '@/constants/nflOlineTeamRanks2025';
+import { OlineTeamRankStatTrigger } from '@/components/OlineComparisonMetricPanel';
 import { cn } from '@/lib/utils';
 
 /** Winner pill in player comparison — matches PositionBadge / `index.css` position colors */
@@ -1384,12 +1386,46 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
         lowerRankWins: true,
       };
     });
+    const offEnd = 3;
+    const olineOverallL = getNflOlineUnitOverallRank(tl);
+    const olineOverallR = getNflOlineUnitOverallRank(tr);
+    const olinePassL = getNflOlinePassOverallRank(tl);
+    const olinePassR = getNflOlinePassOverallRank(tr);
+    const olineRunL = getNflOlineRunOverallRank(tl);
+    const olineRunR = getNflOlineRunOverallRank(tr);
+    const olineRows: typeof fromRanks = [
+      {
+        label: 'O-line overall rank',
+        left: olineOverallL != null ? String(olineOverallL) : '—',
+        right: olineOverallR != null ? String(olineOverallR) : '—',
+        compareLeft: olineOverallL,
+        compareRight: olineOverallR,
+        lowerRankWins: true,
+      },
+      {
+        label: 'O-line pass rank',
+        left: olinePassL != null ? String(olinePassL) : '—',
+        right: olinePassR != null ? String(olinePassR) : '—',
+        compareLeft: olinePassL,
+        compareRight: olinePassR,
+        lowerRankWins: true,
+      },
+      {
+        label: 'O-line run rank',
+        left: olineRunL != null ? String(olineRunL) : '—',
+        right: olineRunR != null ? String(olineRunR) : '—',
+        compareLeft: olineRunL,
+        compareRight: olineRunR,
+        lowerRankWins: true,
+      },
+    ];
+    const mergedTeamRows = [...fromRanks.slice(0, offEnd), ...olineRows, ...fromRanks.slice(offEnd)];
     const sosLp = getNfl2026SosOppWinPct(tl);
     const sosLr = getNfl2026SosRank(tl);
     const sosRp = getNfl2026SosOppWinPct(tr);
     const sosRr = getNfl2026SosRank(tr);
     return [
-      ...fromRanks,
+      ...mergedTeamRows,
       {
         label: '2026 SOS',
         left:
@@ -2490,6 +2526,56 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
                                         {NFL_2026_SOS_HELP_TEXT}
                                       </TooltipContent>
                                     </Tooltip>
+                                  ) : row.label === 'O-line overall rank' ? (
+                                    <OlineTeamRankStatTrigger
+                                      mode="full"
+                                      label={row.label}
+                                      teamAbbrLeft={resolveTeamAbbrForDisplay(
+                                        player.team,
+                                        player.position,
+                                        player.name
+                                      )}
+                                      teamAbbrRight={resolveTeamAbbrForDisplay(
+                                        comparisonPlayer.team,
+                                        comparisonPlayer.position,
+                                        comparisonPlayer.name
+                                      )}
+                                      columnHeaderLeft={displayTeamAbbrevOrFa(
+                                        player.team,
+                                        player.position,
+                                        player.name
+                                      )}
+                                      columnHeaderRight={displayTeamAbbrevOrFa(
+                                        comparisonPlayer.team,
+                                        comparisonPlayer.position,
+                                        comparisonPlayer.name
+                                      )}
+                                    />
+                                  ) : row.label === 'O-line pass rank' || row.label === 'O-line run rank' ? (
+                                    <OlineTeamRankStatTrigger
+                                      mode={row.label === 'O-line pass rank' ? 'pass' : 'run'}
+                                      label={row.label}
+                                      teamAbbrLeft={resolveTeamAbbrForDisplay(
+                                        player.team,
+                                        player.position,
+                                        player.name
+                                      )}
+                                      teamAbbrRight={resolveTeamAbbrForDisplay(
+                                        comparisonPlayer.team,
+                                        comparisonPlayer.position,
+                                        comparisonPlayer.name
+                                      )}
+                                      columnHeaderLeft={displayTeamAbbrevOrFa(
+                                        player.team,
+                                        player.position,
+                                        player.name
+                                      )}
+                                      columnHeaderRight={displayTeamAbbrevOrFa(
+                                        comparisonPlayer.team,
+                                        comparisonPlayer.position,
+                                        comparisonPlayer.name
+                                      )}
+                                    />
                                   ) : (
                                     row.label
                                   )}

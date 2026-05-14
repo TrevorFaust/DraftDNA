@@ -9,6 +9,7 @@ import { usePlayer2025Stats, type Player2025Stats } from "@/hooks/usePlayer2025S
 import { ArrowDown, ArrowUp, HelpCircle, Lightbulb } from "lucide-react";
 import type { RankedPlayer } from "@/types/database";
 import { displayTeamAbbrevOrFa, resolveTeamAbbrForDisplay } from "@/utils/teamMapping";
+import { getNflOlineTeam2025, getNflOlineUnitOverallRank } from "@/constants/nflOlineTeamRanks2025";
 import { useNfl2025TeamRankings, type TeamRankMetric } from "@/hooks/useNfl2025TeamRankings";
 import {
   formatSosCellDisplay,
@@ -35,6 +36,7 @@ import { allLeaguesBucketStorage } from "@/utils/temporaryStorage";
 import { fetchRookiesRankings, filterPlayersToRookieIds } from "@/utils/rookiesFilter";
 import type { ScoringFormat } from "@/utils/fantasyPoints";
 import { BrandedLoader } from "@/components/BrandedLoader";
+import { OlineSpreadsheetRankTrigger } from "@/components/OlineComparisonMetricPanel";
 
 type CommunityRow = { player_id: string; rank_position: number };
 type AgeRow = { espn_id: string; birth_date: string | null };
@@ -50,10 +52,10 @@ type SortDirection = "desc" | "asc";
 type SortConfig = { key: string; direction: SortDirection };
 const ALLOWED_POSITIONS = new Set(["QB", "RB", "WR", "TE", "K", "D/ST"]);
 
-/** Shown on column headers; rank is always among 32 NFL teams (same metrics as Player Comparison → Team ranks). */
-const NFL_TEAM_RANK_SCALE = " (1 is best 32 is worst)";
-
 const SOS_2026_SORT_KEY = "tmSos2026";
+
+/** PFF-style unit overall O-line rank column (detail on hover / click). */
+const OL_UNIT_OVERALL_SORT_KEY = "olUnitRk";
 
 /** NFL team season ranks; same metrics as Player Comparison → Team ranks */
 const NFL_TEAM_RANK_COLUMNS: {
@@ -66,31 +68,31 @@ const NFL_TEAM_RANK_COLUMNS: {
     sortKey: "tmOffPpg",
     label: "Off PPG",
     metric: "offPpg",
-    tooltip: `NFL team offense: points per game rank. ${NFL_TEAM_RANK_SCALE}`,
+    tooltip: "Offensive points per game — team rank in the NFL.",
   },
   {
     sortKey: "tmPassYpg",
     label: "Off Pass YPG",
     metric: "offPassYpg",
-    tooltip: `NFL team offense: passing yards per game rank. ${NFL_TEAM_RANK_SCALE}`,
+    tooltip: "Offensive passing yards per game — team rank in the NFL.",
   },
   {
     sortKey: "tmRushYpg",
     label: "Off Rush YPG",
     metric: "offRushYpg",
-    tooltip: `NFL team offense: rushing yards per game rank. ${NFL_TEAM_RANK_SCALE}`,
+    tooltip: "Offensive rushing yards per game — team rank in the NFL.",
   },
   {
     sortKey: "tmDefYpg",
     label: "Def YPG",
     metric: "defYpg",
-    tooltip: `NFL team defense: yards allowed per game rank. ${NFL_TEAM_RANK_SCALE}`,
+    tooltip: "Defensive yards allowed per game — team rank in the NFL.",
   },
   {
     sortKey: "tmDefPpg",
     label: "Def PPG",
     metric: "defPpg",
-    tooltip: `NFL team defense: points allowed per game rank. ${NFL_TEAM_RANK_SCALE}`,
+    tooltip: "Defensive points allowed per game — team rank in the NFL.",
   },
 ];
 
@@ -654,6 +656,10 @@ export default function PlayersSpreadsheet() {
       const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
       return nflTeamRanks.getRank(abbr, teamRankCol.metric);
     }
+    if (sortKey === OL_UNIT_OVERALL_SORT_KEY) {
+      const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
+      return getNflOlineUnitOverallRank(abbr);
+    }
     if (sortKey === SOS_2026_SORT_KEY) {
       const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
       return getNfl2026SosRank(abbr);
@@ -705,13 +711,15 @@ export default function PlayersSpreadsheet() {
 
   const onSort = (key: string, sortable: boolean) => {
     if (!sortable) return;
-    const nflRankFirstAsc = NFL_TEAM_RANK_COLUMNS.some((c) => c.sortKey === key);
+    const olineColPick = key === OL_UNIT_OVERALL_SORT_KEY;
     const sosFirstDesc = key === SOS_2026_SORT_KEY;
     setSortConfig((prev) => {
       if (prev.key === key) {
         return { key, direction: prev.direction === "desc" ? "asc" : "desc" };
       }
       if (sosFirstDesc) return { key, direction: "desc" };
+      if (olineColPick) return { key, direction: "asc" };
+      const nflRankFirstAsc = NFL_TEAM_RANK_COLUMNS.some((c) => c.sortKey === key);
       return { key, direction: nflRankFirstAsc ? "asc" : "desc" };
     });
   };
@@ -759,7 +767,7 @@ export default function PlayersSpreadsheet() {
     const cell = (
       <TableHead
         className={cn(
-          "sticky top-[var(--nav-sticky-offset)] z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
+          "border-b border-border bg-background text-muted-foreground shadow-[inset_0_-1px_0_0_hsl(var(--border))]",
           className
         )}
       >
@@ -842,8 +850,8 @@ export default function PlayersSpreadsheet() {
           </Select>
         </div>
 
-        <div className="rounded-lg border border-border/50 bg-secondary/20 min-w-0">
-          <Table disableInnerScroll>
+        <div className="rounded-lg border border-border/50 bg-secondary/20 min-w-0 max-w-full overflow-x-auto [overflow-y:visible]">
+          <Table disableInnerScroll className="min-w-max">
             <TableHeader className="shadow-[inset_0_-1px_0_0_hsl(var(--border))]">
               <TableRow>
                 <SortableHeader
@@ -895,10 +903,16 @@ export default function PlayersSpreadsheet() {
                     tooltip={col.tooltip}
                   />
                 ))}
+                <SortableHeader
+                  label="OL Overall"
+                  sortKey={OL_UNIT_OVERALL_SORT_KEY}
+                  sortable
+                  className="text-center whitespace-nowrap min-w-[4.25rem]"
+                  tooltip="PFF-style unit overall offensive line rank for the player's NFL team (2025, 1 = best). Hover or click for pass/run ranks and advanced metrics."
+                />
                 <TableHead
                   className={cn(
-                    "sticky top-[var(--nav-sticky-offset)] z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
-                    "text-center whitespace-nowrap min-w-[10rem]"
+                    "text-center whitespace-nowrap min-w-[10rem] border-b border-border bg-background text-muted-foreground shadow-[inset_0_-1px_0_0_hsl(var(--border))]"
                   )}
                 >
                   <div className="flex items-center justify-center gap-0.5">
@@ -998,6 +1012,17 @@ export default function PlayersSpreadsheet() {
                         </TableCell>
                       );
                     })}
+                    <TableCell className="text-center text-sm">
+                      {getNflOlineTeam2025(teamAbbrForSos) ? (
+                        <OlineSpreadsheetRankTrigger
+                          teamAbbr={teamAbbrForSos}
+                          teamLabel={team && team !== "—" ? team : "Team"}
+                          rankDisplay={String(getNflOlineUnitOverallRank(teamAbbrForSos) ?? "—")}
+                        />
+                      ) : (
+                        <span className="tabular-nums text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center tabular-nums text-sm">
                       {sos2026Pct != null && sos2026Rank != null
                         ? formatSosCellDisplay(sos2026Pct, sos2026Rank)

@@ -1,0 +1,17 @@
+{
+  "name": "Draft DNA — NFL fantasy mock drafts & rankings",
+  "short_name": "Draft DNA",
+  "description": "Fantasy football mock drafts, custom NFL player rankings, stats, and the Pick Six prediction challenge.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1628",
+  "theme_color": "#0a1628",
+  "icons": [
+    {
+      "src": "/dna_image.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

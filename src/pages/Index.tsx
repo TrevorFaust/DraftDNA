@@ -44,10 +44,23 @@ const Index = () => {
               <span className="text-foreground">YOUR DRAFT</span>
             </h1>
             
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-              Create custom player rankings, run unlimited mock drafts, and prepare for 
-              draft day like a pro. Your board, your way.
-            </p>
+            <div
+              className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 space-y-4 leading-relaxed animate-slide-up"
+              style={{ animationDelay: '0.1s' }}
+            >
+              <p>
+                <span className="text-foreground font-medium">Draft DNA</span> is the NFL fantasy command center for
+                redraft and season-long prep: build your own <strong className="text-foreground font-semibold">draft rankings</strong> and
+                big board, stress-test strategy in <strong className="text-foreground font-semibold">unlimited mock drafts</strong>, and
+                unlock <strong className="text-foreground font-semibold">draft archetype badges</strong> that capture how you actually draft.
+              </p>
+              <p>
+                Go deeper with <strong className="text-foreground font-semibold">player stats</strong>, team context, and spreadsheet-style
+                tools so every pick is informed—not a guess. Then put your reads on the line in the{' '}
+                <strong className="text-foreground font-semibold">Pick Six challenge</strong>: weekly NFL predictions with real stakes—
+                <strong className="text-foreground font-semibold">up to $30,000 in prizes</strong> on the table while you compete on the leaderboard.
+              </p>
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
               <Link to={ctaPath}>

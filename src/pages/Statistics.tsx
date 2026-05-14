@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLeagues } from '@/hooks/useLeagues';
@@ -10,7 +10,10 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { BarChart3, Lock, HelpCircle } from 'lucide-react';
 import type { RankedPlayer, Player, MockDraft, DraftPick } from '@/types/database';
-import { tempDraftStorage, tempRankingsStorage } from '@/utils/temporaryStorage';
+import { tempDraftStorage, tempRankingsStorage, getOrCreateGuestSessionId, getRankingsDraftSessionStorageKey, rankingsDraftSessionStorage, allLeaguesBucketStorage } from '@/utils/temporaryStorage';
+import { mergeRankingsWithDraftOrder } from '@/utils/rankingsCommunityMerge';
+import { computeStudsDuds, type StudDudEntry } from '@/utils/studsDuds';
+import { fetchRookiesRankings, filterPlayersToRookieIds, type RookieRankRow } from '@/utils/rookiesFilter';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { cn } from '@/lib/utils';
 import { BrandedLoader } from '@/components/BrandedLoader';
@@ -78,6 +81,20 @@ function buildCommunityFromRpc(
   return result.map((p, index) => ({ ...p, rank: index + 1 }));
 }
 
+type CommunityRpcRow = {
+  player_id: string;
+  rank_position?: number;
+  avg_rank?: number;
+  sample_count?: number;
+};
+
+function communityRowsForBuild(rows: CommunityRpcRow[]): { player_id: string; rank_position: number }[] {
+  return rows.map((r) => ({
+    player_id: r.player_id,
+    rank_position: Number(r.rank_position ?? r.avg_rank ?? 999),
+  }));
+}
+
 const Statistics = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedLeague, leagues } = useLeagues();
@@ -85,6 +102,45 @@ const Statistics = () => {
   const player2025Stats = usePlayer2025Stats();
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [communityPlayers, setCommunityPlayers] = useState<RankedPlayer[]>([]);
+
+  const studsDudsFromRankings = useMemo((): { studs: StudDudEntry[]; duds: StudDudEntry[] } => {
+    if (players.length === 0 || communityPlayers.length === 0) {
+      if (
+        import.meta.env.DEV &&
+        typeof window !== 'undefined' &&
+        window.sessionStorage.getItem('debugStudsDuds') === '1'
+      ) {
+        console.debug('[Statistics studs/duds] skipped — empty players or community', {
+          players: players.length,
+          communityPlayers: communityPlayers.length,
+          leagueId: selectedLeague?.id ?? null,
+        });
+      }
+      return { studs: [], duds: [] };
+    }
+    const out = computeStudsDuds(players, communityPlayers, { compareMode: 'full' });
+    if (
+      import.meta.env.DEV &&
+      typeof window !== 'undefined' &&
+      window.sessionStorage.getItem('debugStudsDuds') === '1'
+    ) {
+      const sample = players.slice(0, 400);
+      const missingInCommunity = sample.filter(
+        (p) => communityPlayers.findIndex((c) => c.id === p.id) < 0
+      ).length;
+      console.debug('[Statistics studs/duds]', {
+        studs: out.studs.length,
+        duds: out.duds.length,
+        leagueId: selectedLeague?.id ?? null,
+        missingInCommunityAmongFirst400: missingInCommunity,
+        topDud: out.duds[0]
+          ? { name: out.duds[0].player.name, diff: out.duds[0].diff }
+          : null,
+      });
+    }
+    return out;
+  }, [players, communityPlayers, selectedLeague?.id]);
+
   const [draftStats, setDraftStats] = useState<{
     mostDrafted: { player: Player; count: number } | null;
     allPlayersSorted: Array<{ player: Player; count: number }>;
@@ -95,8 +151,6 @@ const Statistics = () => {
     avoidedPlayersByRound: Map<number, Array<{ player: Player; fadeScore: number; opportunityCount: number; selectionCount: number; intensitySum: number }>>;
     avoidedPlayersRaw: Array<{ player: Player; fadeScore: number; opportunityCount: number; selectionCount: number; intensitySum: number }>;
     avoidedPlayersByRoundRaw: Map<number, Array<{ player: Player; fadeScore: number; opportunityCount: number; selectionCount: number; intensitySum: number }>>;
-    studs: Array<{ player: RankedPlayer; myRank: number; communityRank: number; diff: number }>;
-    duds: Array<{ player: RankedPlayer; myRank: number; communityRank: number; diff: number }>;
     maxRound: number;
     numDrafts: number;
   }>({
@@ -109,8 +163,6 @@ const Statistics = () => {
     avoidedPlayersByRound: new Map(),
     avoidedPlayersRaw: [],
     avoidedPlayersByRoundRaw: new Map(),
-    studs: [],
-    duds: [],
     maxRound: 0,
     numDrafts: 0,
   });
@@ -214,53 +266,138 @@ const Statistics = () => {
       });
       const updatedPlayersData = deduplicatePlayersByIdentity(merged);
 
-      // Fetch community rankings for current bucket (skip dynasty - Coming Soon)
-      const isDynastyBucket = bucket.leagueType === 'dynasty';
-      let communityData: { player_id: string; rank_position: number }[] = [];
-      if (!isDynastyBucket) {
+      // Match Rankings `displayBucket`: when a league is selected, bucket columns + pool filters must come
+      // from that league — not the global community-bucket hook. Otherwise user_rankings rows do not match
+      // (e.g. hook on PPR while league is half_ppr) and we fall back to community order → empty studs/duds.
+      const isAllLeaguesUser = Boolean(user) && !selectedLeague;
+      const savedAllLeagues = isAllLeaguesUser ? allLeaguesBucketStorage.get() : null;
+      const effectiveBucket = !user
+        ? {
+            scoringFormat: bucket.scoringFormat,
+            leagueType: bucket.leagueType,
+            isSuperflex: bucket.isSuperflex,
+            rookiesOnly: Boolean((bucket as { rookiesOnly?: boolean }).rookiesOnly),
+          }
+        : isAllLeaguesUser && savedAllLeagues
+          ? {
+              scoringFormat: savedAllLeagues.scoringFormat,
+              leagueType: savedAllLeagues.leagueType,
+              isSuperflex: savedAllLeagues.isSuperflex,
+              rookiesOnly:
+                savedAllLeagues.leagueType === 'dynasty' && Boolean(savedAllLeagues.rookiesOnly),
+            }
+          : user && selectedLeague
+            ? {
+                scoringFormat:
+                  (selectedLeague.scoring_format as 'standard' | 'ppr' | 'half_ppr') || 'ppr',
+                leagueType: (selectedLeague.league_type as 'season' | 'dynasty') || 'season',
+                isSuperflex: Boolean(selectedLeague.is_superflex),
+                rookiesOnly:
+                  Boolean((selectedLeague as { rookies_only?: boolean }).rookies_only) &&
+                  (selectedLeague.league_type as string) === 'dynasty',
+              }
+            : {
+                scoringFormat: bucket.scoringFormat,
+                leagueType: bucket.leagueType,
+                isSuperflex: bucket.isSuperflex,
+                rookiesOnly: Boolean((bucket as { rookiesOnly?: boolean }).rookiesOnly),
+              };
+
+      let rookiesRowsCache: RookieRankRow[] | null = null;
+      let playerPool = updatedPlayersData;
+      if (effectiveBucket.rookiesOnly) {
+        rookiesRowsCache = await fetchRookiesRankings({
+          scoringFormat: effectiveBucket.scoringFormat as 'standard' | 'ppr' | 'half_ppr',
+          leagueType: effectiveBucket.leagueType as 'season' | 'dynasty',
+          isSuperflex: effectiveBucket.isSuperflex,
+        });
+        const rookieIds = new Set(rookiesRowsCache.map((r) => r.player_id));
+        playerPool = filterPlayersToRookieIds(playerPool, rookieIds);
+      }
+
+      const bucketKey = `${effectiveBucket.scoringFormat}/${effectiveBucket.leagueType}/${effectiveBucket.isSuperflex}/${effectiveBucket.rookiesOnly || false}`;
+
+      const isDynastyBucket = effectiveBucket.leagueType === 'dynasty';
+      let communityData: CommunityRpcRow[] = [];
+      const p_exclude_user_id = user?.id ?? null;
+      const p_exclude_guest_session_id =
+        !user && typeof window !== 'undefined' ? getOrCreateGuestSessionId() : null;
+
+      const fetchCommunityRpc = async (fmt: string, typ: string, sf: boolean) => {
         const { data } = (await supabase.rpc('get_community_rankings' as any, {
-          p_scoring_format: bucket.scoringFormat,
-          p_league_type: bucket.leagueType,
-          p_is_superflex: bucket.isSuperflex,
-        })) as { data: { player_id: string; rank_position: number }[] | null };
-        if (Array.isArray(data) && data.length > 0) {
-          communityData = data;
+          p_scoring_format: fmt,
+          p_league_type: typ,
+          p_is_superflex: sf,
+          p_exclude_user_id,
+          p_exclude_guest_session_id,
+        })) as { data: CommunityRpcRow[] | null };
+        return Array.isArray(data) && data.length > 0 ? (data as CommunityRpcRow[]) : [];
+      };
+
+      if (!isDynastyBucket) {
+        if (effectiveBucket.rookiesOnly && rookiesRowsCache) {
+          communityData = rookiesRowsCache.map((r) => ({
+            player_id: r.player_id,
+            rank_position: r.rank,
+            avg_rank: r.rank,
+            sample_count: 100,
+          }));
+        } else if (!effectiveBucket.rookiesOnly) {
+          const sf = selectedLeague != null ? Boolean(selectedLeague.is_superflex) : effectiveBucket.isSuperflex;
+          const fmt = (selectedLeague ? selectedLeague.scoring_format || 'ppr' : effectiveBucket.scoringFormat) as string;
+          const typ = (selectedLeague ? selectedLeague.league_type || 'season' : effectiveBucket.leagueType) as string;
+          communityData = await fetchCommunityRpc(fmt, typ, sf);
+          if (communityData.length === 0) {
+            const fallbacks: Array<'ppr' | 'half_ppr' | 'standard'> = ['ppr', 'half_ppr', 'standard'];
+            const typFb = effectiveBucket.leagueType as string;
+            const sfFb = effectiveBucket.isSuperflex;
+            for (const fmtFb of fallbacks) {
+              communityData = await fetchCommunityRpc(fmtFb, typFb, sfFb);
+              if (communityData.length > 0) break;
+            }
+          }
         }
       }
 
-      const bucketAdpMap = new Map(communityData.map((r) => [r.player_id, Number(r.rank_position)]));
+      const bucketAdpMap = new Map(
+        communityData.map((r) => [r.player_id, Number(r.rank_position ?? r.avg_rank ?? 999)])
+      );
 
       const rankingBucketCols = userRankingBucketFromDisplayBucket({
-        scoringFormat: bucket.scoringFormat,
-        leagueType: bucket.leagueType,
-        isSuperflex: bucket.isSuperflex,
-        rookiesOnly: bucket.rookiesOnly,
+        scoringFormat: effectiveBucket.scoringFormat,
+        leagueType: effectiveBucket.leagueType,
+        isSuperflex: effectiveBucket.isSuperflex,
+        rookiesOnly: effectiveBucket.rookiesOnly,
       });
 
       if (!user) {
-        const adpPlayers: RankedPlayer[] = updatedPlayersData.map((p, index) => ({
+        const guestDraftKey = getRankingsDraftSessionStorageKey({
+          userId: null,
+          guestSessionId: getOrCreateGuestSessionId(),
+          leagueId: null,
+          bucketKey,
+        });
+        const guestSessionDraft = rankingsDraftSessionStorage.get(guestDraftKey);
+
+        const adpPlayers: RankedPlayer[] = playerPool.map((p, index) => ({
           ...p,
           adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
           rank: index + 1,
         }));
-        const guestCommunity = communityData.length > 0
-          ? buildCommunityFromRpc(updatedPlayersData, communityData)
-          : adpPlayers;
-        setCommunityPlayers(guestCommunity);
-        
-        // Check for existing temporary rankings for this bucket only
-        const statsBucketKey = `${bucket.scoringFormat}/${bucket.leagueType}/${bucket.isSuperflex}/${(bucket as any).rookiesOnly || false}`;
-        const tempRankings = tempRankingsStorage.get(statsBucketKey);
+        const guestCommunityStatic =
+          communityData.length > 0
+            ? buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData))
+            : adpPlayers;
+
+        const tempRankings = tempRankingsStorage.get(bucketKey);
         if (tempRankings && tempRankings.length > 0) {
           // User has finalized rankings, use them for comparison
-          // Create a map of player IDs to ranks from temp rankings
           const rankingsMap = new Map<string, number>();
           tempRankings.forEach((player) => {
             rankingsMap.set(player.id, player.rank);
           });
-          
-          // Map players with their custom ranks, fallback to ADP if not ranked
-          const rankedPlayers: RankedPlayer[] = updatedPlayersData.map((p, index) => {
+
+          const rankedPlayers: RankedPlayer[] = playerPool.map((p, index) => {
             const customRank = rankingsMap.get(p.id);
             const adpRank = bucketAdpMap.get(p.id) ?? index + 1;
             return {
@@ -269,34 +406,51 @@ const Statistics = () => {
               rank: customRank !== undefined ? customRank : adpRank,
             };
           });
-          
-          // Sort by custom rank
+
           rankedPlayers.sort((a, b) => a.rank - b.rank);
           const sortedPlayers = rankedPlayers.map((p, index) => ({
             ...p,
             rank: index + 1,
           }));
-          
-          setPlayers(sortedPlayers);
+
+          let displayPlayers = sortedPlayers;
+          if (guestSessionDraft?.ids.length) {
+            displayPlayers = mergeRankingsWithDraftOrder(sortedPlayers, guestSessionDraft.ids);
+          }
+          setPlayers(displayPlayers);
+
+          setCommunityPlayers(guestCommunityStatic);
         } else {
-          // No rankings yet, use ADP for both
-          setPlayers(adpPlayers);
+          let list = adpPlayers;
+          if (guestSessionDraft?.ids.length) {
+            list = mergeRankingsWithDraftOrder(adpPlayers, guestSessionDraft.ids);
+          }
+          setPlayers(list);
+          setCommunityPlayers(guestCommunityStatic);
         }
         return;
       }
 
       if (isAllLeagues) {
-        const leagueIds = leagues.map(l => l.id);
+        const matchingLeagues = leagues.filter(
+          (l) =>
+            (l.scoring_format as string || 'ppr') === effectiveBucket.scoringFormat &&
+            (l.league_type as string || 'season') === effectiveBucket.leagueType &&
+            Boolean(l.is_superflex) === effectiveBucket.isSuperflex &&
+            (effectiveBucket.leagueType !== 'dynasty' ||
+              Boolean((l as { rookies_only?: boolean }).rookies_only) === effectiveBucket.rookiesOnly)
+        );
+        const leagueIdsToFetch = matchingLeagues.map((l) => l.id);
         let allLeagueRankingsData: any[] = [];
         
-        if (leagueIds.length > 0) {
+        if (leagueIdsToFetch.length > 0) {
           const qAll = applyUserRankingsBucketMatch(
             supabase
               .from('user_rankings')
               .select('*')
               .eq('user_id', user.id)
               .not('league_id', 'is', null)
-              .in('league_id', leagueIds),
+              .in('league_id', leagueIdsToFetch),
             rankingBucketCols
           );
           const { data, error: allLeagueRankingsError } = await qAll;
@@ -319,7 +473,7 @@ const Statistics = () => {
           averageRankingsMap.set(playerId, average);
         });
 
-        const personalPlayers: RankedPlayer[] = updatedPlayersData.map((p, index) => {
+        const personalPlayers: RankedPlayer[] = playerPool.map((p, index) => {
           const avgRank = averageRankingsMap.get(p.id);
           const fallbackRank = bucketAdpMap.get(p.id) ?? (Number(p.adp) || index + 1);
           return {
@@ -334,11 +488,23 @@ const Statistics = () => {
           ...p,
           rank: index + 1,
         }));
-        setPlayers(sortedPersonal);
+
+        const allLeaguesDraftKey = getRankingsDraftSessionStorageKey({
+          userId: user.id,
+          guestSessionId: null,
+          leagueId: null,
+          bucketKey,
+        });
+        const allLeaguesSessionDraft = rankingsDraftSessionStorage.get(allLeaguesDraftKey);
+        let personalForUi = sortedPersonal;
+        if (allLeaguesSessionDraft?.ids.length) {
+          personalForUi = mergeRankingsWithDraftOrder(sortedPersonal, allLeaguesSessionDraft.ids);
+        }
+        setPlayers(personalForUi);
 
         const allLeaguesCommunity = communityData.length > 0
-          ? buildCommunityFromRpc(updatedPlayersData, communityData)
-          : updatedPlayersData.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
+          ? buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData))
+          : playerPool.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
         setCommunityPlayers(allLeaguesCommunity);
       } else {
         const qLeague = applyUserRankingsBucketMatch(
@@ -362,12 +528,15 @@ const Statistics = () => {
             rankingsData.map((r) => [r.player_id, r.rank])
           );
 
-          rankedPlayers = updatedPlayersData.map((p, index) => ({
+          rankedPlayers = playerPool.map((p, index) => ({
             ...p,
             adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
             rank: rankingsMap.get(p.id) ?? bucketAdpMap.get(p.id) ?? Number(p.adp) ?? index + 1,
           }));
         } else {
+          if (communityData.length > 0) {
+            rankedPlayers = buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData));
+          } else {
           const qNullLeague = applyUserRankingsBucketMatch(
             supabase.from('user_rankings').select('*').eq('user_id', user.id).is('league_id', null),
             rankingBucketCols
@@ -380,11 +549,12 @@ const Statistics = () => {
             allLeaguesRankings?.map((r) => [r.player_id, r.rank]) || []
           );
 
-          rankedPlayers = updatedPlayersData.map((p, index) => ({
+          rankedPlayers = playerPool.map((p, index) => ({
             ...p,
             adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
             rank: allLeaguesMap.get(p.id) ?? bucketAdpMap.get(p.id) ?? Number(p.adp) ?? index + 1,
           }));
+          }
         }
 
         rankedPlayers.sort((a, b) => a.rank - b.rank);
@@ -393,11 +563,21 @@ const Statistics = () => {
           rank: index + 1,
         }));
 
-        setPlayers(sortedPlayers);
+        const leagueDraftKey = getRankingsDraftSessionStorageKey({
+          userId: user.id,
+          guestSessionId: null,
+          leagueId: selectedLeague.id,
+          bucketKey,
+        });
+        const leagueSessionDraft = rankingsDraftSessionStorage.get(leagueDraftKey);
+        const displayPlayers = leagueSessionDraft?.ids.length
+          ? mergeRankingsWithDraftOrder(sortedPlayers, leagueSessionDraft.ids)
+          : sortedPlayers;
+        setPlayers(displayPlayers);
 
         const leagueCommunity = communityData.length > 0
-          ? buildCommunityFromRpc(updatedPlayersData, communityData)
-          : updatedPlayersData.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
+          ? buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData))
+          : playerPool.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
         setCommunityPlayers(leagueCommunity);
       }
     } catch (error: any) {
@@ -424,6 +604,16 @@ const Statistics = () => {
     setLoading(true);
     fetchPlayers();
   }, [fetchPlayers]);
+
+  useEffect(() => {
+    const onAllLeaguesBucket = () => {
+      if (!user || selectedLeague) return;
+      setLoading(true);
+      void fetchPlayers();
+    };
+    window.addEventListener('all-leagues-bucket-changed', onAllLeaguesBucket);
+    return () => window.removeEventListener('all-leagues-bucket-changed', onAllLeaguesBucket);
+  }, [user, selectedLeague, fetchPlayers]);
 
   // Fetch draft statistics
   const fetchDraftStats = useCallback(async () => {
@@ -461,8 +651,6 @@ const Statistics = () => {
             avoidedPlayersByRound: new Map(),
             avoidedPlayersRaw: [],
             avoidedPlayersByRoundRaw: new Map(),
-            studs: [], 
-            duds: [],
             maxRound: 0,
             numDrafts: 0,
           });
@@ -590,8 +778,6 @@ const Statistics = () => {
             avoidedPlayersByRound: new Map(),
             avoidedPlayersRaw: [],
             avoidedPlayersByRoundRaw: new Map(),
-            studs: [], 
-            duds: [],
             maxRound: 0,
             numDrafts: 0,
           });
@@ -1134,26 +1320,6 @@ const Statistics = () => {
         }
       });
 
-      // Calculate studs and duds (only if players and communityPlayers are loaded)
-      let studs: Array<{ player: RankedPlayer; myRank: number; communityRank: number; diff: number }> = [];
-      let duds: Array<{ player: RankedPlayer; myRank: number; communityRank: number; diff: number }> = [];
-
-      if (players.length > 0 && communityPlayers.length > 0) {
-        const diffs = players.slice(0, 150).map((myPlayer) => {
-          const myRank = players.findIndex((p) => p.id === myPlayer.id) + 1;
-          const communityRank = communityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
-          return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
-        });
-
-        studs = diffs
-          .filter((d) => d.diff > 0 && d.myRank <= 150 && d.communityRank <= 150)
-          .sort((a, b) => b.diff - a.diff);
-
-        duds = diffs
-          .filter((d) => d.diff < 0 && d.myRank <= 150 && d.communityRank <= 150)
-          .sort((a, b) => a.diff - b.diff);
-      }
-
       const numDrafts = drafts.length;
 
       setDraftStats({
@@ -1166,8 +1332,6 @@ const Statistics = () => {
         avoidedPlayersByRound,
         avoidedPlayersRaw,
         avoidedPlayersByRoundRaw,
-        studs,
-        duds,
         maxRound,
         numDrafts,
       });
@@ -1176,11 +1340,10 @@ const Statistics = () => {
     } finally {
       setStatsLoading(false);
     }
-  }, [user, players, communityPlayers, isAllLeagues, selectedLeague]);
+  }, [user, communityPlayers, isAllLeagues, selectedLeague]);
 
   useEffect(() => {
-    // Fetch draft stats when communityPlayers is loaded (for both guests and logged-in users)
-    // This ensures fade detection uses community ADP, not personal rankings
+    // Draft faves/fades only; studs/duds come from `studsDudsFromRankings` (rankings vs community).
     if (communityPlayers.length > 0) {
       fetchDraftStats();
     }
@@ -1939,20 +2102,16 @@ const Statistics = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Your Studs */}
               <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
-                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-500/30">
+                <div className="flex items-center justify-center gap-2 mb-4 pb-2 border-b border-green-500/30">
                   <div className="w-3 h-3 rounded-full bg-green-500" />
                   <h2 className="font-display text-xl tracking-wide text-green-400">YOUR STUDS</h2>
                 </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  View all players you rank higher than the community
+                <p className="text-sm text-muted-foreground mb-4 text-center leading-snug">
+                  All your studs vs. community consensus.
                 </p>
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
-                  {statsLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <BrandedLoader size={30} />
-                    </div>
-                  ) : draftStats.studs.length > 0 ? (
-                    draftStats.studs.map(({ player, myRank, communityRank, diff }) => (
+                  {studsDudsFromRankings.studs.length > 0 ? (
+                    studsDudsFromRankings.studs.map(({ player, myRank, communityRank, diff }) => (
                       <div
                         key={player.id}
                         className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
@@ -1991,20 +2150,16 @@ const Statistics = () => {
 
               {/* Your Duds */}
               <div className="bg-red-500/10 rounded-lg border border-red-500/30 p-4">
-                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-red-500/30">
+                <div className="flex items-center justify-center gap-2 mb-4 pb-2 border-b border-red-500/30">
                   <div className="w-3 h-3 rounded-full bg-red-500" />
                   <h2 className="font-display text-xl tracking-wide text-red-400">YOUR DUDS</h2>
                 </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  View all players you rank lower than the community
+                <p className="text-sm text-muted-foreground mb-4 text-center leading-snug">
+                  All your duds vs. community consensus.
                 </p>
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
-                  {statsLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <BrandedLoader size={30} />
-                    </div>
-                  ) : draftStats.duds.length > 0 ? (
-                    draftStats.duds.map(({ player, myRank, communityRank, diff }) => (
+                  {studsDudsFromRankings.duds.length > 0 ? (
+                    studsDudsFromRankings.duds.map(({ player, myRank, communityRank, diff }) => (
                       <div
                         key={player.id}
                         className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"

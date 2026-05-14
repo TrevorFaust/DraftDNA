@@ -21,6 +21,12 @@ import {
   getRankingsDraftSessionStorageKey,
   rankingsDraftSessionStorage,
 } from '@/utils/temporaryStorage';
+import { mergeLiveCommunity, mergeRankingsWithDraftOrder } from '@/utils/rankingsCommunityMerge';
+import {
+  computeStudsDuds,
+  STUDS_DUDS_RANKINGS_WINDOW,
+  type StudDudEntry,
+} from '@/utils/studsDuds';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import {
@@ -199,53 +205,6 @@ function buildCommunityFromRpc(
   return result.map((p, index) => ({ ...p, rank: index + 1 }));
 }
 
-/** Merge my current rankings into community (excluding me) for live update when dragging. */
-/** ADP = position in merged list so ADP always matches community rank (updates as user drags). */
-function mergeLiveCommunity(
-  allPlayersData: any[],
-  communityRaw: { player_id: string; avg_rank: number; sample_count: number }[],
-  myRankedPlayers: RankedPlayer[]
-): RankedPlayer[] {
-  const playerById = new Map(allPlayersData.map((p) => [p.id, p]));
-  const communityMap = new Map(communityRaw.map((r) => [r.player_id, { avg: Number(r.avg_rank), n: Number(r.sample_count) || 1 }]));
-  const myRankMap = new Map(myRankedPlayers.map((p) => [p.id, p.rank]));
-
-  const withNewAvg: { id: string; newAvg: number }[] = [];
-  const seen = new Set<string>();
-  for (const p of myRankedPlayers) {
-    if (seen.has(p.id)) continue;
-    seen.add(p.id);
-    const entry = communityMap.get(p.id);
-    const myRank = myRankMap.get(p.id) ?? 9999;
-    const avg = entry ? entry.avg : 0;
-    const n = entry ? entry.n : 0;
-    const newAvg = n > 0 ? (avg * n + myRank) / (n + 1) : myRank;
-    withNewAvg.push({ id: p.id, newAvg });
-  }
-  for (const r of communityRaw) {
-    if (seen.has(r.player_id)) continue;
-    seen.add(r.player_id);
-    const myRank = myRankMap.get(r.player_id) ?? 9999;
-    const n = Number(r.sample_count) || 1;
-    const newAvg = (Number(r.avg_rank) * n + myRank) / (n + 1);
-    withNewAvg.push({ id: r.player_id, newAvg });
-  }
-  withNewAvg.sort((a, b) => a.newAvg - b.newAvg);
-  const result: RankedPlayer[] = [];
-  for (let i = 0; i < withNewAvg.length; i++) {
-    const p = playerById.get(withNewAvg[i].id);
-    if (p) {
-      const communityRank = i + 1;
-      result.push({
-        ...p,
-        adp: communityRank,
-        rank: communityRank,
-      } as RankedPlayer);
-    }
-  }
-  return result;
-}
-
 /**
  * After reordering the filtered subset (position/team/search), reassign integer ranks so that
  * subset keeps the same multiset of global rank slots. Avoids midpoint ties with the old rank
@@ -300,23 +259,6 @@ function movePlayersByIds(
   if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return allPlayers;
   const newItems = arrayMove(allPlayers, oldIndex, newIndex);
   return newItems.map((item, index) => ({ ...item, rank: index + 1 }));
-}
-
-/** Reapply in-session draft order onto a freshly fetched list (new players append by rank). */
-function mergeRankingsWithDraftOrder(fetched: RankedPlayer[], draftIds: string[]): RankedPlayer[] {
-  const byId = new Map(fetched.map((p) => [p.id, p]));
-  const used = new Set<string>();
-  const ordered: RankedPlayer[] = [];
-  for (const id of draftIds) {
-    const p = byId.get(id);
-    if (p) {
-      used.add(p.id);
-      ordered.push({ ...p });
-    }
-  }
-  const rest = fetched.filter((p) => !used.has(p.id)).sort((a, b) => a.rank - b.rank);
-  for (const p of rest) ordered.push({ ...p });
-  return ordered.map((p, i) => ({ ...p, rank: i + 1 }));
 }
 
 function parseGuestRankingBucketKey(bucketKey: string): UserRankingBucketDb {
@@ -452,6 +394,8 @@ const Rankings = () => {
   const navigate = useNavigate();
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [communityPlayers, setCommunityPlayers] = useState<RankedPlayer[]>([]);
+  /** Pure RPC community order (excludes you) for studs/duds — same scale as Draft Stats. */
+  const [communityConsensusForStuds, setCommunityConsensusForStuds] = useState<RankedPlayer[]>([]);
   const [communityRawExcludingMe, setCommunityRawExcludingMe] = useState<{ player_id: string; avg_rank: number; sample_count: number }[] | null>(null);
   const allPlayersDataRef = useRef<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -922,6 +866,17 @@ const Rankings = () => {
     [displayedCommunityPlayers]
   );
 
+  const studsDudsVsConsensus = useMemo(() => {
+    if (players.length === 0 || communityConsensusForStuds.length === 0) {
+      return { studsTop10: [] as StudDudEntry[], dudsTop10: [] as StudDudEntry[] };
+    }
+    const { studs, duds } = computeStudsDuds(players, communityConsensusForStuds, {
+      compareMode: 'window',
+      maxRankConsider: STUDS_DUDS_RANKINGS_WINDOW,
+    });
+    return { studsTop10: studs.slice(0, 10), dudsTop10: duds.slice(0, 10) };
+  }, [players, communityConsensusForStuds]);
+
   // Leagues matching the current bucket (for All Leagues dropdown)
   const matchingLeaguesForBucket = useMemo(
     () =>
@@ -1156,6 +1111,7 @@ const Rankings = () => {
         const guestCommunity = communityData.length > 0
           ? buildCommunityFromRpc(allPlayersData, communityData)
           : adpPlayers;
+        setCommunityConsensusForStuds(guestCommunity);
         setCommunityPlayers(guestCommunity);
         // Set communityRawExcludingMe so live merge runs when guest drags (Community column updates in real time)
         setCommunityRawExcludingMe(
@@ -1303,6 +1259,7 @@ const Rankings = () => {
         const allLeaguesCommunity = communityData.length > 0
           ? buildCommunityFromRpc(allPlayersData, communityData)
           : allPlayersData.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
+        setCommunityConsensusForStuds(allLeaguesCommunity);
         setCommunityPlayers(allLeaguesCommunity);
         setCommunityRawExcludingMe(null);
       } else {
@@ -1401,6 +1358,15 @@ const Rankings = () => {
           : communityData.length > 0
             ? buildCommunityFromRpc(allPlayersData, communityData)
             : allPlayersData.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
+        const consensusForStuds =
+          communityData.length > 0
+            ? buildCommunityFromRpc(allPlayersData, communityData)
+            : allPlayersData.map((p, index) => ({
+                ...p,
+                adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
+                rank: index + 1,
+              }));
+        setCommunityConsensusForStuds(consensusForStuds);
         setCommunityPlayers(leagueCommunity);
       }
     } catch (error: any) {
@@ -1419,6 +1385,7 @@ const Rankings = () => {
       if (players.length === 0 && communityPlayers.length === 0) {
         setPlayers([]);
         setCommunityPlayers([]);
+        setCommunityConsensusForStuds([]);
       }
       // Otherwise, keep existing data so user doesn't see empty screen
     } finally {
@@ -2059,89 +2026,83 @@ const Rankings = () => {
             </div>
 
             {/* Differential Analysis Section */}
-            {players.length > 0 && displayedCommunityPlayers.length > 0 && (
+            {players.length > 0 && communityConsensusForStuds.length > 0 && (
               <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Your Studs */}
                 <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
-                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-500/30">
+                  <div className="flex items-center justify-center gap-2 mb-4 pb-2 border-b border-green-500/30">
                     <div className="w-3 h-3 rounded-full bg-green-500" />
                     <h2 className="font-display text-xl tracking-wide text-green-400">YOUR STUDS</h2>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Top 10 players you rank higher than the community
-                  </p>
+                  <div className="mb-4 space-y-1.5 text-center text-sm text-muted-foreground leading-snug">
+                    <p className="text-balance">Top 10 players you rank higher than community consensus.</p>
+                    <p>
+                      (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
+                    </p>
+                    <p>See all studs in the Draft Stats tab.</p>
+                  </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
-                    {(() => {
-                      const diffs = players.slice(0, 150).map((myPlayer) => {
-                        const myRank = myPlayer.rank;
-                        const communityRank = displayedCommunityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
-                        return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
-                      });
-                      return diffs
-                        .filter((d) => d.diff > 0 && d.myRank <= 150 && d.communityRank <= 150)
-                        .sort((a, b) => b.diff - a.diff)
-                        .slice(0, 10)
-                        .map(({ player, myRank, communityRank, diff }) => (
-                          <div
-                            key={player.id}
-                            className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
-                            onClick={() => handlePlayerClick(player)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold text-green-400">+{diff}</span>
-                              <div>
-                                <p className="font-medium">{player.name}</p>
-                                <p className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}</p>
-                              </div>
-                            </div>
-                            <div className="text-right text-sm">
-                              <p className="text-green-400">#{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}</p>
-                            </div>
+                    {studsDudsVsConsensus.studsTop10.map(({ player, myRank, communityRank, diff }) => (
+                      <div
+                        key={player.id}
+                        className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
+                        onClick={() => handlePlayerClick(player)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-green-400">+{diff}</span>
+                          <div>
+                            <p className="font-medium">{player.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}
+                            </p>
                           </div>
-                        ));
-                    })()}
+                        </div>
+                        <div className="text-right text-sm">
+                          <p className="text-green-400">
+                            #{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Your Duds */}
                 <div className="bg-red-500/10 rounded-lg border border-red-500/30 p-4">
-                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-red-500/30">
+                  <div className="flex items-center justify-center gap-2 mb-4 pb-2 border-b border-red-500/30">
                     <div className="w-3 h-3 rounded-full bg-red-500" />
                     <h2 className="font-display text-xl tracking-wide text-red-400">YOUR DUDS</h2>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Top 10 players you rank lower than the community
-                  </p>
+                  <div className="mb-4 space-y-1.5 text-center text-sm text-muted-foreground leading-snug">
+                    <p className="text-balance">Top 10 players you rank lower than community consensus.</p>
+                    <p>
+                      (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
+                    </p>
+                    <p>See all duds in the Draft Stats tab.</p>
+                  </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
-                    {(() => {
-                      const diffs = players.slice(0, 150).map((myPlayer) => {
-                        const myRank = myPlayer.rank;
-                        const communityRank = displayedCommunityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
-                        return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
-                      });
-                      return diffs
-                        .filter((d) => d.diff < 0 && d.myRank <= 150 && d.communityRank <= 150)
-                        .sort((a, b) => a.diff - b.diff)
-                        .slice(0, 10)
-                        .map(({ player, myRank, communityRank, diff }) => (
-                          <div
-                            key={player.id}
-                            className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
-                            onClick={() => handlePlayerClick(player)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold text-red-400">{diff}</span>
-                              <div>
-                                <p className="font-medium">{player.name}</p>
-                                <p className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}</p>
-                              </div>
-                            </div>
-                            <div className="text-right text-sm">
-                              <p className="text-red-400">#{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}</p>
-                            </div>
+                    {studsDudsVsConsensus.dudsTop10.map(({ player, myRank, communityRank, diff }) => (
+                      <div
+                        key={player.id}
+                        className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
+                        onClick={() => handlePlayerClick(player)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-red-400">{diff}</span>
+                          <div>
+                            <p className="font-medium">{player.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}
+                            </p>
                           </div>
-                        ));
-                    })()}
+                        </div>
+                        <div className="text-right text-sm">
+                          <p className="text-red-400">
+                            #{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -2265,89 +2226,83 @@ const Rankings = () => {
             </div>
 
             {/* Differential Analysis Section */}
-            {players.length > 0 && displayedCommunityPlayers.length > 0 && (
+            {players.length > 0 && communityConsensusForStuds.length > 0 && (
               <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Your Studs */}
                 <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
-                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-500/30">
+                  <div className="flex items-center justify-center gap-2 mb-4 pb-2 border-b border-green-500/30">
                     <div className="w-3 h-3 rounded-full bg-green-500" />
                     <h2 className="font-display text-xl tracking-wide text-green-400">YOUR STUDS</h2>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Top 10 players you rank higher than the community
-                  </p>
+                  <div className="mb-4 space-y-1.5 text-center text-sm text-muted-foreground leading-snug">
+                    <p className="text-balance">Top 10 players you rank higher than community consensus.</p>
+                    <p>
+                      (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
+                    </p>
+                    <p>See all studs in the Draft Stats tab.</p>
+                  </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
-                    {(() => {
-                      const diffs = players.slice(0, 150).map((myPlayer) => {
-                        const myRank = myPlayer.rank;
-                        const communityRank = displayedCommunityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
-                        return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
-                      });
-                      return diffs
-                        .filter((d) => d.diff > 0 && d.myRank <= 150 && d.communityRank <= 150)
-                        .sort((a, b) => b.diff - a.diff)
-                        .slice(0, 10)
-                        .map(({ player, myRank, communityRank, diff }) => (
-                          <div
-                            key={player.id}
-                            className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
-                            onClick={() => handlePlayerClick(player)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold text-green-400">+{diff}</span>
-                              <div>
-                                <p className="font-medium">{player.name}</p>
-                                <p className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}</p>
-                              </div>
-                            </div>
-                            <div className="text-right text-sm">
-                              <p className="text-green-400">#{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}</p>
-                            </div>
+                    {studsDudsVsConsensus.studsTop10.map(({ player, myRank, communityRank, diff }) => (
+                      <div
+                        key={player.id}
+                        className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
+                        onClick={() => handlePlayerClick(player)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-green-400">+{diff}</span>
+                          <div>
+                            <p className="font-medium">{player.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}
+                            </p>
                           </div>
-                        ));
-                    })()}
+                        </div>
+                        <div className="text-right text-sm">
+                          <p className="text-green-400">
+                            #{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Your Duds */}
                 <div className="bg-red-500/10 rounded-lg border border-red-500/30 p-4">
-                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-red-500/30">
+                  <div className="flex items-center justify-center gap-2 mb-4 pb-2 border-b border-red-500/30">
                     <div className="w-3 h-3 rounded-full bg-red-500" />
                     <h2 className="font-display text-xl tracking-wide text-red-400">YOUR DUDS</h2>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Top 10 players you rank lower than the community
-                  </p>
+                  <div className="mb-4 space-y-1.5 text-center text-sm text-muted-foreground leading-snug">
+                    <p className="text-balance">Top 10 players you rank lower than community consensus.</p>
+                    <p>
+                      (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
+                    </p>
+                    <p>See all duds in the Draft Stats tab.</p>
+                  </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
-                    {(() => {
-                      const diffs = players.slice(0, 150).map((myPlayer) => {
-                        const myRank = myPlayer.rank;
-                        const communityRank = displayedCommunityPlayers.findIndex((p) => p.id === myPlayer.id) + 1;
-                        return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
-                      });
-                      return diffs
-                        .filter((d) => d.diff < 0 && d.myRank <= 150 && d.communityRank <= 150)
-                        .sort((a, b) => a.diff - b.diff)
-                        .slice(0, 10)
-                        .map(({ player, myRank, communityRank, diff }) => (
-                          <div
-                            key={player.id}
-                            className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
-                            onClick={() => handlePlayerClick(player)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold text-red-400">{diff}</span>
-                              <div>
-                                <p className="font-medium">{player.name}</p>
-                                <p className="text-xs text-muted-foreground">{displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}</p>
-                              </div>
-                            </div>
-                            <div className="text-right text-sm">
-                              <p className="text-red-400">#{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}</p>
-                            </div>
+                    {studsDudsVsConsensus.dudsTop10.map(({ player, myRank, communityRank, diff }) => (
+                      <div
+                        key={player.id}
+                        className="flex items-center justify-between bg-background/50 rounded-md p-3 cursor-pointer hover:bg-background/70 transition-colors"
+                        onClick={() => handlePlayerClick(player)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-red-400">{diff}</span>
+                          <div>
+                            <p className="font-medium">{player.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {displayTeamAbbrevOrFa(player.team, player.position, player.name)} • {player.position}
+                            </p>
                           </div>
-                        ));
-                    })()}
+                        </div>
+                        <div className="text-right text-sm">
+                          <p className="text-red-400">
+                            #{myRank} <span className="text-muted-foreground">vs</span> #{communityRank}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
