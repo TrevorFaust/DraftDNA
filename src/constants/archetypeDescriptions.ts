@@ -5,7 +5,7 @@
 
 import type { ArchetypeStrategies } from './archetypeStrategies';
 
-const STRATEGY_LABELS: Record<string, string> = {
+export const STRATEGY_LABELS: Record<string, string> = {
   // RB
   bpa: 'Best Player Available',
   zero_rb: 'Zero RB',

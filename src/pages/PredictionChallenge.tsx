@@ -31,7 +31,6 @@ import {
 import {
   ArrowLeft,
   CheckCircle2,
-  Target,
   ChevronUp,
   ChevronDown,
   Instagram,
@@ -49,7 +48,14 @@ import { toast } from 'sonner';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { OfficialRulesContent } from '@/components/OfficialRulesContent';
 import { BrandedLoader } from '@/components/BrandedLoader';
-import { SITE_NAME, SEASON } from '@/constants/contest';
+import { PickSixMark } from '@/components/PickSixIcon';
+import {
+  SITE_NAME,
+  SEASON,
+  PICK_SIX_CATEGORY_PRIZE_USD,
+  PICK_SIX_TOTAL_PRIZE_POOL_USD,
+  formatContestPrizeUsd,
+} from '@/constants/contest';
 import { getSiteOriginForAuth } from '@/lib/siteOrigin';
 import { cn } from '@/lib/utils';
 
@@ -347,7 +353,7 @@ ${shareUrl}`;
   /** Premade SMS / text invite (Pick Six + prizes). */
   const getSmsInviteText = useCallback(
     () =>
-      `Join the DraftDNA Pick Six Challenge — make your picks in order and win up to $30,000 in prizes. ${shareUrl}`,
+      `Join the DraftDNA Pick Six Challenge — make your picks in order and win up to ${formatContestPrizeUsd(PICK_SIX_TOTAL_PRIZE_POOL_USD)} in prizes. ${shareUrl}`,
     [shareUrl]
   );
 
@@ -570,15 +576,13 @@ ${shareUrl}`;
             <ArrowLeft className="w-4 h-4" /> Back to Dashboard
           </Link>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-              <Target className="w-6 h-6 text-white" />
-            </div>
+            <PickSixMark frameClassName="w-12 h-12 rounded-xl bg-gradient-primary" />
             <div>
               <h1 className="font-display text-3xl tracking-wide">
                 Pick Six Challenge
               </h1>
               <p className="text-muted-foreground text-sm mt-1">
-                Pick the top {TOP_N} fantasy finishers (in order) per position. Win $5k per position if you’re right!
+                {`Pick the top six ${SEASON} fantasy players per position in order. Win $${PICK_SIX_CATEGORY_PRIZE_USD / 1000}k per position if you're right!`}
               </p>
             </div>
           </div>
@@ -587,47 +591,47 @@ ${shareUrl}`;
         {/* Rules & How it Works */}
         <Collapsible open={rulesOpen} onOpenChange={setRulesOpen} className="glass-card mb-8">
           <CollapsibleTrigger className="flex w-full items-center justify-between p-6 text-left hover:opacity-90 transition-opacity">
-            <h2 className="font-display text-lg flex items-center gap-2">
+            <h2 className="font-sans text-lg font-semibold tracking-wide text-foreground flex items-center gap-2">
               <Info className="w-5 h-5 text-amber-500" />
               Rules & How it Works
             </h2>
             <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${rulesOpen ? 'rotate-180' : ''}`} />
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="space-y-4 text-sm text-muted-foreground px-6 pb-6 pt-0 -mt-2">
+            <div className="space-y-7 text-sm text-muted-foreground px-6 pb-6 pt-0 -mt-2 subpixel-antialiased [&_h3]:font-sans [&_h4]:font-sans [&_h3]:tracking-wide [&_h4]:tracking-wide [&_h3]:shadow-none [&_h4]:shadow-none">
             <div>
-              <h3 className="font-medium text-foreground mb-1">Fantasy Scoring</h3>
-              <p className="mb-2">Actual rankings are based on fantasy points scored. All points use half PPR (0.5 per reception).</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-1">
-                  <h4 className="text-foreground font-semibold">Passing</h4>
-                  <ul className="text-muted-foreground space-y-0.5">
+              <h3 className="font-medium text-foreground mb-3 tracking-wide">Fantasy Scoring</h3>
+              <p className="mb-4 leading-relaxed">Actual rankings are based on fantasy points scored. All points use half PPR (0.5 per reception).</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-10 text-sm leading-relaxed">
+                <div className="space-y-3">
+                  <h4 className="text-foreground text-base font-semibold tracking-wide leading-relaxed">Passing</h4>
+                  <ul className="text-muted-foreground space-y-2">
                     <li>Per passing yard: 0.04</li>
                     <li>TD pass: 4</li>
                     <li>Interception: -2</li>
                     <li>2pt passing conversion: 2</li>
                   </ul>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-foreground font-semibold">Rushing</h4>
-                  <ul className="text-muted-foreground space-y-0.5">
+                <div className="space-y-3">
+                  <h4 className="text-foreground text-base font-semibold tracking-wide leading-relaxed">Rushing</h4>
+                  <ul className="text-muted-foreground space-y-2">
                     <li>Per rushing yard: 0.1</li>
                     <li>TD rush: 6</li>
                     <li>2pt rushing conversion: 2</li>
                   </ul>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-foreground font-semibold">Receiving</h4>
-                  <ul className="text-muted-foreground space-y-0.5">
+                <div className="space-y-3">
+                  <h4 className="text-foreground text-base font-semibold tracking-wide leading-relaxed">Receiving</h4>
+                  <ul className="text-muted-foreground space-y-2">
                     <li>Per receiving yard: 0.1</li>
                     <li>Per reception: 0.5</li>
                     <li>TD reception: 6</li>
                     <li>2pt receiving conversion: 2</li>
                   </ul>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-foreground font-semibold">Kicking</h4>
-                  <ul className="text-muted-foreground space-y-0.5">
+                <div className="space-y-3">
+                  <h4 className="text-foreground text-base font-semibold tracking-wide leading-relaxed">Kicking</h4>
+                  <ul className="text-muted-foreground space-y-2">
                     <li>PAT made: 1</li>
                     <li>FG missed: -1</li>
                     <li>FG made (0–39 yards): 3</li>
@@ -636,11 +640,11 @@ ${shareUrl}`;
                     <li>FG made (60+ yards): 6</li>
                   </ul>
                 </div>
-                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <h4 className="text-foreground font-semibold">Team Defense / Special Teams</h4>
-                    <p className="text-muted-foreground text-xs font-medium mb-1">Points allowed</p>
-                    <ul className="text-muted-foreground space-y-0.5">
+                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-10">
+                  <div className="space-y-3">
+                    <h4 className="text-foreground text-base font-semibold tracking-wide leading-relaxed">Team Defense / Special Teams</h4>
+                    <p className="text-muted-foreground text-sm font-medium mb-2 leading-relaxed">Points allowed</p>
+                    <ul className="text-muted-foreground space-y-2">
                       <li>0 points allowed: 5</li>
                       <li>1–6 points allowed: 4</li>
                       <li>7–13 points allowed: 3</li>
@@ -650,10 +654,12 @@ ${shareUrl}`;
                       <li>46+ points allowed: -5</li>
                     </ul>
                   </div>
-                  <div className="space-y-1">
-                    <h4 className="text-foreground font-semibold sm:invisible">&#8203;</h4>
-                    <p className="text-muted-foreground text-xs font-medium mb-1">Yards allowed</p>
-                    <ul className="text-muted-foreground space-y-0.5">
+                  <div className="space-y-3">
+                    <h4 className="text-foreground text-base font-semibold tracking-wide leading-relaxed sm:invisible" aria-hidden>
+                      &#8203;
+                    </h4>
+                    <p className="text-muted-foreground text-sm font-medium mb-2 leading-relaxed">Yards allowed</p>
+                    <ul className="text-muted-foreground space-y-2">
                       <li>&lt;100 yards allowed: 5</li>
                       <li>100–199 yards allowed: 3</li>
                       <li>200–299 yards allowed: 2</li>
@@ -664,10 +670,12 @@ ${shareUrl}`;
                       <li>550+ yards allowed: -7</li>
                     </ul>
                   </div>
-                  <div className="space-y-1">
-                    <h4 className="text-foreground font-semibold sm:invisible">&#8203;</h4>
-                    <p className="text-muted-foreground text-xs font-medium mb-1">Sacks, turnovers, return TDs</p>
-                    <ul className="text-muted-foreground space-y-0.5">
+                  <div className="space-y-3">
+                    <h4 className="text-foreground text-base font-semibold tracking-wide leading-relaxed sm:invisible" aria-hidden>
+                      &#8203;
+                    </h4>
+                    <p className="text-muted-foreground text-sm font-medium mb-2 leading-relaxed">Sacks, turnovers, return TDs</p>
+                    <ul className="text-muted-foreground space-y-2">
                       <li>Kickoff return TD: 6</li>
                       <li>Punt return TD: 6</li>
                       <li>Interception return TD: 6</li>
@@ -686,12 +694,12 @@ ${shareUrl}`;
               </div>
             </div>
             <div>
-              <h3 className="font-medium text-foreground mb-1">Per-Position Leaderboards</h3>
-              <p>You have 6 separate ranks — one per position (QB, RB, WR, TE, K, D/ST). Each position has its own leaderboard.</p>
+              <h3 className="font-medium text-foreground mb-3 tracking-wide">Per-Position Leaderboards</h3>
+              <p className="leading-relaxed">You have 6 separate ranks — one per position (QB, RB, WR, TE, K, D/ST). Each position has its own leaderboard.</p>
             </div>
             <div>
-              <h3 className="font-medium text-foreground mb-1">Leaderboard Scoring</h3>
-              <ul className="list-disc list-inside space-y-1 ml-2">
+              <h3 className="font-medium text-foreground mb-3 tracking-wide">Leaderboard Scoring</h3>
+              <ul className="list-disc list-inside space-y-2 ml-2 leading-relaxed">
                 <li><strong>Exact match</strong> (correct rank) = 1 point</li>
                 <li><strong>1 off</strong> (e.g. you ranked 4th, actual 3rd) = ½ point</li>
                 <li><strong>2 off</strong> = ⅓ point</li>
@@ -702,8 +710,8 @@ ${shareUrl}`;
               </ul>
             </div>
             <div>
-              <h3 className="font-medium text-foreground mb-1">Weekly Updates</h3>
-              <p>Leaderboards are updated weekly based on current fantasy leaders (typically from ESPN). Your score is calculated from your submitted picks vs. the current top 6 in fantasy points.</p>
+              <h3 className="font-medium text-foreground mb-3 tracking-wide">Weekly Updates</h3>
+              <p className="leading-relaxed">Leaderboards are updated weekly based on current fantasy leaders (typically from ESPN). Your score is calculated from your submitted picks vs. the current top 6 in fantasy points.</p>
             </div>
             </div>
           </CollapsibleContent>

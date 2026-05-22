@@ -36,7 +36,7 @@ function absoluteSeoHeadPlugin(mode: string, envDir: string): Plugin {
         alternateName: ["DraftDNA", "Draft DNA Fantasy Football"],
         url: `${origin}/`,
         description:
-          "Custom NFL fantasy rankings, mock drafts, player stats, draft badges, and the Pick Six challenge with up to $30,000 in prizes.",
+          "Custom NFL fantasy rankings, mock drafts, player stats, draft badges, and the Pick Six Challenge with up to $36,000 in prizes.",
       };
 
       const block = `

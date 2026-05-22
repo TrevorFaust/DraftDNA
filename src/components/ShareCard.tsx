@@ -1,11 +1,16 @@
 import { forwardRef } from 'react';
 import { Crown } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { SiteLogo } from '@/components/SiteLogo';
+import { PickSixMark } from '@/components/PickSixIcon';
 import { getFullTeamName } from '@/utils/teamMapping';
 import type { Player } from '@/types/database';
 import { getPickSixPlayerSurfaceStyle, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
 import { cn } from '@/lib/utils';
+import {
+  PICK_SIX_CATEGORY_PRIZE_USD,
+  PICK_SIX_TOTAL_PRIZE_POOL_USD,
+  formatContestPrizeUsd,
+} from '@/constants/contest';
 
 export interface ShareCardProps {
   position: string;
@@ -36,11 +41,16 @@ const SHARE_CARD_HEADLINES: Record<string, string> = {
   RB: "Between the tackles, just like you drew it up.",
   WR: "They said inconsistent. You said payday.",
   TE: "You saw the seam. They saw linebackers.",
-  'D/ST': "You knew they'd hold. Now hold that $5,000.",
 };
 
 function getShareCardHeadline(position: string): string {
-  return SHARE_CARD_HEADLINES[position] ?? "You know something they don't. You'll laugh last.";
+  if (position === 'D/ST') {
+    const amt = formatContestPrizeUsd(PICK_SIX_CATEGORY_PRIZE_USD);
+    return `You knew they'd hold. Now hold that ${amt}.`;
+  }
+  return (
+    SHARE_CARD_HEADLINES[position] ?? "You know something they don't. You'll laugh last."
+  );
 }
 
 /** Label for "2026 Top 6 Fantasy QBs" style header */
@@ -81,9 +91,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
         {/* Header: Pick Six Challenge + 2026 Top 6 Fantasy QBs on same line */}
         <div className="relative flex items-center justify-between gap-3 px-4 pt-2 pb-1 border-b border-cyan-500/30">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center shadow-[0_0_8px_rgba(34,211,238,0.4)] overflow-hidden">
-              <SiteLogo size={14} className="w-3.5 h-3.5" />
-            </div>
+            <PickSixMark frameClassName="h-10 w-10 rounded-md" />
             <span className="text-slate-400 text-[10px] font-bold tracking-[0.15em] uppercase">
               Pick Six Challenge
             </span>
@@ -210,8 +218,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
               </div>
             </div>
             <p className="text-slate-500 text-xs leading-relaxed flex-1 min-w-0 text-left">
-              Scan the QR code to open DraftDNA&apos;s Pick Six Challenge. Sign up to lock in your prediction and
-              win up to $30,000 in prizes.
+              {`Scan the QR code to open DraftDNA's Pick Six Challenge. Sign up to lock in your prediction and win up to ${formatContestPrizeUsd(PICK_SIX_TOTAL_PRIZE_POOL_USD)} in prizes.`}
             </p>
           </div>
         </div>

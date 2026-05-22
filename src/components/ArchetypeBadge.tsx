@@ -50,8 +50,8 @@ interface ArchetypeBadgeProps {
   archetypeIndex?: number;
   /** Icon-only circle (hover for tooltip) vs full pill with name */
   iconOnly?: boolean;
-  /** Size of icon-only circle: sm (history) vs md (badges page) */
-  size?: 'sm' | 'md';
+  /** Size of icon-only thumbnail: xs (history list), sm (compact), md/lg (completion & detail) */
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   /** Draft-specific context for "why you got it" */
   earnedFromDraft?: string;
   /** Not yet earned: uses public/badges/locked.png instead of composed art (unless showUnlockedAppearance). */
@@ -109,18 +109,36 @@ export function ArchetypeBadge({
 
   if (iconOnly) {
     const circleLocked = locked && !showUnlockedAppearance;
-    const circleSize = size === 'sm' ? 'w-7 h-7' : 'w-10 h-10';
-    const iconSize = size === 'sm' ? 'w-3.5 h-3.5' : 'w-5 h-5';
+    const circleSize =
+      size === 'xs'
+        ? 'w-6 h-6'
+        : size === 'sm'
+          ? 'w-7 h-7'
+          : size === 'md'
+            ? 'w-10 h-10'
+            : 'w-12 h-12';
+    const iconSize =
+      size === 'xs'
+        ? 'w-3 h-3'
+        : size === 'sm'
+          ? 'w-3.5 h-3.5'
+          : size === 'md'
+            ? 'w-5 h-5'
+            : 'w-6 h-6';
     /** Portrait composed badges (360×480): readable ribbon text needs width, not a tiny crop. */
     const customThumbClass =
-      size === 'sm'
-        ? 'w-[min(100%,7.5rem)] max-w-[7.5rem] aspect-[3/4]'
-        : 'w-full max-w-[min(100%,11rem)] sm:max-w-[12.5rem] aspect-[3/4]';
+      size === 'xs'
+        ? 'w-[min(100%,4.25rem)] max-w-[4.25rem] aspect-[3/4]'
+        : size === 'sm'
+          ? 'w-[min(100%,5.25rem)] max-w-[5.25rem] aspect-[3/4]'
+          : size === 'md'
+            ? 'w-full max-w-[min(100%,9rem)] sm:max-w-[10rem] aspect-[3/4]'
+            : 'w-full max-w-[min(100%,11rem)] sm:max-w-[12rem] aspect-[3/4]';
 
     if (circleLocked) {
       return (
         <div
-          className={cn('cursor-default flex items-center justify-center', customThumbClass, className)}
+          className={cn('cursor-help flex items-center justify-center', customThumbClass, className)}
           role="img"
           aria-label="Locked badge"
         >
@@ -139,7 +157,7 @@ export function ArchetypeBadge({
       if (disableTooltip) {
         return (
           <div
-            className={cn('cursor-default flex items-center justify-center', customThumbClass, className)}
+            className={cn('cursor-help flex items-center justify-center', customThumbClass, className)}
             role="img"
             aria-label={archetypeName}
           >
@@ -158,7 +176,7 @@ export function ArchetypeBadge({
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={cn('cursor-default flex items-center justify-center', customThumbClass, className)}
+              className={cn('cursor-help flex items-center justify-center', customThumbClass, className)}
               role="img"
               aria-label={archetypeName}
             >

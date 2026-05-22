@@ -1,5 +1,18 @@
 /** Official Pick Six Challenge rules content (read-only). Used in terms dialog and footer. */
+import { PICK_SIX_CATEGORY_PRIZE_USD, PICK_SIX_TOTAL_PRIZE_POOL_USD } from '@/constants/contest';
+
 type Props = { siteName: string; season: number };
+
+const categoryPrize = PICK_SIX_CATEGORY_PRIZE_USD.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+});
+const totalPool = PICK_SIX_TOTAL_PRIZE_POOL_USD.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+});
 
 export function OfficialRulesContent({ siteName, season }: Props) {
   return (
@@ -24,13 +37,13 @@ export function OfficialRulesContent({ siteName, season }: Props) {
       <section>
         <h3 className="font-semibold text-foreground mb-1">4. THE &quot;PERFECT PICK SIX&quot; JACKPOT</h3>
         <p><strong>The Goal:</strong> To win a Category Jackpot, an entrant must correctly predict the Top 6 fantasy point scorers in a specific position group in Exact Order (#1 through #6).</p>
-        <p className="mt-2"><strong>Category Prize:</strong> Each category (QB, RB, WR, TE, K, DEF) carries a $5,000.00 jackpot.</p>
-        <p className="mt-2"><strong>Total Prize Pool:</strong> The total aggregate value of all prizes offered in this promotion is $30,000.00.</p>
+        <p className="mt-2"><strong>Category Prize:</strong> Each category (QB, RB, WR, TE, K, DEF) carries a {categoryPrize} jackpot.</p>
+        <p className="mt-2"><strong>Total Prize Pool:</strong> The total aggregate value of all prizes offered in this promotion is {totalPool}.</p>
         <p className="mt-2"><strong>The Tie-Breaker System:</strong> In the event multiple entrants achieve a Perfect Pick Six in the same category, the winner will be determined by the following logic:</p>
         <p className="mt-2"><strong>Prediction Metric:</strong> The entrant whose prediction is closest to the actual official regular-season stat for the #1 ranked player/team in that category will be declared the winner.</p>
         <p className="mt-2"><strong>Target Stats:</strong> QB: Total Passing Yards | RB: Total Rushing Yards | WR/TE: Total Receiving Yards | K: Total Field Goals Made | DEF: Total Points Allowed.</p>
         <p className="mt-2"><strong>The &quot;Price is Right&quot; Equidistance Rule:</strong> If two or more predictions are equally distant from the actual stat (e.g., one entrant is 50 yards over and another is 50 yards under), the &quot;Price is Right&quot; Rule applies: The entrant who did not go over the actual stat will be declared the winner.</p>
-        <p className="mt-2"><strong>The Split:</strong> In the extremely unlikely event that multiple entrants achieve a Perfect Pick Six and submit identical tie-breaker guesses, the $5,000.00 category prize will be split equally among those tied winners.</p>
+        <p className="mt-2"><strong>The Split:</strong> In the extremely unlikely event that multiple entrants achieve a Perfect Pick Six and submit identical tie-breaker guesses, the {categoryPrize} category prize will be split equally among those tied winners.</p>
       </section>
       <section>
         <h3 className="font-semibold text-foreground mb-1">5. SCORING &amp; SOURCE OF TRUTH</h3>

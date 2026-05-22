@@ -1,4 +1,4 @@
-# Draft Board — Fantasy Football Draft Tool
+o Draft Board — Fantasy Football Draft Tool
 
 A fantasy football web app for creating custom player rankings, running mock drafts, and preparing for draft day. Features league support, multiple scoring formats, CPU opponents with archetype-based draft logic, and the Pick Six prediction challenge.
 

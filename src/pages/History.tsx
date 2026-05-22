@@ -36,6 +36,10 @@ import { getArchetypeForTeam } from '@/utils/archetypeDetection';
 import { ArchetypeBadge } from '@/components/ArchetypeBadge';
 import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
 import { getArchetypeByName } from '@/constants/archetypeMappings.generated';
+import { DraftGradeBanner, DraftGradeDisplay } from '@/components/DraftGradeDisplay';
+import { computeDraftGrade, toDraftGradePicks } from '@/utils/draftGrade';
+import { buildPriorSeasonRankByPlayerId } from '@/utils/draftGradePriorSeason';
+import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 
 interface DraftWithPicks extends MockDraft {
   picks: (DraftPick & { player: Player })[];
@@ -45,6 +49,11 @@ const History = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedLeague: globalSelectedLeague, leagues } = useLeagues();
   const navigate = useNavigate();
+  const player2025Stats = usePlayer2025Stats();
+  const priorSeasonRankByPlayerId = useMemo(
+    () => buildPriorSeasonRankByPlayerId(player2025Stats),
+    [player2025Stats]
+  );
   const [drafts, setDrafts] = useState<DraftWithPicks[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDraft, setSelectedDraft] = useState<DraftWithPicks | null>(null);
@@ -348,6 +357,49 @@ const History = () => {
       seen.add(key);
       return true;
     });
+  };
+
+  const computeGradeForDraft = (draft: DraftWithPicks) => {
+    if (draft.status !== 'completed') return null;
+    const userPicks = dedupePicksBySlot(getUserTeamPicks(draft).filter((p) => p.player));
+    if (userPicks.length === 0) return null;
+    const chaos =
+      (draft as { user_detected_chaos_archetype?: string | null }).user_detected_chaos_archetype?.trim() ||
+      null;
+    const archetypeName =
+      (draft as { user_detected_archetype?: string | null }).user_detected_archetype?.trim() || null;
+    return computeDraftGrade(
+      toDraftGradePicks(
+        userPicks.map((p) => ({
+          pick_number: p.pick_number,
+          round_number: p.round_number,
+          is_autodraft: p.is_autodraft,
+          player: p.player
+            ? {
+                id: p.player.id,
+                name: p.player.name,
+                adp: p.player.adp,
+                position: p.player.position,
+                team: p.player.team,
+                bye_week: p.player.bye_week,
+              }
+            : null,
+        }))
+      ),
+      {
+        numTeams: draft.num_teams,
+        numRounds: draft.num_rounds,
+        chaosArchetype: chaos,
+        isSuperflex: draft.id === selectedDraft?.id ? draftLeagueSettings?.isSuperflex : undefined,
+        playerPool: players.map((p) => ({
+          position: p.position,
+          team: p.team,
+          adp: p.adp,
+        })),
+        priorSeasonRankByPlayerId,
+        archetypeName: archetypeName || undefined,
+      }
+    );
   };
 
   // Reset selected CPU team when draft changes so we don't show another draft's team
@@ -857,6 +909,7 @@ const History = () => {
                         {draft.status === 'completed' ? 'Completed' : 'In Progress'}
                       </span>
                       {draft.status === 'completed' && (() => {
+                        const listGrade = computeGradeForDraft(draft);
                         const chaosNm =
                           (draft as { user_detected_chaos_archetype?: string | null }).user_detected_chaos_archetype?.trim() ||
                           null;
@@ -868,38 +921,43 @@ const History = () => {
                         const useStoredIndex =
                           !!(stored && archetype === stored && typeof storedIdx === 'number' && storedIdx >= 0);
                         const chaosFlavor = chaosMeta?.flavorText;
-                        if (replaceChaos && chaosNm) {
-                          return (
-                            <ArchetypeBadge
-                              archetypeName={chaosNm}
-                              iconOnly
-                              size="sm"
-                              flavorText={chaosFlavor}
-                              earnedFromDraft={draft.name}
-                            />
-                          );
-                        }
-                        if (!archetype && !chaosNm) return null;
+                        const hasBadges = (replaceChaos && chaosNm) || archetype || chaosNm;
+                        if (!listGrade && !hasBadges) return null;
                         return (
                           <div className="flex items-center gap-2 flex-wrap">
-                            {archetype ? (
-                              <ArchetypeBadge
-                                archetypeName={archetype}
-                                archetypeIndex={useStoredIndex ? storedIdx : undefined}
-                                iconOnly
-                                size="sm"
-                                earnedFromDraft={draft.name}
-                              />
+                            {listGrade ? (
+                              <DraftGradeDisplay result={listGrade} size="xs" showLabel={false} />
                             ) : null}
-                            {chaosNm ? (
+                            {replaceChaos && chaosNm ? (
                               <ArchetypeBadge
                                 archetypeName={chaosNm}
                                 iconOnly
-                                size="sm"
+                                size="xs"
                                 flavorText={chaosFlavor}
                                 earnedFromDraft={draft.name}
                               />
-                            ) : null}
+                            ) : (
+                              <>
+                                {archetype ? (
+                                  <ArchetypeBadge
+                                    archetypeName={archetype}
+                                    archetypeIndex={useStoredIndex ? storedIdx : undefined}
+                                    iconOnly
+                                    size="xs"
+                                    earnedFromDraft={draft.name}
+                                  />
+                                ) : null}
+                                {chaosNm ? (
+                                  <ArchetypeBadge
+                                    archetypeName={chaosNm}
+                                    iconOnly
+                                    size="xs"
+                                    flavorText={chaosFlavor}
+                                    earnedFromDraft={draft.name}
+                                  />
+                                ) : null}
+                              </>
+                            )}
                           </div>
                         );
                       })()}
@@ -1147,43 +1205,53 @@ const History = () => {
                         ? storedIdx
                         : undefined;
                     const chaosFlavor = chaosMeta?.flavorText;
+                    const draftGrade = computeGradeForDraft(selectedDraft);
+                    const hasArchetypeBadges =
+                      (replaceChaos && chaosNm) || mainArchetype || chaosNm;
+                    const badgeNodes = replaceChaos && chaosNm ? (
+                      <ArchetypeBadge
+                        archetypeName={chaosNm}
+                        iconOnly
+                        size="lg"
+                        flavorText={chaosFlavor}
+                        earnedFromDraft={selectedDraft.name}
+                        className="shrink-0"
+                      />
+                    ) : (
+                      <>
+                        {mainArchetype ? (
+                          <ArchetypeBadge
+                            archetypeName={mainArchetype}
+                            archetypeIndex={mainArchetypeIndex}
+                            iconOnly
+                            size="lg"
+                            earnedFromDraft={selectedDraft.name}
+                            className="shrink-0"
+                          />
+                        ) : null}
+                        {chaosNm ? (
+                          <ArchetypeBadge
+                            archetypeName={chaosNm}
+                            iconOnly
+                            size="lg"
+                            flavorText={chaosFlavor}
+                            earnedFromDraft={selectedDraft.name}
+                            className="shrink-0"
+                          />
+                        ) : null}
+                      </>
+                    );
                     return (
                       <div>
-                        <div className="mb-3 flex items-center justify-center gap-3 flex-wrap">
-                          {replaceChaos && chaosNm ? (
-                            <ArchetypeBadge
-                              archetypeName={chaosNm}
-                              iconOnly
-                              size="md"
-                              flavorText={chaosFlavor}
-                              earnedFromDraft={selectedDraft.name}
-                              className="cursor-help"
-                            />
-                          ) : (
-                            <>
-                              {mainArchetype ? (
-                                <ArchetypeBadge
-                                  archetypeName={mainArchetype}
-                                  archetypeIndex={mainArchetypeIndex}
-                                  iconOnly
-                                  size="md"
-                                  earnedFromDraft={selectedDraft.name}
-                                  className="cursor-help"
-                                />
-                              ) : null}
-                              {chaosNm ? (
-                                <ArchetypeBadge
-                                  archetypeName={chaosNm}
-                                  iconOnly
-                                  size="md"
-                                  flavorText={chaosFlavor}
-                                  earnedFromDraft={selectedDraft.name}
-                                  className="cursor-help"
-                                />
-                              ) : null}
-                            </>
-                          )}
-                        </div>
+                        {draftGrade ? (
+                          <DraftGradeBanner result={draftGrade} className="mb-4">
+                            {hasArchetypeBadges ? badgeNodes : null}
+                          </DraftGradeBanner>
+                        ) : hasArchetypeBadges ? (
+                          <div className="mb-4 flex items-center justify-center gap-3 flex-wrap">
+                            {badgeNodes}
+                          </div>
+                        ) : null}
                       <MyRoster
                         picks={picksForRoster}
                         players={rankedPlayers}

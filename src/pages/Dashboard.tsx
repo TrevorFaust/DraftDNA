@@ -5,20 +5,19 @@ import { useLeagues } from '@/hooks/useLeagues';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
-import { 
-  ListOrdered, 
-  History, 
-  Trophy, 
-  Plus, 
+import {
+  ListOrdered,
+  Trophy,
+  Plus,
   ArrowRight,
   Users,
   BarChart3,
-  Target,
   Medal,
   ChevronRight,
+  Table2,
 } from 'lucide-react';
 import { ClipboardList } from 'lucide-react';
-import { SEASON, PICK_SIX_VIEW_OTHERS_PICKS } from '@/constants/contest';
+import { SEASON, PICK_SIX_VIEW_OTHERS_PICKS, PICK_SIX_TOTAL_PRIZE_POOL_USD } from '@/constants/contest';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { PositionBadge } from '@/components/PositionBadge';
 import { BrandedLoader } from '@/components/BrandedLoader';
+import { PickSixMark } from '@/components/PickSixIcon';
 
 type LeaderboardRow = {
   rank: number;
@@ -197,13 +197,14 @@ const Dashboard = () => {
       iconColor: 'text-white',
     },
     {
-      title: 'Draft History',
-      description: 'Review your past mock drafts and analyze performance',
-      icon: History,
-      path: '/history',
-      gradient: 'bg-gradient-to-br from-emerald-500 to-teal-600',
-      hoverBorder: 'hover:border-emerald-500/50',
-      iconColor: 'text-white',
+      title: 'Player Stats',
+      description:
+        'Spreadsheet-style view: sort, filter, and compare the full player pool with all fantasy-relevant stats',
+      icon: Table2,
+      path: '/players',
+      gradient: 'bg-gradient-to-br from-[hsl(350_78%_72%)] to-[hsl(28_92%_58%)]',
+      hoverBorder: 'hover:border-[hsl(350_50%_50%/0.45)]',
+      iconColor: 'text-primary-foreground',
     },
   ];
 
@@ -250,23 +251,21 @@ const Dashboard = () => {
         <div className="flex flex-col md:flex-row gap-6 mb-12">
           <Link
             to="/prediction-challenge"
-            className="flex-1 md:max-w-[50%] glass-card p-6 group hover:border-amber-500/50 transition-all duration-300 flex items-center justify-center min-h-[140px]"
+            className="flex-1 md:max-w-[50%] glass-card p-6 group hover:border-primary/50 transition-all duration-300 flex items-center justify-center min-h-[140px]"
           >
             <div className="flex items-center gap-4 w-full justify-center">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center group-hover:scale-105 transition-transform shadow-lg shrink-0">
-                <Target className="w-7 h-7 text-white" />
-              </div>
+              <PickSixMark frameClassName="h-14 w-14 rounded-xl bg-gradient-primary transition-transform group-hover:scale-105" />
               <div className="flex items-center gap-2">
-                <h2 className="font-display text-2xl group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                <h2 className="font-display text-2xl group-hover:text-primary transition-colors">
                   Pick Six Challenge
                 </h2>
-                <ArrowRight className="w-5 h-5 text-amber-600 dark:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ArrowRight className="w-5 h-5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </div>
           </Link>
           <div className="flex-1 md:max-w-[50%] flex flex-col justify-center">
             <p className="text-muted-foreground text-sm leading-relaxed mb-3">
-              Win up to $30k by correctly guessing the top fantasy players at each position.
+              {`Win up to $${PICK_SIX_TOTAL_PRIZE_POOL_USD / 1000}k by correctly guessing the top fantasy players at each position.`}
             </p>
             <p className="text-muted-foreground text-sm leading-relaxed mb-4">
               Track your progress on the leaderboard — see how you rank with 1 correct, 2 correct, all 6, and more.
@@ -386,7 +385,7 @@ const Dashboard = () => {
           <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-amber-500" />
+                <PickSixMark frameClassName="h-10 w-10 rounded-md bg-primary/15" />
                 {picksDialogUser && (user && picksDialogUser.user_id === user.id ? "Your Pick Six" : `${picksDialogUser.username?.trim() || "User"}'s Pick Six`)}
               </DialogTitle>
             </DialogHeader>

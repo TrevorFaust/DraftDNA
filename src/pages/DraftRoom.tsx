@@ -28,7 +28,11 @@ import {
   PLAYER_POOL_CURRENT_SEASON,
 } from '@/constants/playerPoolSeason';
 import { cn, capitalizeSentenceStart } from '@/lib/utils';
-import { tempDraftStorage, tempSettingsStorage } from '@/utils/temporaryStorage';
+import { tempDraftStorage, tempSettingsStorage, getOrCreateGuestSessionId } from '@/utils/temporaryStorage';
+import {
+  buildDraftRankingsFromCommunity,
+  fetchCommunityRankingsForDraft,
+} from '@/utils/communityRankingsMerge';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { selectCpuPick, assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
@@ -36,13 +40,24 @@ import {
   detectArchetypeName,
   detectArchetypeIndex,
   detectStrategiesFromPicks,
-  getArchetypeBucketFromStrategies,
-  chooseArchetypeIndexFromBucket,
+  chooseArchetypeIndexForAward,
   hashPicksForTieBreak,
 } from '@/utils/archetypeDetection';
 import { getArchetypeByNameOrImproviser, FULL_ARCHETYPE_LIST } from '@/constants/archetypeListWithImproviser';
 import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
 import { ArchetypeBadge } from '@/components/ArchetypeBadge';
+import { DraftGradeBanner } from '@/components/DraftGradeDisplay';
+import { computeDraftGrade, toDraftGradePicks } from '@/utils/draftGrade';
+import { buildPriorSeasonRankByPlayerId } from '@/utils/draftGradePriorSeason';
+import {
+  countLeagueTop12Te,
+  countRbsInRounds12,
+  countRbsInPickWindow,
+  countPositionInRecentWindow,
+  countRecentPositionStreak,
+  countRound1Qb,
+  draftIdToSeed,
+} from '@/utils/cpuDraftRealism';
 import { buildDraftConfig, type DraftConfig } from '@/constants/buildDraftConfig';
 import { detectChaosArchetype, type ChaosPick } from '@/utils/chaosDetection';
 import { getAgeFromBirthDate } from '@/utils/playerAge';
@@ -53,7 +68,11 @@ const DraftRoom = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const player2025Stats = usePlayer2025Stats();
-  
+  const priorSeasonRankByPlayerId = useMemo(
+    () => buildPriorSeasonRankByPlayerId(player2025Stats),
+    [player2025Stats]
+  );
+
   const [draft, setDraft] = useState<MockDraft | null>(null);
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [picks, setPicks] = useState<DraftPick[]>([]);
@@ -167,11 +186,17 @@ const DraftRoom = () => {
       console.log('CPU speed value:', draftWithDefaults.cpu_speed);
 
       // Fetch league data (position limits, bucket settings) if draft is tied to a league
-      let leagueData: { position_limits?: any; is_superflex?: boolean; scoring_format?: string; league_type?: string } | null = null;
+      let leagueData: {
+        position_limits?: any;
+        is_superflex?: boolean;
+        scoring_format?: string;
+        league_type?: string;
+        rookies_only?: boolean;
+      } | null = null;
       if (!isTempDraft && draftData.league_id) {
         const { data: ld } = await supabase
           .from('leagues')
-          .select('position_limits, is_superflex, scoring_format, league_type')
+          .select('position_limits, is_superflex, scoring_format, league_type, rookies_only')
           .eq('id', draftData.league_id)
           .single();
         leagueData = ld;
@@ -475,14 +500,19 @@ const DraftRoom = () => {
       }
       }
 
-      // Determine draft bucket for community rankings (reuse for community fetch)
+      // Draft bucket for community consensus (CPUs use league board, not your personal rankings)
       const draftBucket = (() => {
+        const tempSettings = isTempDraft ? tempSettingsStorage.get() : null;
+        const rookiesOnly =
+          isRookiesOnly ||
+          (leagueData?.league_type === 'dynasty' && leagueData?.rookies_only === true) ||
+          tempSettings?.rookiesOnly === true;
         if (isTempDraft) {
-          const tempSettings = tempSettingsStorage.get();
           return {
             scoringFormat: ((draftData as any).scoring_format as string) || 'ppr',
             leagueType: (tempSettings?.leagueType as string) || 'season',
             isSuperflex: tempSettings?.isSuperflex ?? false,
+            rookiesOnly,
           };
         }
         if (leagueData) {
@@ -490,40 +520,35 @@ const DraftRoom = () => {
             scoringFormat: (leagueData.scoring_format as string) || ((draftData as any).scoring_format as string) || 'ppr',
             leagueType: (leagueData.league_type as string) || 'season',
             isSuperflex: (leagueData.is_superflex as boolean) ?? false,
+            rookiesOnly,
           };
         }
         return {
           scoringFormat: ((draftData as any).scoring_format as string) || 'ppr',
           leagueType: 'season',
           isSuperflex: false,
+          rookiesOnly,
         };
       })();
 
-      // Fetch community rankings for this bucket (CPU drafts from consensus, not user rankings)
-      let communityRankMap = new Map<string, number>();
-      if (draftBucket.leagueType !== 'dynasty') {
-        const { data: communityData } = (await supabase.rpc('get_community_rankings' as any, {
-          p_scoring_format: draftBucket.scoringFormat,
-          p_league_type: draftBucket.leagueType,
-          p_is_superflex: draftBucket.isSuperflex,
-        })) as { data: { player_id: string; rank_position: number }[] | null };
-        if (Array.isArray(communityData) && communityData.length > 0) {
-          communityData.forEach((r) => communityRankMap.set(r.player_id, r.rank_position));
-        }
-      }
+      const communityExclude = user
+        ? { excludeUserId: user.id }
+        : { excludeGuestSessionId: getOrCreateGuestSessionId() };
 
-      // Rank players: use community consensus when available, else ADP
-      const useCommunity = communityRankMap.size > 0;
-      const maxCommRank = useCommunity ? Math.max(...communityRankMap.values()) : 0;
-      const rankedPlayers: RankedPlayer[] = (allPlayersData || []).map((p, index) => {
-        const rank = useCommunity
-          ? (communityRankMap.get(p.id) ?? maxCommRank + index + 1)
-          : index + 1; // ADP order when no community data
-        const adp = useCommunity ? (communityRankMap.get(p.id) ?? maxCommRank + index + 1) : Number(p.adp);
-        return { ...p, adp, rank };
-      });
-      rankedPlayers.sort((a, b) => a.rank - b.rank);
-      const sortedRankedPlayers = rankedPlayers.map((p, index) => ({ ...p, rank: index + 1 }));
+      const communityRows = await fetchCommunityRankingsForDraft(supabase, draftBucket, communityExclude);
+      const sortedRankedPlayers = await buildDraftRankingsFromCommunity(
+        supabase,
+        allPlayersData || [],
+        communityRows
+      );
+
+      if (communityRows.length > 0) {
+        console.log(
+          `[DraftRoom] CPU board: community rankings (${draftBucket.scoringFormat}/${draftBucket.leagueType}/sf=${draftBucket.isSuperflex}), excluding drafter from consensus`
+        );
+      } else {
+        console.warn('[DraftRoom] No community rankings for bucket — CPU board using players.adp order');
+      }
 
       // Load picks before capping rounds so we never schedule more full rounds than the loaded pool supports
       let loadedPicks: DraftPick[] = existingPicks;
@@ -1105,6 +1130,11 @@ const DraftRoom = () => {
         const archetypeIdOrIds = draft?.cpu_archetypes?.[currentTeam];
         const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
         const benchCount = positionLimits?.BENCH ?? 6;
+        const picksWithPlayer = picks.map((p) => ({
+          pick_number: p.pick_number,
+          round_number: p.round_number,
+          player: players.find((pl) => pl.id === p.player_id),
+        }));
         const context = {
           roundNumber: getCurrentRound(),
           numRounds: draft.num_rounds,
@@ -1117,6 +1147,21 @@ const DraftRoom = () => {
           flexSlots: flexCount,
           benchSize: benchCount,
           rookieFlexDraft: isRookiesOnlyDraft,
+          realism: {
+            roundNumber: getCurrentRound(),
+            pickNumber: currentPick,
+            numTeams: draft.num_teams,
+            teTakenInTop12: countLeagueTop12Te(picksWithPlayer),
+            qbTakenInRound1: countRound1Qb(picksWithPlayer, draft.num_teams),
+            rbsTakenRounds12: countRbsInRounds12(picksWithPlayer),
+            rbsInTop12: countRbsInPickWindow(picksWithPlayer, 12),
+            recentRbPickStreak: countRecentPositionStreak(picksWithPlayer, 'RB', 8),
+            rbInRecentWindow: countPositionInRecentWindow(picksWithPlayer, 'RB', 8),
+            teamRbCount: teamDraftedPlayers.filter(
+              (p) => (p.position || '').toUpperCase() === 'RB'
+            ).length,
+            draftSeed: draftIdToSeed(draftId),
+          },
         };
         const cpuPick = selectCpuPick(available, archetypeIdOrIds, context) ?? available[0];
         
@@ -1663,9 +1708,8 @@ const DraftRoom = () => {
         .filter((p): p is NonNullable<typeof p> => !!p)
         .sort((a, b) => a.pick_number - b.pick_number);
       const strategies = detectStrategiesFromPicks(teamPicksForDetection, config);
-      const bucket = getArchetypeBucketFromStrategies(strategies);
       let earnedSet = new Set<number>();
-      let timesAssignedFromBucket = 0;
+      const earnedCountByIndex = new Map<number, number>();
       let earnedChaosNames = new Set<string>();
       if (user?.id) {
         const { data: completed } = await supabase
@@ -1676,32 +1720,31 @@ const DraftRoom = () => {
         for (const r of completed || []) {
           const row = r as { user_detected_archetype_index?: number | null; user_detected_chaos_archetype?: string | null };
           if (typeof row.user_detected_archetype_index === 'number') {
-            earnedSet.add(row.user_detected_archetype_index);
+            const idx = row.user_detected_archetype_index;
+            earnedSet.add(idx);
+            earnedCountByIndex.set(idx, (earnedCountByIndex.get(idx) ?? 0) + 1);
           }
           if (row.user_detected_chaos_archetype) {
             earnedChaosNames.add(row.user_detected_chaos_archetype);
           }
         }
-        timesAssignedFromBucket = (completed || []).filter((r) => {
-          const idx = (r as { user_detected_archetype_index?: number }).user_detected_archetype_index;
-          return typeof idx === 'number' && bucket.includes(idx);
-        }).length;
       } else {
         const tempIds = tempDraftStorage.getDraftList();
-        const tempIndices: number[] = [];
         for (const id of tempIds) {
           const t = tempDraftStorage.getDraft(id);
           if (t?.draft.status === 'completed') {
             const d = t.draft as { user_detected_archetype_index?: number; user_detected_chaos_archetype?: string | null };
-            if (typeof d.user_detected_archetype_index === 'number') tempIndices.push(d.user_detected_archetype_index);
+            if (typeof d.user_detected_archetype_index === 'number') {
+              const idx = d.user_detected_archetype_index;
+              earnedSet.add(idx);
+              earnedCountByIndex.set(idx, (earnedCountByIndex.get(idx) ?? 0) + 1);
+            }
             if (d.user_detected_chaos_archetype) earnedChaosNames.add(d.user_detected_chaos_archetype);
           }
         }
-        tempIndices.forEach((i) => earnedSet.add(i));
-        timesAssignedFromBucket = tempIndices.filter((i) => bucket.includes(i)).length;
       }
       const tieBreakHash = hashPicksForTieBreak(teamPicksForDetection);
-      const chosenIndex = chooseArchetypeIndexFromBucket(bucket, earnedSet, timesAssignedFromBucket, tieBreakHash);
+      const chosenIndex = chooseArchetypeIndexForAward(strategies, earnedSet, earnedCountByIndex, tieBreakHash);
       const name = FULL_ARCHETYPE_LIST[chosenIndex]?.name ?? detectArchetypeName(teamPicksForDetection, config);
 
       // Fetch age for chaos (Old Boys Club, Time Traveler, Retirement Watch)
@@ -1944,110 +1987,128 @@ const DraftRoom = () => {
     const mainFlavor = archetypeMeta?.flavorText;
     const flavorText = isReplaceChaos ? (chaosMeta?.flavorText ?? null) : mainFlavor;
 
+    const completionGrade =
+      !isFinalizingBadge && draft?.status === 'completed' && userPicks.length > 0
+        ? computeDraftGrade(
+            toDraftGradePicks(
+              userPicks
+                .map((pick) => {
+                  const pl = players.find((p) => p.id === pick.player_id);
+                  if (!pl) return null;
+                  return {
+                    pick_number: pick.pick_number,
+                    round_number: pick.round_number,
+                    is_autodraft: pick.is_autodraft,
+                    player: {
+                      id: pl.id,
+                      name: pl.name,
+                      adp: pl.adp,
+                      position: pl.position,
+                      team: pl.team,
+                      bye_week: pl.bye_week,
+                    },
+                  };
+                })
+                .filter((p): p is NonNullable<typeof p> => p != null)
+            ),
+            {
+              numTeams: draft.num_teams,
+              numRounds: draft.num_rounds,
+              chaosArchetype: draft.user_detected_chaos_archetype ?? chaosName,
+              isSuperflex,
+              playerPool: players,
+              priorSeasonRankByPlayerId,
+              archetypeName: isReplaceChaos ? chaosName : detectedArchetype || null,
+            }
+          )
+        : null;
+
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="max-w-6xl mx-auto px-4 py-8">
-          <div className="text-center mb-8">
-            <Trophy className="w-16 h-16 text-accent mx-auto mb-4" />
-            <h1 className="font-display text-4xl mb-4">DRAFT COMPLETE!</h1>
-            <p className="text-xl font-medium text-accent mb-1">
-              {isFinalizingBadge ? 'Locking in your badges…' : `You're ${headlineBadgeLabel}`}
-            </p>
-            <div className="flex flex-col items-center gap-4 mb-4 w-full max-w-5xl mx-auto">
-              {isFinalizingBadge ? (
-                <div className="flex flex-col items-center gap-3 py-6">
-                  <BrandedLoader size={52} />
-                  <p className="text-muted-foreground text-sm text-center max-w-sm">
-                    Assigning your archetype and any chaos badges from this draft…
-                  </p>
-                </div>
-              ) : isReplaceChaos && chaosMeta ? (
-                <>
+        <main className="max-w-6xl mx-auto px-4 py-4 sm:py-5">
+          <div className="text-center mb-3">
+            <Trophy className="w-8 h-8 text-accent mx-auto mb-1.5" />
+            <h1 className="font-display text-2xl sm:text-3xl mb-0.5">DRAFT COMPLETE!</h1>
+            {!isFinalizingBadge && headlineBadgeLabel && (
+              <p className="text-sm font-medium text-accent mb-2">
+                You&apos;re {headlineBadgeLabel}
+              </p>
+            )}
+            {isFinalizingBadge ? (
+              <div className="flex flex-col items-center gap-2 py-2 mb-2">
+                <BrandedLoader size={40} />
+                <p className="text-muted-foreground text-sm text-center max-w-sm">
+                  Locking in your badges…
+                </p>
+              </div>
+            ) : null}
+            {!isFinalizingBadge && completionGrade && (
+              <DraftGradeBanner
+                compact
+                result={completionGrade}
+                className="w-full max-w-4xl mx-auto mb-2 text-left"
+              >
+                {isReplaceChaos && chaosMeta ? (
                   <ArchetypeBadge
                     archetypeName={chaosName!}
-                    iconOnly={false}
-                    size="md"
+                    iconOnly
+                    size="lg"
                     flavorText={chaosMeta.flavorText}
                     locked={false}
                     className="shrink-0"
                   />
-                  {chaosMeta.flavorText && (
-                    <p className="text-muted-foreground text-sm max-w-xl text-center">
-                      {capitalizeSentenceStart(chaosMeta.flavorText)}
-                    </p>
-                  )}
-                </>
-              ) : !isReplaceChaos && chaosName && chaosMeta ? (
-                <div className="flex flex-col sm:flex-row items-start justify-center gap-8 md:gap-12 w-full">
-                  <div className="flex flex-col items-center gap-2 flex-1 min-w-0 max-w-sm">
+                ) : !isReplaceChaos && chaosName && chaosMeta ? (
+                  <>
                     <ArchetypeBadge
                       archetypeName={detectedArchetype}
-                      archetypeIndex={typeof draft?.user_detected_archetype_index === 'number' ? draft.user_detected_archetype_index : undefined}
-                      iconOnly={false}
-                      size="md"
+                      archetypeIndex={
+                        typeof draft?.user_detected_archetype_index === 'number'
+                          ? draft.user_detected_archetype_index
+                          : undefined
+                      }
+                      iconOnly
+                      size="lg"
+                      flavorText={mainFlavor}
                       locked={false}
                       className="shrink-0"
                     />
-                    {mainFlavor && (
-                      <p className="text-muted-foreground text-sm text-center max-w-sm">
-                        {capitalizeSentenceStart(mainFlavor)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-center gap-2 flex-1 min-w-0 max-w-sm">
                     <ArchetypeBadge
                       archetypeName={chaosName}
-                      iconOnly={false}
-                      size="md"
+                      iconOnly
+                      size="lg"
                       flavorText={chaosMeta.flavorText}
                       locked={false}
                       className="shrink-0"
                     />
-                    {chaosMeta.flavorText && (
-                      <p className="text-muted-foreground text-xs text-center max-w-sm">
-                        {capitalizeSentenceStart(chaosMeta.flavorText)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <>
+                  </>
+                ) : detectedArchetype ? (
                   <ArchetypeBadge
                     archetypeName={detectedArchetype}
-                    archetypeIndex={typeof draft?.user_detected_archetype_index === 'number' ? draft.user_detected_archetype_index : undefined}
-                    iconOnly={false}
-                    size="md"
+                    archetypeIndex={
+                      typeof draft?.user_detected_archetype_index === 'number'
+                        ? draft.user_detected_archetype_index
+                        : undefined
+                    }
+                    iconOnly
+                    size="lg"
+                    flavorText={flavorText ?? undefined}
                     locked={false}
                     className="shrink-0"
                   />
-                  {flavorText && (
-                    <p className="text-muted-foreground text-sm max-w-xl text-center">
-                      {capitalizeSentenceStart(flavorText)}
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-            <p className="text-muted-foreground mb-6 mt-6">
-              {draft?.name} has been completed and saved to your history.
-            </p>
-            <div className="flex justify-center gap-4 flex-wrap">
-              <Button variant="outline" onClick={() => navigate('/history')}>
-                View History
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/badges', { state: { fromDraftComplete: true } })}>
-                View Badges
-              </Button>
-              <Button variant="hero" onClick={() => navigate('/mock-draft')}>
-                Start New Draft
-              </Button>
-            </div>
+                ) : null}
+              </DraftGradeBanner>
+            )}
+            {!isFinalizingBadge && (
+              <p className="text-muted-foreground text-xs sm:text-sm mt-1 mb-0">
+                {draft?.name} saved to your history.
+              </p>
+            )}
           </div>
 
           {/* Team Display - Two Column Layout (or ordered pick slots for rookie-only) */}
-          <div className="glass-card p-6">
-            <h2 className="font-display text-2xl mb-6 text-center">{teamName}</h2>
+          <div className="glass-card p-6 mt-2">
+            <h2 className="font-display text-2xl mb-4 text-center">{teamName}</h2>
 
             {isRookiesOnlyDraft && draft ? (
               <div>
@@ -2155,6 +2216,23 @@ const DraftRoom = () => {
             </div>
             )}
           </div>
+
+          {!isFinalizingBadge && (
+            <div className="flex justify-center gap-3 sm:gap-4 flex-wrap mt-6 pb-4">
+              <Button variant="outline" onClick={() => navigate('/history')}>
+                View History
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate('/badges', { state: { fromDraftComplete: true } })}
+              >
+                View Badges
+              </Button>
+              <Button variant="hero" onClick={() => navigate('/mock-draft')}>
+                Start New Draft
+              </Button>
+            </div>
+          )}
         </main>
       </div>
     );

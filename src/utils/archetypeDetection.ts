@@ -191,24 +191,99 @@ export function getArchetypeBucketFromStrategies(strategies: ArchetypeStrategies
   return bucket.length > 0 ? bucket : [0]; // fallback to first if none match (should not happen)
 }
 
+function strategyMatchScore(a: ArchetypeStrategies, b: ArchetypeStrategies): number {
+  let score = 0;
+  if (a.rb === b.rb) score += 1;
+  if (a.wr === b.wr) score += 1;
+  if (a.qb === b.qb) score += 1;
+  if (a.te === b.te) score += 1;
+  if (a.late === b.late) score += 1;
+  return score;
+}
+
 /**
- * Choose one index from the bucket for badge assignment. Among archetypes the user has not
- * earned yet, picks using the same pick-hash as {@link detectArchetypeIndex} (stable order =
- * ascending list index), not “first in list.” If every bucket archetype is already earned,
- * rotates by timesAssignedFromBucket.
+ * Choose a badge index with variety: prefer unearned archetypes that closely match this draft,
+ * avoid repeating the same badge when similar alternatives exist, and only repeat after options run out.
  */
 export function chooseArchetypeIndexFromBucket(
   bucketIndices: number[],
   earnedIndices: Set<number>,
   timesAssignedFromBucket: number,
-  tieBreakHash: number
+  tieBreakHash: number,
+  strategies?: ArchetypeStrategies,
+  earnedCountByIndex?: Map<number, number>
 ): number {
+  if (strategies) {
+    return chooseArchetypeIndexForAward(strategies, earnedIndices, earnedCountByIndex ?? new Map(), tieBreakHash);
+  }
+
   const unearned = bucketIndices.filter((i) => !earnedIndices.has(i));
   if (unearned.length > 0) {
     const sorted = [...unearned].sort((a, b) => a - b);
     return sorted[Math.abs(tieBreakHash) % sorted.length];
   }
   return bucketIndices[timesAssignedFromBucket % bucketIndices.length];
+}
+
+export function chooseArchetypeIndexForAward(
+  strategies: ArchetypeStrategies,
+  earnedIndices: Set<number>,
+  earnedCountByIndex: Map<number, number>,
+  tieBreakHash: number
+): number {
+  const bucket = getArchetypeBucketFromStrategies(strategies);
+  const bucketNeverEarned = bucket.filter((i) => !earnedIndices.has(i));
+  if (bucketNeverEarned.length > 0) {
+    const byTimes = [...bucketNeverEarned].sort(
+      (a, b) => (earnedCountByIndex.get(a) ?? 0) - (earnedCountByIndex.get(b) ?? 0)
+    );
+    const minTimes = earnedCountByIndex.get(byTimes[0]) ?? 0;
+    const tier = byTimes.filter((i) => (earnedCountByIndex.get(i) ?? 0) === minTimes);
+    return tier[Math.abs(tieBreakHash) % tier.length];
+  }
+
+  const bestMatch = Math.max(
+    ...FULL_ARCHETYPE_LIST.map((a) => strategyMatchScore(a.strategies, strategies))
+  );
+
+  const buildCandidates = (minAccept: number) =>
+    FULL_ARCHETYPE_LIST.map((a, index) => ({
+      index,
+      match: strategyMatchScore(a.strategies, strategies),
+      earned: earnedIndices.has(index),
+      times: earnedCountByIndex.get(index) ?? 0,
+    })).filter((c) => c.match >= minAccept);
+
+  let minAccept = Math.max(3, bestMatch - 1);
+  let candidates = buildCandidates(minAccept);
+
+  const neverEarned = candidates.filter((c) => !c.earned);
+  if (neverEarned.length > 0) candidates = neverEarned;
+
+  const zeroTimes = candidates.filter((c) => c.times === 0);
+  if (zeroTimes.length > 0) candidates = zeroTimes;
+
+  if (candidates.length === 0) {
+    minAccept = Math.max(3, bestMatch - 2);
+    candidates = buildCandidates(minAccept);
+    const unearnedWide = candidates.filter((c) => !c.earned);
+    if (unearnedWide.length > 0) candidates = unearnedWide;
+  }
+
+  if (candidates.length === 0) {
+    candidates = buildCandidates(minAccept).filter((c) => c.times <= 1);
+  }
+
+  candidates.sort((a, b) => {
+    if (a.times !== b.times) return a.times - b.times;
+    if (b.match !== a.match) return b.match - a.match;
+    return a.index - b.index;
+  });
+
+  const topTimes = candidates[0]?.times ?? 0;
+  const topMatch = candidates[0]?.match ?? 0;
+  const tier = candidates.filter((c) => c.times === topTimes && c.match === topMatch);
+  return tier[Math.abs(tieBreakHash) % tier.length].index;
 }
 
 /** Find archetypes with the most matching strategy dimensions; tie-break by draft hash for variety. Returns index into FULL_ARCHETYPE_LIST. */

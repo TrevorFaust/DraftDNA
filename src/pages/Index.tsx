@@ -2,10 +2,51 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/Navbar';
-import { ListOrdered, History, ArrowRight } from 'lucide-react';
+import { ListOrdered, ArrowRight, Table2, ClipboardList } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
-import { ClipboardList } from 'lucide-react';
 import { BrandedLoader } from '@/components/BrandedLoader';
+import { PickSixMark } from '@/components/PickSixIcon';
+import {
+  SEASON,
+  LEAGUE_FORMAT_COMBINATION_COUNT,
+  PICK_SIX_TOTAL_PRIZE_POOL_USD,
+  formatContestPrizeUsd,
+} from '@/constants/contest';
+
+const pickSixPrizePoolDisplay = formatContestPrizeUsd(PICK_SIX_TOTAL_PRIZE_POOL_USD);
+const pickSixPrizePoolShort = `$${Math.round(PICK_SIX_TOTAL_PRIZE_POOL_USD / 1000)}K`;
+
+/** Rough combined-pool size for marketing (adjust if your merged `players` count changes). */
+const LANDING_PLAYERS_HEADLINE = '1100+';
+
+const iconBoxBlue =
+  'w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center mb-4 group-hover:shadow-glow transition-shadow';
+/** Salmon / coral strand (closer to logo DNA accent than pure red). */
+const iconBoxCoral =
+  'w-12 h-12 rounded-xl bg-gradient-to-br from-[hsl(350_78%_72%)] to-[hsl(28_92%_58%)] flex items-center justify-center mb-4 text-primary-foreground group-hover:shadow-[0_0_26px_hsl(350_75%_58%/0.35)] transition-shadow';
+
+/** Blue tile — matches landing stats strip rhythm (blue / coral / blue / …). */
+const iconBoxPickSix = iconBoxBlue;
+
+const statCellBlue =
+  'rounded-xl border border-primary/35 bg-primary/[0.07] px-3 py-5 text-center shadow-sm';
+const statCellCoral =
+  'rounded-xl border border-[hsl(350_45%_45%/0.4)] bg-[hsl(350_32%_48%/0.12)] px-3 py-5 text-center shadow-sm';
+
+const statNumberCoral =
+  'font-display text-4xl bg-gradient-to-br from-[hsl(350_85%_78%)] to-[hsl(32_95%_62%)] bg-clip-text text-transparent';
+
+function InfinityGlyph({ className }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex h-10 min-w-[2.75rem] items-center justify-center text-[2.25rem] leading-none ${className ?? 'text-primary'}`}
+      style={{ fontFamily: '"Cambria Math", "Apple Symbols", "Segoe UI Symbol", "Times New Roman", serif' }}
+      aria-hidden
+    >
+      {'\u221E'}
+    </span>
+  );
+}
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -31,7 +72,7 @@ const Index = () => {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsl(190_95%_50%/0.15),transparent_50%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_hsl(45_100%_55%/0.1),transparent_50%)]" />
 
-        <div className="max-w-6xl mx-auto px-4 pt-20 pb-32 relative">
+        <div className="max-w-6xl mx-auto px-4 pt-20 pb-12 relative">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6 animate-fade-in">
               <SiteLogo size={22} className="w-[22px] h-[22px]" />
@@ -45,20 +86,16 @@ const Index = () => {
             </h1>
             
             <div
-              className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 space-y-4 leading-relaxed animate-slide-up"
+              className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto mb-8 space-y-2 leading-relaxed animate-slide-up"
               style={{ animationDelay: '0.1s' }}
             >
               <p>
-                <span className="text-foreground font-medium">Draft DNA</span> is the NFL fantasy command center for
-                redraft and season-long prep: build your own <strong className="text-foreground font-semibold">draft rankings</strong> and
-                big board, stress-test strategy in <strong className="text-foreground font-semibold">unlimited mock drafts</strong>, and
-                unlock <strong className="text-foreground font-semibold">draft archetype badges</strong> that capture how you actually draft.
+                Rank your board, run mock drafts, and dig into player stats. Draft DNA keeps your {SEASON} fantasy
+                football prep all in one place.
               </p>
               <p>
-                Go deeper with <strong className="text-foreground font-semibold">player stats</strong>, team context, and spreadsheet-style
-                tools so every pick is informed—not a guess. Then put your reads on the line in the{' '}
-                <strong className="text-foreground font-semibold">Pick Six challenge</strong>: weekly NFL predictions with real stakes—
-                <strong className="text-foreground font-semibold">up to $30,000 in prizes</strong> on the table while you compete on the leaderboard.
+                Enter the Pick Six Challenge and put your football knowledge to the test playing for up to{' '}
+                {pickSixPrizePoolDisplay} in prizes.
               </p>
             </div>
 
@@ -72,10 +109,10 @@ const Index = () => {
           </div>
 
           {/* Features Grid */}
-          <div className="grid md:grid-cols-3 gap-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
             <Link to="/rankings" className="block">
               <div className="glass-card p-6 group hover:border-primary/50 transition-all duration-300 cursor-pointer h-full">
-                <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center mb-4 group-hover:shadow-glow transition-shadow">
+                <div className={iconBoxBlue}>
                   <ListOrdered className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <h3 className="font-display text-2xl mb-2">CUSTOM RANKINGS</h3>
@@ -86,55 +123,81 @@ const Index = () => {
             </Link>
 
             <Link to="/mock-draft" className="block">
-              <div className="glass-card p-6 group hover:border-accent/50 transition-all duration-300 cursor-pointer h-full">
-                <div className="w-12 h-12 rounded-xl bg-gradient-gold flex items-center justify-center mb-4 group-hover:shadow-[0_0_30px_hsl(45_100%_55%/0.3)] transition-shadow">
-                  <ClipboardList className="w-6 h-6 text-accent-foreground" />
+              <div className="glass-card p-6 group hover:border-[hsl(350_50%_50%/0.45)] transition-all duration-300 cursor-pointer h-full">
+                <div className={iconBoxCoral}>
+                  <ClipboardList className="w-6 h-6" />
                 </div>
                 <h3 className="font-display text-2xl mb-2">MOCK DRAFTS</h3>
                 <p className="text-muted-foreground">
-                  Simulate real drafts with customizable settings. Snake or linear, 8-16 teams.
+                  Simulate real drafts with customizable settings. Snake or linear, 4–32 teams.
                 </p>
               </div>
             </Link>
 
-            <Link to="/history" className="block">
+            <Link to="/prediction-challenge" className="block">
               <div className="glass-card p-6 group hover:border-primary/50 transition-all duration-300 cursor-pointer h-full">
-                <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center mb-4 group-hover:bg-secondary/80 transition-colors">
-                  <History className="w-6 h-6 text-foreground" />
-                </div>
-                <h3 className="font-display text-2xl mb-2">DRAFT HISTORY</h3>
+                <PickSixMark frameClassName={iconBoxPickSix} />
+                <h3 className="font-display text-xl sm:text-2xl mb-2 leading-tight">PICK SIX CHALLENGE</h3>
                 <p className="text-muted-foreground">
-                  Review past mock drafts, analyze your picks, and refine your strategy.
+                  Lock in your {SEASON} fantasy scoring predictions and follow along as the year plays out for a chance
+                  at {pickSixPrizePoolDisplay}.
+                </p>
+              </div>
+            </Link>
+
+            <Link to="/players" className="block">
+              <div className="glass-card p-6 group hover:border-[hsl(350_50%_50%/0.45)] transition-all duration-300 cursor-pointer h-full">
+                <div className={iconBoxCoral}>
+                  <Table2 className="w-6 h-6" />
+                </div>
+                <h3 className="font-display text-2xl mb-2">PLAYER STATS</h3>
+                <p className="text-muted-foreground">
+                  Spreadsheet-style view: sort, filter, and compare the full player pool with all fantasy-relevant
+                  stats.
                 </p>
               </div>
             </Link>
           </div>
 
           {/* Stats Section */}
-          <div className="mt-20 glass-card p-8 animate-slide-up" style={{ animationDelay: '0.4s' }}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              <div className="text-center">
-                <div className="font-display text-4xl text-gradient-gold">1000+</div>
-                <div className="text-sm text-muted-foreground mt-1">Datapoints</div>
+          <div className="mt-14 glass-card p-6 sm:p-8 animate-slide-up" style={{ animationDelay: '0.4s' }}>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
+              <div className={statCellBlue}>
+                <div className="font-display text-4xl text-gradient">{LANDING_PLAYERS_HEADLINE}</div>
+                <div className="text-sm text-muted-foreground mt-1 leading-snug">Players to mock</div>
               </div>
-              <div className="text-center">
-                <div className="font-display text-4xl text-gradient">10+</div>
-                <div className="text-sm text-muted-foreground mt-1">Scoring Formats</div>
+              <div className={statCellCoral}>
+                <div className={statNumberCoral}>{LEAGUE_FORMAT_COMBINATION_COUNT}</div>
+                <div className="text-sm text-muted-foreground mt-1 leading-snug">League Formats</div>
               </div>
-              <div className="text-center">
-                <div className="font-display text-4xl text-gradient-gold">∞</div>
-                <div className="text-sm text-muted-foreground mt-1">Mock Drafts</div>
+              <div className={statCellBlue}>
+                <div className="font-display text-4xl text-gradient-gold">
+                  {pickSixPrizePoolShort}
+                  <sup className="text-[0.45em] font-sans font-normal -top-[0.15em] relative">*</sup>
+                </div>
+                <div className="text-sm text-muted-foreground mt-1 leading-snug">In cash prizes</div>
               </div>
-              <div className="text-center">
+              <div className={statCellCoral}>
+                <div className="flex justify-center">
+                  <InfinityGlyph className="text-[hsl(350_78%_72%)]" />
+                </div>
+                <div className="text-sm text-muted-foreground mt-1 leading-snug">Mock drafts</div>
+              </div>
+              <div className={`${statCellBlue} col-span-2 md:col-span-1 lg:col-span-1`}>
                 <div className="font-display text-4xl text-gradient">FREE</div>
-                <div className="text-sm text-muted-foreground mt-1">To Use</div>
+                <div className="text-sm text-muted-foreground mt-1 leading-snug">To use</div>
               </div>
             </div>
+            <p className="text-center text-[11px] sm:text-xs text-muted-foreground mt-5 max-w-2xl mx-auto leading-relaxed">
+              *Pick Six is free to play. Create an account and accept the official contest rules to enter. Prizes are
+              awarded as described in the Official Rules (including up to {pickSixPrizePoolDisplay} in total prize
+              money); see rules for eligibility, tie-breakers, and how winners are determined.
+            </p>
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="border-t border-border/50 py-8">
+        <footer className="border-t border-border/50 py-5">
           <div className="max-w-6xl mx-auto px-4 text-center text-sm text-muted-foreground">
             <p>Built for fantasy football enthusiasts. Good luck in your drafts!</p>
           </div>
