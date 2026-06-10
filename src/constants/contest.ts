@@ -27,8 +27,53 @@ export function formatContestPrizeUsd(amount: number): string {
  */
 export const LEAGUE_FORMAT_COMBINATION_COUNT = 3 * 2 * 1 + 3 * 2 * 2;
 
-/** 8:00 PM ET, Thursday September 3, 2026 — after this, leaderboard can show all users' picks */
-export const PICK_SIX_ENTRY_DEADLINE_ET = new Date('2026-09-03T20:00:00-04:00');
+/**
+ * 8:20 PM ET, Wednesday September 9, 2026 — NFL kickoff.
+ * Entry deadline, others' picks visibility, and live leaderboard scoring all begin at this moment.
+ */
+export const PICK_SIX_KICKOFF_ET = new Date('2026-09-09T20:20:00-04:00');
+
+/** @deprecated Alias — use {@link PICK_SIX_KICKOFF_ET} */
+export const PICK_SIX_ENTRY_DEADLINE_ET = PICK_SIX_KICKOFF_ET;
+
+/** @deprecated Alias — use {@link PICK_SIX_KICKOFF_ET} */
+export const PICK_SIX_LIVE_SCORING_START_ET = PICK_SIX_KICKOFF_ET;
+
+/** Human-readable kickoff for UI copy (always Eastern Time). */
+export function formatPickSixKickoffDisplay(): string {
+  return PICK_SIX_KICKOFF_ET.toLocaleString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/New_York',
+    timeZoneName: 'short',
+  });
+}
+
+/** Contest season whose fantasy totals drive live Pick Six scoring once games begin. */
+export const PICK_SIX_SCORING_STATS_SEASON = SEASON;
+
+/**
+ * Local preview of live scoring UI (2025 stats via `usePickSixLiveStats` until 2026 RPC exists).
+ * Set `VITE_PICK_SIX_PREVIEW_LIVE_SCORING=true` in `.env`.
+ */
+export const PICK_SIX_PREVIEW_LIVE_SCORING =
+  import.meta.env.VITE_PICK_SIX_PREVIEW_LIVE_SCORING === 'true';
+
+/** True when live top 6, scoring, and full leaderboard are shown */
+export const PICK_SIX_LIVE_SCORING_ACTIVE =
+  PICK_SIX_PREVIEW_LIVE_SCORING || new Date() >= PICK_SIX_KICKOFF_ET;
+
+/**
+ * Local preview of post-deadline leaderboard (all picks expandable). Set
+ * `VITE_PICK_SIX_PREVIEW_OTHERS_PICKS=true` in `.env` — remove before production.
+ */
+export const PICK_SIX_PREVIEW_OTHERS_PICKS =
+  import.meta.env.VITE_PICK_SIX_PREVIEW_OTHERS_PICKS === 'true';
 
 /** True when viewing others' picks on the leaderboard is allowed (after entry deadline) */
-export const PICK_SIX_VIEW_OTHERS_PICKS = new Date() >= PICK_SIX_ENTRY_DEADLINE_ET;
+export const PICK_SIX_VIEW_OTHERS_PICKS =
+  PICK_SIX_PREVIEW_OTHERS_PICKS || new Date() >= PICK_SIX_KICKOFF_ET;

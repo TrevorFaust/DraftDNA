@@ -5,7 +5,8 @@ import type { RankedPlayer } from '@/types/database';
 import type { Player2025Stats } from '@/hooks/usePlayer2025Stats';
 import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
 import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
-import { displayTeamAbbrevOrFa, resolveTeamAbbrForDisplay } from '@/utils/teamMapping';
+import { resolveTeamAbbrForDisplay } from '@/utils/teamMapping';
+import { PlayerHeaderStatsLine } from '@/components/PlayerHeaderStatsLine';
 
 interface PlayerCardProps {
   player: RankedPlayer;
@@ -16,6 +17,10 @@ interface PlayerCardProps {
   positionColoredRank?: boolean;
   /** 2025 stats - only used on draggable cards to show avg PPG */
   stats2025?: Player2025Stats | null;
+  /** Overall ADP rank at position (e.g. 8 = WR8) */
+  positionAdpRank?: number | null;
+  /** One-line ADP + bye only (rankings lists). Default follows showGrabHandle. */
+  compactStats?: boolean;
 }
 
 const getPositionRankClass = (position: string) => {
@@ -45,8 +50,11 @@ export const PlayerCard = ({
   onClick,
   showGrabHandle = false,
   positionColoredRank = false,
-  stats2025
+  stats2025,
+  positionAdpRank,
+  compactStats,
 }: PlayerCardProps) => {
+  const useCompactStats = compactStats ?? showGrabHandle;
   const { data: jerseyColorsByAbbr } = useNflTeamJerseyColors();
   const jerseyTeamAbbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
   const numberFill = lookupJerseyNumberFill(jerseyColorsByAbbr, jerseyTeamAbbr);
@@ -82,11 +90,16 @@ export const PlayerCard = ({
           <span className="font-semibold truncate">{player.name}</span>
           <PositionBadge position={player.position} />
         </div>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-          <span>{displayTeamAbbrevOrFa(player.team, player.position, player.name)}</span>
-          <span>ADP: {player.adp}</span>
-          {player.bye_week && <span>BYE: {player.bye_week}</span>}
-        </div>
+        <PlayerHeaderStatsLine
+          position={player.position}
+          team={player.team}
+          playerName={player.name}
+          adp={player.adp}
+          byeWeek={player.bye_week}
+          positionAdpRank={useCompactStats ? undefined : positionAdpRank}
+          layout={useCompactStats ? 'compact' : 'stacked'}
+          className="mt-0"
+        />
       </div>
 
       {showGrabHandle && (() => {

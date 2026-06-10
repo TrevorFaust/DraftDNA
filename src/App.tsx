@@ -22,6 +22,8 @@ import LeagueSettings from "./pages/LeagueSettings";
 import NotFound from "./pages/NotFound";
 import { Footer } from "./components/Footer";
 import { BrandedLoader } from "./components/BrandedLoader";
+import { FantasyDepthProvider } from "@/contexts/FantasyDepthContext";
+import { NflTeamContextProvider } from "@/contexts/NflTeamContext";
 
 const Statistics = lazy(() => import("./pages/Statistics").then((m) => ({ default: m.default })));
 const History = lazy(() => import("./pages/History").then((m) => ({ default: m.default })));
@@ -45,6 +47,8 @@ const App = () => (
         <AuthProvider>
           <LeaguesProvider>
             <TooltipProvider>
+              <FantasyDepthProvider>
+              <NflTeamContextProvider>
               <Toaster />
               <Sonner />
               <div className="min-h-screen flex flex-col">
@@ -69,6 +73,8 @@ const App = () => (
                 </main>
                 <Footer />
               </div>
+              </NflTeamContextProvider>
+              </FantasyDepthProvider>
             </TooltipProvider>
           </LeaguesProvider>
         </AuthProvider>

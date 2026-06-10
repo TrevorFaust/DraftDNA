@@ -70,7 +70,7 @@ export function canonicalTeamAbbr(abbr: string | null | undefined): string | nul
   return u;
 }
 
-function isDefensePosition(position: string | null | undefined): boolean {
+export function isDefensePosition(position: string | null | undefined): boolean {
   if (!position?.trim()) return false;
   const p = position.trim().toUpperCase();
   return p === 'D/ST' || p === 'DEF' || p === 'DST';
@@ -110,4 +110,16 @@ export function displayTeamAbbrevOrFa(
   const faLabel = opts?.faLabel ?? 'FA';
   if (!abbr || abbr === 'FA') return faLabel;
   return abbr;
+}
+
+/** Full club name for player cards; `null` for defenses; `Free Agent` when no team. */
+export function displayPlayerCardTeamName(
+  team: string | null | undefined,
+  position: string | null | undefined,
+  playerName: string | null | undefined
+): string | null {
+  if (isDefensePosition(position)) return null;
+  const abbr = resolveTeamAbbrForDisplay(team, position, playerName);
+  if (!abbr || abbr === 'FA') return 'Free Agent';
+  return getFullTeamName(abbr) ?? abbr;
 }

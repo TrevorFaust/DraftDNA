@@ -62,6 +62,32 @@ import { buildDraftConfig, type DraftConfig } from '@/constants/buildDraftConfig
 import { detectChaosArchetype, type ChaosPick } from '@/utils/chaosDetection';
 import { getAgeFromBirthDate } from '@/utils/playerAge';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
+import {
+  buildDefenseRankFromList,
+  buildPositionAdpRankMap,
+  resolvePositionAdpRankForDisplay,
+} from '@/utils/positionAdpRank';
+function DraftPlayerHeaderLine({ player }: { player: RankedPlayer }) {
+  return (
+    <PlayerHeaderStatsLine
+      position={player.position}
+      team={player.team}
+      adp={player.adp}
+      byeWeek={player.bye_week}
+      layout="compact"
+      className="text-xs mt-0"
+    />
+  );
+}
+
+import { PlayerHeaderStatsLine } from '@/components/PlayerHeaderStatsLine';
+
+/** Minimum ms between rapid CPU picks finishing — keeps pace steady when the board is lighter late in the draft. */
+const RAPID_CPU_PICK_GAP_MS = 360;
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const DraftRoom = () => {
   const { draftId } = useParams<{ draftId: string }>();
@@ -75,6 +101,18 @@ const DraftRoom = () => {
 
   const [draft, setDraft] = useState<MockDraft | null>(null);
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
+  const positionAdpRankMap = useMemo(
+    () => buildPositionAdpRankMap(players),
+    [players]
+  );
+  /** Draft pool is community-ordered; defense Pos ADP follows that list. */
+  const communityDefenseRankFromList = useMemo(
+    () =>
+      buildDefenseRankFromList(
+        players.map((p) => ({ id: p.id, position: p.position, rank: p.rank }))
+      ),
+    [players]
+  );
   const [picks, setPicks] = useState<DraftPick[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -113,6 +151,7 @@ const DraftRoom = () => {
   const cpuDraftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const draftBoardRef = useRef<HTMLDivElement | null>(null);
   const lastPickRef = useRef<number>(0);
+  const lastRapidCpuPickAtRef = useRef(0);
   const isDraftPausedRef = useRef<boolean>(false);
   const [draftBoardScrolledUp, setDraftBoardScrolledUp] = useState(false);
 
@@ -125,6 +164,10 @@ const DraftRoom = () => {
 
   // Don't redirect - allow non-logged-in users to access temporary drafts
   const isTempDraft = draftId?.startsWith('temp_');
+
+  useEffect(() => {
+    lastRapidCpuPickAtRef.current = 0;
+  }, [draftId]);
 
   const fetchDraftData = useCallback(async () => {
     if (!draftId) return;
@@ -1176,77 +1219,101 @@ const DraftRoom = () => {
           return;
         }
         
-        // Delay for UX (so user can see what happened)
-        // Calculate delay based on CPU speed: normal = 750ms, slow = 1500ms (2x), fast = 375ms (0.5x), rapid = 100ms (very short pause)
         const cpuSpeed = (draft?.cpu_speed || 'normal') as 'slow' | 'normal' | 'fast' | 'rapid' | 'instant';
-        console.log('🤖 CPU Speed setting:', cpuSpeed, 'from draft:', draft?.cpu_speed);
-        const baseDelay = 750;
-        // Support both 'rapid' and 'instant' for backward compatibility
-        // Rapid mode should have a very short pause (100ms) for better UX, not completely instant
-        const delay = (cpuSpeed === 'rapid' || cpuSpeed === 'instant') ? 100 : cpuSpeed === 'slow' ? baseDelay * 2 : cpuSpeed === 'fast' ? baseDelay / 2 : baseDelay;
-        console.log('🤖 Calculated delay:', delay, 'ms');
-        if (delay > 0) {
-          console.log('🤖 Waiting', delay, 'ms...');
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          console.log('🤖 Delay complete');
-        }
-        
-        // Check again after delay - user might have paused during the delay (use ref for immediate check)
-        console.log('🤖 makeCpuPick: After delay, checking pause:', {
-          refValue: isDraftPausedRef.current,
-          stateValue: isDraftPaused
-        });
-        if (isDraftPausedRef.current) {
-          console.log('⏸️ makeCpuPick: ABORTED after delay - draft is paused');
-          setIsDrafting(false);
-          return;
-        }
-        
-        // Final check right before making the pick (most critical point)
-        console.log('🤖 makeCpuPick: Before draftPlayer call, checking pause:', {
-          refValue: isDraftPausedRef.current,
-          stateValue: isDraftPaused
-        });
-        if (isDraftPausedRef.current) {
-          console.log('⏸️ makeCpuPick: ABORTED right before draftPlayer - draft is paused');
-          setIsDrafting(false);
-          return;
-        }
-        
+        const isRapidCpu = cpuSpeed === 'rapid' || cpuSpeed === 'instant';
         const roundNumber = getCurrentRound();
-        const data = await draftPlayer(cpuPick, currentPick, currentTeam, roundNumber);
-        
-        // Check one more time after the API call (in case pause was clicked during the call)
-        if (isDraftPausedRef.current && data) {
-          console.log('CPU pick completed but draft is now paused - this should not happen');
+        const pickNumber = currentPick;
+
+        if (!isRapidCpu) {
+          const baseDelay = 750;
+          const delay =
+            cpuSpeed === 'slow' ? baseDelay * 2 : cpuSpeed === 'fast' ? baseDelay / 2 : baseDelay;
+          if (delay > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+          if (isDraftPausedRef.current) {
+            setIsDrafting(false);
+            return;
+          }
         }
-        
-        if (data) {
-          // Update picks and current pick
+
+        if (isDraftPausedRef.current) {
+          setIsDrafting(false);
+          return;
+        }
+
+        const applyPick = (data: DraftPick) => {
           setPicks((prev) => [...prev, data]);
-          const nextPick = currentPick + 1;
-          setCurrentPick(nextPick);
-          
-          // Scroll draft board to bottom after a short delay (only if user is at bottom)
+          setCurrentPick(pickNumber + 1);
+        };
+
+        if (isRapidCpu) {
+          const paceWaitMs =
+            lastRapidCpuPickAtRef.current > 0
+              ? Math.max(
+                  0,
+                  RAPID_CPU_PICK_GAP_MS -
+                    (performance.now() - lastRapidCpuPickAtRef.current)
+                )
+              : 0;
+          if (paceWaitMs > 0) {
+            await sleepMs(paceWaitMs);
+          }
+          if (isDraftPausedRef.current) {
+            setIsDrafting(false);
+            return;
+          }
+
+          const optimisticPick: DraftPick = {
+            id: isTempDraft
+              ? `temp_pick_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+              : `pending_${pickNumber}`,
+            mock_draft_id: draftId!,
+            player_id: cpuPick.id,
+            team_number: currentTeam,
+            round_number: roundNumber,
+            pick_number: pickNumber,
+            created_at: new Date().toISOString(),
+          };
+          applyPick(optimisticPick);
+          lastRapidCpuPickAtRef.current = performance.now();
+          setIsDrafting(false);
+
+          void draftPlayer(cpuPick, pickNumber, currentTeam, roundNumber)
+            .then((data) => {
+              if (!data) return;
+              setPicks((prev) =>
+                prev.map((p) =>
+                  p.pick_number === pickNumber ? { ...data, id: data.id || p.id } : p
+                )
+              );
+            })
+            .catch((error: unknown) => {
+              console.error('Rapid CPU pick save failed:', error);
+              setPicks((prev) => prev.filter((p) => p.pick_number !== pickNumber));
+              setCurrentPick(pickNumber);
+              toast.error(
+                `Failed to save CPU pick: ${error instanceof Error ? error.message : 'Unknown error'}`
+              );
+            });
+          return;
+        }
+
+        const data = await draftPlayer(cpuPick, pickNumber, currentTeam, roundNumber);
+        if (data) {
+          applyPick(data);
           setTimeout(() => {
             if (draftBoardRef.current) {
               const container = draftBoardRef.current;
-              const scrollHeight = container.scrollHeight;
-              const scrollTop = container.scrollTop;
-              const clientHeight = container.clientHeight;
-              
-              // Check if user is at or near the bottom (within 50px threshold)
-              const isNearBottom = scrollHeight - scrollTop - clientHeight < 50;
-              
-              // Only auto-scroll if user is already at the bottom
+              const isNearBottom =
+                container.scrollHeight - container.scrollTop - container.clientHeight < 50;
               if (isNearBottom) {
-                container.scrollTop = scrollHeight;
+                container.scrollTop = container.scrollHeight;
               }
             }
           }, 100);
         }
-        
-        // Don't auto-complete - user must click "Finish Draft" button after validating roster
+
         setIsDrafting(false);
       } catch (error: any) {
         console.error('CPU draft error:', error);
@@ -2593,9 +2660,7 @@ const DraftRoom = () => {
                         </span>
                         <PositionBadge position={player.position} />
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {displayTeamAbbrevOrFa(player.team, player.position, player.name)} • ADP: {player.adp}
-                      </div>
+                      <DraftPlayerHeaderLine player={player} />
                     </div>
                     <Button
                       size="sm"
@@ -2664,6 +2729,15 @@ const DraftRoom = () => {
         onOpenChange={setIsStatsDialogOpen}
         stats2025={selectedPlayerForStats ? player2025Stats.get(selectedPlayerForStats.id) : undefined}
         allStats2025={player2025Stats}
+        positionAdpRank={
+          selectedPlayerForStats
+            ? resolvePositionAdpRankForDisplay(
+                selectedPlayerForStats,
+                positionAdpRankMap,
+                communityDefenseRankFromList
+              )
+            : null
+        }
       />
     </div>
   );

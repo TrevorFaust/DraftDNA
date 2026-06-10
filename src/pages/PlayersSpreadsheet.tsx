@@ -9,15 +9,13 @@ import { usePlayer2025Stats, type Player2025Stats } from "@/hooks/usePlayer2025S
 import { ArrowDown, ArrowUp, HelpCircle, Lightbulb } from "lucide-react";
 import type { RankedPlayer } from "@/types/database";
 import { displayTeamAbbrevOrFa, resolveTeamAbbrForDisplay } from "@/utils/teamMapping";
-import { getNflOlineTeam2025, getNflOlineUnitOverallRank } from "@/constants/nflOlineTeamRanks2025";
-import { useNfl2025TeamRankings, type TeamRankMetric } from "@/hooks/useNfl2025TeamRankings";
+import { useNflTeamContext } from "@/contexts/NflTeamContext";
+import type { TeamRankMetric } from "@/types/nflTeamContext2025";
 import {
-  formatSosCellDisplay,
-  getNfl2026SosOppWinPct,
-  getNfl2026SosRank,
   NFL_2026_SOS_HELP_TEXT,
 } from "@/constants/nfl2026StrengthOfSchedule";
 import { PlayerDetailDialog } from "@/components/PlayerDetailDialog";
+import { SosCellDisplay } from "@/components/SosCellDisplay";
 import { cn } from "@/lib/utils";
 import { getAgeFromBirthDate } from "@/utils/playerAge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -37,6 +35,7 @@ import { fetchRookiesRankings, filterPlayersToRookieIds } from "@/utils/rookiesF
 import type { ScoringFormat } from "@/utils/fantasyPoints";
 import { BrandedLoader } from "@/components/BrandedLoader";
 import { OlineSpreadsheetRankTrigger } from "@/components/OlineComparisonMetricPanel";
+import { buildPositionAdpRankMap } from "@/utils/positionAdpRank";
 
 type CommunityRow = { player_id: string; rank_position: number };
 type AgeRow = { espn_id: string; birth_date: string | null };
@@ -446,7 +445,8 @@ export default function PlayersSpreadsheet() {
   ]);
 
   const statsMap = usePlayer2025Stats(displayBucket.scoringFormat);
-  const nflTeamRanks = useNfl2025TeamRankings(true);
+  const positionAdpRankMap = useMemo(() => buildPositionAdpRankMap(players), [players]);
+  const teamContext = useNflTeamContext();
 
   const scoringPhrase = scoringFormatLabel(displayBucket.scoringFormat);
   const bucketBadgeLine = useMemo(() => {
@@ -654,15 +654,15 @@ export default function PlayersSpreadsheet() {
     const teamRankCol = NFL_TEAM_RANK_COLUMNS.find((c) => c.sortKey === sortKey);
     if (teamRankCol) {
       const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
-      return nflTeamRanks.getRank(abbr, teamRankCol.metric);
+      return teamContext.getRank(abbr, teamRankCol.metric);
     }
     if (sortKey === OL_UNIT_OVERALL_SORT_KEY) {
       const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
-      return getNflOlineUnitOverallRank(abbr);
+      return teamContext.getForTeam(abbr)?.oline_unit_rank ?? null;
     }
     if (sortKey === SOS_2026_SORT_KEY) {
       const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
-      return getNfl2026SosRank(abbr);
+      return teamContext.getSosRank(abbr);
     }
     if (sortKey === "totalPoints") return stats?.totalFantasyPoints ?? null;
     if (sortKey === "posRank") {
@@ -706,7 +706,7 @@ export default function PlayersSpreadsheet() {
     ageByEspnId,
     activeStatColumns,
     normalizedPosRankByPlayerId,
-    nflTeamRanks.getRank,
+    teamContext,
   ]);
 
   const onSort = (key: string, sortable: boolean) => {
@@ -850,7 +850,7 @@ export default function PlayersSpreadsheet() {
           </Select>
         </div>
 
-        <div className="rounded-lg border border-border/50 bg-secondary/20 min-w-0 max-w-full overflow-x-auto [overflow-y:visible]">
+        <div className="rounded-lg border border-border/50 bg-secondary/20 min-w-0 max-w-full overflow-x-auto overflow-y-visible scrollbar-thin">
           <Table disableInnerScroll className="min-w-max">
             <TableHeader className="shadow-[inset_0_-1px_0_0_hsl(var(--border))]">
               <TableRow>
@@ -963,8 +963,8 @@ export default function PlayersSpreadsheet() {
                 const age = normalizedPosition === "D/ST" ? null : (espnId ? ageByEspnId.get(espnId) ?? null : null);
                 const displayPosRank = normalizedPosRankByPlayerId.get(player.id) ?? "-";
                 const teamAbbrForSos = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
-                const sos2026Rank = getNfl2026SosRank(teamAbbrForSos);
-                const sos2026Pct = getNfl2026SosOppWinPct(teamAbbrForSos);
+                const sos2026Rank = teamContext.getSosRank(teamAbbrForSos);
+                const sos2026Pct = teamContext.getSosOppWinPct(teamAbbrForSos);
                 return (
                   <TableRow
                     key={player.id}
@@ -996,7 +996,7 @@ export default function PlayersSpreadsheet() {
                       <TableCell className="text-center">{formatWhole(stats?.gamesPlayed)}</TableCell>
                     )}
                     {NFL_TEAM_RANK_COLUMNS.map((col) => {
-                      if (nflTeamRanks.loading) {
+                      if (teamContext.loading) {
                         return (
                           <TableCell key={col.sortKey} className="text-center tabular-nums text-muted-foreground">
                             –
@@ -1005,7 +1005,7 @@ export default function PlayersSpreadsheet() {
                       }
                       const abbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
                       const rank =
-                        !abbr || abbr === "FA" ? null : nflTeamRanks.getRank(abbr, col.metric);
+                        !abbr || abbr === "FA" ? null : teamContext.getRank(abbr, col.metric);
                       return (
                         <TableCell key={col.sortKey} className="text-center tabular-nums">
                           {rank != null ? String(rank) : "-"}
@@ -1013,20 +1013,22 @@ export default function PlayersSpreadsheet() {
                       );
                     })}
                     <TableCell className="text-center text-sm">
-                      {getNflOlineTeam2025(teamAbbrForSos) ? (
+                      {teamContext.getOlineForTeam(teamAbbrForSos) ? (
                         <OlineSpreadsheetRankTrigger
                           teamAbbr={teamAbbrForSos}
                           teamLabel={team && team !== "—" ? team : "Team"}
-                          rankDisplay={String(getNflOlineUnitOverallRank(teamAbbrForSos) ?? "—")}
+                          rankDisplay={String(teamContext.getForTeam(teamAbbrForSos)?.oline_unit_rank ?? "—")}
                         />
                       ) : (
                         <span className="tabular-nums text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-center tabular-nums text-sm">
-                      {sos2026Pct != null && sos2026Rank != null
-                        ? formatSosCellDisplay(sos2026Pct, sos2026Rank)
-                        : "-"}
+                    <TableCell className="text-center text-sm">
+                      {sos2026Pct != null && sos2026Rank != null ? (
+                        <SosCellDisplay pct={sos2026Pct} rank={sos2026Rank} />
+                      ) : (
+                        "-"
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -1041,6 +1043,9 @@ export default function PlayersSpreadsheet() {
           onOpenChange={setDetailDialogOpen}
           stats2025={selectedPlayer ? statsMap.get(selectedPlayer.id) : undefined}
           allStats2025={statsMap}
+          positionAdpRank={
+            selectedPlayer ? positionAdpRankMap.get(selectedPlayer.id) ?? null : null
+          }
         />
       </main>
     </div>

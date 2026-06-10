@@ -2,20 +2,10 @@ import { canonicalTeamAbbr } from "@/utils/teamMapping";
 
 /**
  * NFL offensive line team metrics (2025 season), transcribed from a published
- * pass/run blocking rankings table. Overall ranks: 1 = best among 32 teams, 32 = worst.
+ * pass/run blocking rankings table.
  *
- * PFF-style **unit** overall O-line rank (1 = best) is stored as `unitOverallRank` (user-supplied
- * 2025 ordering). Use `passOverallRank` / `runOverallRank` for phase-only leaderboards; use
- * grades/rates in each row for deeper analysis.
- *
- * Column meanings (source table):
- * - PRESS %: Percentage of Dropbacks Under Pressure
- * - PrROE: Pressure Rate vs. Expected Pressure Rate based on QB Time to Throw
- * - PB PFF: Overall Pass-Blocking PFF Grade
- * - PB WR: Pass-Blocking Win Rate
- * - ADJ YBC/Att: Adjusted Yards Before Contact per Attempt
- * - RB PFF: Overall Run-Blocking PFF Grade
- * - RB WR: Run-Blocking Win Rate
+ * **Seed source only** — runtime reads `nfl_team_context_2025` via `useNflTeamContext`.
+ * Regenerate DB: npx tsx scripts/generate-nfl-team-context-2025-migration.ts
  */
 
 export type NflOlineTeamRow = {

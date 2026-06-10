@@ -15,6 +15,7 @@ import { mergeRankingsWithDraftOrder } from '@/utils/rankingsCommunityMerge';
 import { computeStudsDuds, type StudDudEntry } from '@/utils/studsDuds';
 import { fetchRookiesRankings, filterPlayersToRookieIds, type RookieRankRow } from '@/utils/rookiesFilter';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
+import { buildPositionAdpRankMap } from '@/utils/positionAdpRank';
 import { cn } from '@/lib/utils';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
@@ -102,6 +103,13 @@ const Statistics = () => {
   const player2025Stats = usePlayer2025Stats();
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [communityPlayers, setCommunityPlayers] = useState<RankedPlayer[]>([]);
+  const positionAdpRankMap = useMemo(() => {
+    const byId = new Map<string, RankedPlayer>();
+    for (const p of [...players, ...communityPlayers]) {
+      if (!byId.has(p.id)) byId.set(p.id, p);
+    }
+    return buildPositionAdpRankMap([...byId.values()]);
+  }, [players, communityPlayers]);
 
   const studsDudsFromRankings = useMemo((): { studs: StudDudEntry[]; duds: StudDudEntry[] } => {
     if (players.length === 0 || communityPlayers.length === 0) {
@@ -2254,6 +2262,9 @@ const Statistics = () => {
         onOpenChange={setDetailDialogOpen}
         stats2025={selectedPlayer ? player2025Stats.get(selectedPlayer.id) : undefined}
         allStats2025={player2025Stats}
+        positionAdpRank={
+          selectedPlayer ? positionAdpRankMap.get(selectedPlayer.id) ?? null : null
+        }
       />
     </div>
   );

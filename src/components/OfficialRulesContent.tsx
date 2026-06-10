@@ -1,5 +1,9 @@
 /** Official Pick Six Challenge rules content (read-only). Used in terms dialog and footer. */
-import { PICK_SIX_CATEGORY_PRIZE_USD, PICK_SIX_TOTAL_PRIZE_POOL_USD } from '@/constants/contest';
+import {
+  formatPickSixKickoffDisplay,
+  PICK_SIX_CATEGORY_PRIZE_USD,
+  PICK_SIX_TOTAL_PRIZE_POOL_USD,
+} from '@/constants/contest';
 
 type Props = { siteName: string; season: number };
 
@@ -32,7 +36,7 @@ export function OfficialRulesContent({ siteName, season }: Props) {
         <p><strong>One Entry Rule:</strong> There is a strict limit of one (1) entry per person, per position group (QB, RB, WR, TE, K, DEF).</p>
         <p className="mt-2"><strong>Multiple Accounts:</strong> Use of multiple email addresses, identities, or any automated &quot;bot&quot; system to submit entries is strictly prohibited. Any participant found using multiple accounts or automated methods will have all entries voided and will be banned from the platform.</p>
         <p className="mt-2">To participate, users must have a verified {siteName} account. Sponsor reserves the right to review account activity and IP logs. If a single individual is found to be operating multiple accounts to bypass entry limits, all associated accounts and entries will be permanently disqualified and banned from the platform.</p>
-        <p className="mt-2">All entries must be received and recorded by the Sponsor&apos;s servers prior to 8:00 PM ET on Thursday, September 3rd, 2026. Sponsor&apos;s computer is the official time-keeping device for this Contest. Entries submitted after this deadline are void, regardless of any technical malfunctions or server delays.</p>
+        <p className="mt-2">All entries must be received and recorded by the Sponsor&apos;s servers prior to {formatPickSixKickoffDisplay()}. Sponsor&apos;s computer is the official time-keeping device for this Contest. Entries submitted after this deadline are void, regardless of any technical malfunctions or server delays.</p>
       </section>
       <section>
         <h3 className="font-semibold text-foreground mb-1">4. THE &quot;PERFECT PICK SIX&quot; JACKPOT</h3>

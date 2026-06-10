@@ -2,7 +2,7 @@ import { canonicalTeamAbbr } from "@/utils/teamMapping";
 
 /**
  * 2026 strength of schedule by opponent win % from 2025.
- * Rank 1 = hardest schedule, 32 = easiest.
+ * **Seed source only** — runtime reads `sos_2026_*` from `nfl_team_context_2025`.
  */
 
 /** Shared hover / popover copy for 2026 SOS (Player Stats header + comparison dialog). */

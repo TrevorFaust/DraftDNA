@@ -2,7 +2,8 @@ import { forwardRef } from 'react';
 import { Crown } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { PickSixMark } from '@/components/PickSixIcon';
-import { getFullTeamName } from '@/utils/teamMapping';
+import { getFullTeamName, resolveTeamAbbrForDisplay } from '@/utils/teamMapping';
+import { isDefenseLikePosition } from '@/utils/pickSixScoring';
 import type { Player } from '@/types/database';
 import { getPickSixPlayerSurfaceStyle, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
 import { cn } from '@/lib/utils';
@@ -60,9 +61,17 @@ function getSeasonPositionLabel(season: number, position: string): string {
 }
 
 /** Full team name for display (e.g. "Baltimore Ravens") */
-function teamDisplay(team: string | null | undefined): string {
+function teamDisplay(
+  team: string | null | undefined,
+  position: string,
+  playerName: string
+): string {
+  if (isDefenseLikePosition(position)) {
+    const abbr = resolveTeamAbbrForDisplay(team, position, playerName);
+    return (abbr && getFullTeamName(abbr)) || playerName.trim() || '—';
+  }
   const full = getFullTeamName(team);
-  return full || (team?.trim()) || '—';
+  return full || team?.trim() || '—';
 }
 
 /* Grain texture for share card */
@@ -144,7 +153,12 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
               'text-[10px]',
               'text-[10px]',
             ][i];
-            const surface = getPickSixPlayerSurfaceStyle(teamColorsByAbbr, player.team);
+            const teamAbbr = resolveTeamAbbrForDisplay(
+              player.team,
+              player.position,
+              player.name
+            );
+            const surface = getPickSixPlayerSurfaceStyle(teamColorsByAbbr, teamAbbr);
             return (
               <div key={player.id} className={`relative flex flex-col items-center w-full ${isCrown ? 'mt-6' : ''}`}>
                 {isCrown && (
@@ -195,7 +209,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
                       surface ? 'text-xs opacity-90' : 'text-slate-500 text-[10px]'
                     )}
                   >
-                    {teamDisplay(player.team)}
+                    {teamDisplay(player.team, player.position, player.name)}
                   </div>
                 </div>
               </div>

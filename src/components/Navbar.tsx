@@ -54,28 +54,48 @@ const navItems: NavItem[] = [
   { path: '/league-settings', label: 'League Settings', icon: Settings2 },
 ];
 
-function NavTabScrollArea({ children }: { children: ReactNode }) {
+function NavTabScrollArea({
+  children,
+  onOverflowChange,
+}: {
+  children: ReactNode;
+  onOverflowChange?: (hasOverflow: boolean) => void;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [showLeftFade, setShowLeftFade] = useState(false);
-  const [showRightFade, setShowRightFade] = useState(false);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const updateScrollFades = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    const hasOverflow = scrollWidth > clientWidth + 2;
-    setShowLeftFade(hasOverflow && scrollLeft > 4);
-    setShowRightFade(hasOverflow && scrollLeft < scrollWidth - clientWidth - 4);
+    const overflow = scrollWidth > clientWidth + 2;
+    setHasOverflow(overflow);
+    onOverflowChange?.(overflow);
+    setCanScrollLeft(overflow && scrollLeft > 4);
+    setCanScrollRight(overflow && scrollLeft < scrollWidth - clientWidth - 4);
+  }, [onOverflowChange]);
+
+  const scrollTabs = useCallback((direction: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const amount = Math.max(120, el.clientWidth * 0.55);
+    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
   }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
+    const inner = el.firstElementChild;
+
     updateScrollFades();
     const observer = new ResizeObserver(updateScrollFades);
     observer.observe(el);
+    if (inner) observer.observe(inner);
     el.addEventListener('scroll', updateScrollFades, { passive: true });
     window.addEventListener('resize', updateScrollFades);
 
@@ -87,32 +107,53 @@ function NavTabScrollArea({ children }: { children: ReactNode }) {
   }, [updateScrollFades]);
 
   return (
-    <div className="relative min-w-0 flex-1">
+    <div className="relative min-w-0 w-full">
       <div
         ref={scrollRef}
         className="overflow-x-auto overscroll-x-contain scrollbar-none"
         aria-label="Site navigation tabs"
       >
-        {children}
+        <div className={cn('w-max', !hasOverflow && 'mx-auto')}>{children}</div>
       </div>
-      {showLeftFade && (
-        <div
-          className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-9 items-center bg-gradient-to-r from-card/95 via-card/40 to-transparent pl-0.5"
-          aria-hidden
+      {canScrollLeft && (
+        <button
+          type="button"
+          onClick={() => scrollTabs('left')}
+          className="absolute inset-y-0 left-0 z-10 flex w-9 items-center bg-gradient-to-r from-card/95 via-card/40 to-transparent pl-0.5 text-muted-foreground/70 transition-colors hover:text-foreground"
+          aria-label="Scroll navigation left"
         >
-          <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground/70" />
-        </div>
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
       )}
-      {showRightFade && (
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-10 items-center justify-end bg-gradient-to-l from-card/95 via-card/50 to-transparent pr-0.5"
-          aria-hidden
+      {canScrollRight && (
+        <button
+          type="button"
+          onClick={() => scrollTabs('right')}
+          className="absolute inset-y-0 right-0 z-10 flex w-10 items-center justify-end bg-gradient-to-l from-card/95 via-card/50 to-transparent pr-0.5 text-muted-foreground/70 transition-colors hover:text-foreground"
+          aria-label="Scroll navigation right"
         >
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/70" />
-        </div>
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
       )}
     </div>
   );
+}
+
+const TAB_LABELS_MEDIA_QUERY = '(min-width: 1024px)';
+
+function useTabLabelsVisible() {
+  const [tabLabelsVisible, setTabLabelsVisible] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia(TAB_LABELS_MEDIA_QUERY).matches : true
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia(TAB_LABELS_MEDIA_QUERY);
+    const onChange = () => setTabLabelsVisible(mql.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  return tabLabelsVisible;
 }
 
 export const Navbar = () => {
@@ -120,6 +161,9 @@ export const Navbar = () => {
   const { leagues, selectedLeague, setSelectedLeague } = useLeagues();
   const location = useLocation();
   const navigate = useNavigate();
+  const tabLabelsVisible = useTabLabelsVisible();
+  const [tabsOverflow, setTabsOverflow] = useState(false);
+  const showPagesMenu = !tabLabelsVisible && tabsOverflow;
 
   const handleLeagueChange = (leagueId: string) => {
     if (leagueId === 'all') {
@@ -150,150 +194,151 @@ export const Navbar = () => {
     );
 
   return (
-    <nav className="sticky top-0 z-50 glass-card border-b border-border/50 px-4 py-3">
-      <div className="mx-auto flex min-w-0 max-w-7xl items-center gap-2 sm:gap-3">
-        <Link to="/" className="flex shrink-0 items-center justify-center gap-[1px]">
-          <div className="hidden flex-col items-center sm:flex">
-            <span className="font-display text-2xl leading-tight tracking-wide text-gradient">Draft</span>
-            <span className="font-display text-2xl leading-tight tracking-wide text-gradient">DNA</span>
-          </div>
-          <SiteLogo size={56} className="h-14 w-14 shrink-0" />
-        </Link>
-
-        <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 gap-1.5 border-border/50 bg-secondary/30 px-2.5 sm:gap-2 sm:px-3"
-                aria-label="All pages"
-              >
-                <Menu className="h-4 w-4" />
-                <span className="hidden sm:inline">Pages</span>
-                <ChevronDown className="h-3 w-3 opacity-60" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 border-border bg-card">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Go to</DropdownMenuLabel>
-              {navItems.map((item) => (
-                <DropdownMenuItem
-                  key={item.path}
-                  onClick={() => navigate(item.path)}
-                  className={menuItemClass(item.path)}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              {user ? (
-                <>
-                  <DropdownMenuItem
-                    onClick={() => navigate('/settings')}
-                    className={menuItemClass('/settings')}
-                  >
-                    <Settings className="h-4 w-4" />
-                    Account Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleSignOut}
-                    className="cursor-pointer gap-2 text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Log Out
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <DropdownMenuItem onClick={() => navigate('/auth')} className={menuItemClass('/auth')}>
-                  Sign In
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {user && (
-            <>
-              <Select value={selectedLeague?.id || 'all'} onValueChange={handleLeagueChange}>
-                <SelectTrigger className="w-[128px] shrink-0 border-border/50 bg-secondary/50 sm:w-[168px]">
-                  <Trophy className="mr-2 h-4 w-4 text-primary" />
-                  <SelectValue placeholder="All Leagues" />
-                </SelectTrigger>
-                <SelectContent className="border-border bg-card">
-                  <SelectItem value="all">All Leagues</SelectItem>
-                  {leagues.map((league) => (
-                    <SelectItem key={league.id} value={league.id}>
-                      {league.name}
-                    </SelectItem>
-                  ))}
-                  <div className="my-1 border-t border-border" />
-                  <div
-                    className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm text-primary outline-none hover:bg-accent hover:text-accent-foreground"
-                    onClick={() => navigate('/settings')}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create League
-                  </div>
-                </SelectContent>
-              </Select>
-              <div className="hidden h-6 w-px shrink-0 bg-border sm:block" />
-            </>
-          )}
-
-          <NavTabScrollArea>
-            <div className="flex w-max flex-nowrap items-center gap-0.5 py-0.5 sm:gap-1">
-              {navItems.map((item) => (
-                <Link key={item.path} to={item.path} className="shrink-0">
-                  <Button variant="ghost" size="sm" className={navLinkClass(item.path)}>
-                    <item.icon className="h-4 w-4" />
-                    <span className="hidden lg:inline">{item.label}</span>
-                  </Button>
-                </Link>
-              ))}
+    <nav className="sticky top-0 z-50 glass-card border-b border-border/50 py-3 pl-5 pr-4 sm:pl-6 sm:pr-5">
+      <div className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Link to="/" className="flex shrink-0 items-center justify-center gap-[1px]">
+            <div className="hidden flex-col items-center sm:flex">
+              <span className="font-display text-2xl leading-tight tracking-wide text-gradient">Draft</span>
+              <span className="font-display text-2xl leading-tight tracking-wide text-gradient">DNA</span>
             </div>
-          </NavTabScrollArea>
+            <SiteLogo size={56} className="h-14 w-14 shrink-0" />
+          </Link>
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            {user ? (
-              <>
-                <div className="hidden h-6 w-px bg-border sm:block" />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="shrink-0 gap-2 text-muted-foreground">
-                      <User className="h-4 w-4" />
-                      <span className="hidden max-w-[100px] truncate sm:inline">
-                        {user.email?.split('@')[0]}
-                      </span>
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 border-border bg-card">
-                    <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Settings
+          {showPagesMenu && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5 border-border/50 bg-secondary/30 px-2.5 sm:gap-2 sm:px-3"
+                  aria-label="All pages"
+                >
+                  <Menu className="h-4 w-4" />
+                  <span className="hidden sm:inline">Pages</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 border-border bg-card">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Go to</DropdownMenuLabel>
+                {navItems.map((item) => (
+                  <DropdownMenuItem
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    className={menuItemClass(item.path)}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                {user ? (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => navigate('/settings')}
+                      className={menuItemClass('/settings')}
+                    >
+                      <Settings className="h-4 w-4" />
+                      Account Settings
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={handleSignOut}
-                      className="cursor-pointer text-destructive focus:text-destructive"
+                      className="cursor-pointer gap-2 text-destructive focus:text-destructive"
                     >
-                      <LogOut className="mr-2 h-4 w-4" />
+                      <LogOut className="h-4 w-4" />
                       Log Out
                     </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            ) : (
-              <>
-                <div className="hidden h-6 w-px bg-border sm:block" />
-                <Link to="/auth" className="shrink-0">
-                  <Button variant="default" size="sm">
+                  </>
+                ) : (
+                  <DropdownMenuItem onClick={() => navigate('/auth')} className={menuItemClass('/auth')}>
                     Sign In
-                  </Button>
-                </Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        <NavTabScrollArea onOverflowChange={setTabsOverflow}>
+          <div className="flex w-max flex-nowrap items-center gap-0.5 py-0.5 sm:gap-1">
+            {user && (
+              <>
+                <Select value={selectedLeague?.id || 'all'} onValueChange={handleLeagueChange}>
+                  <SelectTrigger className="w-[128px] shrink-0 border-border/50 bg-secondary/50 sm:w-[168px]">
+                    <Trophy className="mr-2 h-4 w-4 text-primary" />
+                    <SelectValue placeholder="All Leagues" />
+                  </SelectTrigger>
+                  <SelectContent className="border-border bg-card">
+                    <SelectItem value="all">All Leagues</SelectItem>
+                    {leagues.map((league) => (
+                      <SelectItem key={league.id} value={league.id}>
+                        {league.name}
+                      </SelectItem>
+                    ))}
+                    <div className="my-1 border-t border-border" />
+                    <div
+                      className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm text-primary outline-none hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => navigate('/settings')}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create League
+                    </div>
+                  </SelectContent>
+                </Select>
+                <div className="hidden h-6 w-px shrink-0 bg-border sm:block" />
               </>
             )}
+            {navItems.map((item) => (
+              <Link key={item.path} to={item.path} className="shrink-0">
+                <Button variant="ghost" size="sm" className={navLinkClass(item.path)}>
+                  <item.icon className="h-4 w-4" />
+                  <span className="hidden lg:inline">{item.label}</span>
+                </Button>
+              </Link>
+            ))}
           </div>
+        </NavTabScrollArea>
+
+        <div className="flex shrink-0 items-center justify-self-end gap-1 sm:gap-2">
+          {user ? (
+            <>
+              <div className="hidden h-6 w-px bg-border sm:block" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="shrink-0 gap-2 text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    <span className="hidden max-w-[100px] truncate sm:inline">
+                      {user.email?.split('@')[0]}
+                    </span>
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 border-border bg-card">
+                  <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <>
+              <div className="hidden h-6 w-px bg-border sm:block" />
+              <Link to="/auth" className="shrink-0">
+                <Button variant="default" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </nav>

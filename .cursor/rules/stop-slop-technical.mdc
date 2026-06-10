@@ -1,0 +1,20 @@
+---
+description: stop-slop carve-out for code explanations, debugging, and architecture
+alwaysApply: true
+---
+
+# stop-slop — technical exceptions
+
+**stop-slop** has top priority for all wording and writing (see `.cursor/rules/skills-priority.mdc`).
+
+Default to stop-slop for tone and prose quality.
+
+When explaining code or debugging:
+
+- Follow stop-slop for tone.
+- Keep technical hedges when needed (`typically`, `usually`, `may`, etc.).
+- Allow passive voice for architecture and system descriptions.
+- Keep scannable lists (bullets, numbered steps, tables) when they aid clarity.
+- Keep code-citation rules (`startLine:endLine:filepath` blocks, full markdown links).
+
+User Rules and git/PR workflows still apply where they conflict with stylistic preferences.

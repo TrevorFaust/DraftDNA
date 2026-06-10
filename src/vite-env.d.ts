@@ -5,4 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_SYNC_ADMIN_USER_ID?: string;
   /** Google reCAPTCHA v2 site key (public). Used on first-time Pick Six rules; secret is Edge RECAPTCHA_SECRET_KEY. */
   readonly VITE_RECAPTCHA_SITE_KEY?: string;
+  /** Dev preview: show all Pick Six picks on dashboard as if past entry deadline */
+  readonly VITE_PICK_SIX_PREVIEW_OTHERS_PICKS?: string;
 }

@@ -35,21 +35,20 @@ import {
   getFullTeamName,
   resolveTeamAbbrForDisplay,
 } from '@/utils/teamMapping';
-import { useNfl2025TeamRankings, type TeamRankMetric } from '@/hooks/useNfl2025TeamRankings';
+import { useNflTeamContext } from '@/contexts/NflTeamContext';
+import type { TeamRankMetric } from '@/types/nflTeamContext2025';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { PLAYER_POOL_CURRENT_SEASON, PLAYER_POOL_PRIOR_SEASON } from '@/constants/playerPoolSeason';
 import {
   formatOpponentWinPctDisplay,
   formatSosCellDisplay,
-  getNfl2026SosOppWinPct,
-  getNfl2026SosRank,
   NFL_2026_SOS_HELP_TEXT,
   sosOrdinal,
 } from '@/constants/nfl2026StrengthOfSchedule';
-import { getNflOlinePassOverallRank, getNflOlineRunOverallRank, getNflOlineUnitOverallRank } from '@/constants/nflOlineTeamRanks2025';
 import { OlineTeamRankStatTrigger } from '@/components/OlineComparisonMetricPanel';
 import { cn } from '@/lib/utils';
+import { PlayerHeaderStatsLine } from '@/components/PlayerHeaderStatsLine';
 
 /** Winner pill in player comparison — matches PositionBadge / `index.css` position colors */
 /** Full NFL club name for team-ranks comparison subtitle (e.g. Cincinnati Bengals). */
@@ -143,6 +142,8 @@ interface PlayerDetailDialogProps {
   /** 2025 season fantasy points and position rank (e.g. QB1, RB9) - shown next to name in header */
   stats2025?: Player2025Stats | null;
   allStats2025?: Map<string, Player2025Stats>;
+  /** Overall ADP rank at position (e.g. 8 = WR8) */
+  positionAdpRank?: number | null;
 }
 
 interface WeeklyStats {
@@ -573,7 +574,14 @@ function kickerFgPctNumber(made: number | undefined, att: number | undefined): n
   return (m / a) * 100;
 }
 
-export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allStats2025 }: PlayerDetailDialogProps) => {
+export const PlayerDetailDialog = ({
+  player,
+  open,
+  onOpenChange,
+  stats2025,
+  allStats2025,
+  positionAdpRank,
+}: PlayerDetailDialogProps) => {
   const scoringFormat = useScoringFormat();
   const [stats, setStats] = useState<WeeklyStats[]>([]);
   const [comparisonPlayer, setComparisonPlayer] = useState<Player | null>(null);
@@ -1359,7 +1367,7 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
     };
   }, [comparisonPlayer]);
 
-  const nflTeamRanks = useNfl2025TeamRankings(open);
+  const teamContext = useNflTeamContext();
 
   const teamComparisonRows = useMemo(() => {
     if (!player || !comparisonPlayer) return [];
@@ -1375,8 +1383,8 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
       { label: 'Def PPG allowed', metric: 'defPpg' },
     ];
     const fromRanks = defs.map(({ label, metric }) => {
-      const lr = nflTeamRanks.getRank(tl, metric);
-      const rr = nflTeamRanks.getRank(tr, metric);
+      const lr = teamContext.getRank(tl, metric);
+      const rr = teamContext.getRank(tr, metric);
       return {
         label,
         left: lr != null ? String(lr) : '—',
@@ -1387,12 +1395,14 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
       };
     });
     const offEnd = 3;
-    const olineOverallL = getNflOlineUnitOverallRank(tl);
-    const olineOverallR = getNflOlineUnitOverallRank(tr);
-    const olinePassL = getNflOlinePassOverallRank(tl);
-    const olinePassR = getNflOlinePassOverallRank(tr);
-    const olineRunL = getNflOlineRunOverallRank(tl);
-    const olineRunR = getNflOlineRunOverallRank(tr);
+    const leftCtx = teamContext.getForTeam(tl);
+    const rightCtx = teamContext.getForTeam(tr);
+    const olineOverallL = leftCtx?.oline_unit_rank ?? null;
+    const olineOverallR = rightCtx?.oline_unit_rank ?? null;
+    const olinePassL = leftCtx?.oline_pass_rank ?? null;
+    const olinePassR = rightCtx?.oline_pass_rank ?? null;
+    const olineRunL = leftCtx?.oline_run_rank ?? null;
+    const olineRunR = rightCtx?.oline_run_rank ?? null;
     const olineRows: typeof fromRanks = [
       {
         label: 'O-line overall rank',
@@ -1420,10 +1430,10 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
       },
     ];
     const mergedTeamRows = [...fromRanks.slice(0, offEnd), ...olineRows, ...fromRanks.slice(offEnd)];
-    const sosLp = getNfl2026SosOppWinPct(tl);
-    const sosLr = getNfl2026SosRank(tl);
-    const sosRp = getNfl2026SosOppWinPct(tr);
-    const sosRr = getNfl2026SosRank(tr);
+    const sosLp = teamContext.getSosOppWinPct(tl);
+    const sosLr = teamContext.getSosRank(tl);
+    const sosRp = teamContext.getSosOppWinPct(tr);
+    const sosRr = teamContext.getSosRank(tr);
     return [
       ...mergedTeamRows,
       {
@@ -1443,7 +1453,7 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
         },
       },
     ];
-  }, [player, comparisonPlayer, allStats2025, nflTeamRanks.getRank]);
+  }, [player, comparisonPlayer, allStats2025, teamContext]);
 
   if (!player) return null;
 
@@ -2011,13 +2021,12 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
   const jerseyTeamAbbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
   const numberFill = lookupJerseyNumberFill(jerseyColorsByAbbr, jerseyTeamAbbr);
   const displayPosRank = stats2025?.positionRank ? (stats2025.positionRank.match(/\d+$/)?.[0] ?? stats2025.positionRank) : null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
-        <DialogHeader className="relative">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+        <DialogHeader className="relative pb-2">
+          <div className="flex items-stretch justify-between gap-4">
+            <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
               <DialogTitle className="flex items-center gap-3 flex-wrap">
                 <PlayerJerseyWithNumber
                   team={jerseyTeamAbbr}
@@ -2029,12 +2038,16 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
                 <span className="font-display text-2xl">{player.name}</span>
                 <PositionBadge position={player.position} />
               </DialogTitle>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap mt-1">
-                <span>{displayTeamAbbrevOrFa(player.team, player.position, player.name, { faLabel: 'Free Agent' })}</span>
-                <span>ADP: {player.adp}</span>
-                {player.bye_week && <span>BYE: Week {player.bye_week}</span>}
-                {playerAge != null && <span>Age: {playerAge}</span>}
-              </div>
+              <PlayerHeaderStatsLine
+                position={player.position}
+                team={player.team}
+                playerName={player.name}
+                adp={player.adp}
+                byeWeek={player.bye_week}
+                age={playerAge}
+                positionAdpRank={positionAdpRank}
+                className="mt-0 mb-0"
+              />
             </div>
             {stats2025 && (
               <div className="shrink-0 rounded-lg border-2 border-primary/30 bg-primary/5 px-5 py-4 min-w-[200px]">
@@ -2141,7 +2154,7 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
             <BrandedLoader size={44} />
           </div>
         ) : (
-          <Tabs defaultValue="stats" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <Tabs defaultValue="stats" className="-mt-1 flex min-h-0 flex-1 flex-col overflow-hidden">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="stats" className="gap-2">
                 <BarChart3 className="w-4 h-4" />
@@ -2426,16 +2439,16 @@ export const PlayerDetailDialog = ({ player, open, onOpenChange, stats2025, allS
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {comparisonStatSource === 'team' && nflTeamRanks.loading ? (
+                        {comparisonStatSource === 'team' && teamContext.loading ? (
                           <TableRow>
                             <TableCell colSpan={3} className="py-12 text-center">
                               <BrandedLoader />
                             </TableCell>
                           </TableRow>
-                        ) : comparisonStatSource === 'team' && nflTeamRanks.error ? (
+                        ) : comparisonStatSource === 'team' && teamContext.error ? (
                           <TableRow>
                             <TableCell colSpan={3} className="py-8 text-center text-sm text-destructive">
-                              {nflTeamRanks.error}
+                              {teamContext.error}
                             </TableCell>
                           </TableRow>
                         ) : (

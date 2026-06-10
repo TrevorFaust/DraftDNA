@@ -29,6 +29,8 @@ export interface KickerSeasonTotals2025 {
 
 export interface Player2025Stats {
   totalFantasyPoints: number;
+  /** Raw position from season stats RPC (QB, RB, WR, …). */
+  position: string | null;
   positionRank: string; // e.g. "QB1", "RB9", "WR12"
   totalPassYards: number;
   totalRushYards: number;
@@ -113,8 +115,13 @@ function statsTeamAbbrKey(rawTeam: string): string {
 /** Fetch 2025 season fantasy totals and position rank for all players. Returns a map of playerId -> stats.
  * @param scoringFormatOverride - When provided (e.g. from Rankings bucket), use this instead of the selected league's format.
  *  Ensures PPG/total points reflect the current bucket (standard, half_ppr, ppr) when switching leagues.
+ * @param options.enabled - When false, skips network fetch and returns an empty map.
  */
-export function usePlayer2025Stats(scoringFormatOverride?: ScoringFormat | null): Map<string, Player2025Stats> {
+export function usePlayer2025Stats(
+  scoringFormatOverride?: ScoringFormat | null,
+  options?: { enabled?: boolean }
+): Map<string, Player2025Stats> {
+  const enabled = options?.enabled !== false;
   const leagueFormat = useScoringFormat();
   const scoringFormat = (scoringFormatOverride ?? leagueFormat) as ScoringFormat;
   const [rawRows, setRawRows] = useState<RawRow[]>([]);
@@ -125,6 +132,11 @@ export function usePlayer2025Stats(scoringFormatOverride?: ScoringFormat | null)
   } | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setRawRows([]);
+      setDefenseBundle(null);
+      return;
+    }
     (async () => {
       const [rpcRes, tsRes, gamesRes, plRes] = await Promise.all([
         (supabase.rpc as any)('get_player_2025_season_stats'),
@@ -183,9 +195,10 @@ export function usePlayer2025Stats(scoringFormatOverride?: ScoringFormat | null)
         gamesRows: (gamesRes.data ?? []) as Games2025ScheduleRow[],
       });
     })();
-  }, []);
+  }, [enabled]);
 
   return useMemo(() => {
+    if (!enabled) return new Map<string, Player2025Stats>();
     const map = new Map<string, Player2025Stats>();
     for (const row of rawRows) {
       const playerId = row.player_id != null ? String(row.player_id) : null;
@@ -226,6 +239,7 @@ export function usePlayer2025Stats(scoringFormatOverride?: ScoringFormat | null)
 
       map.set(playerId, {
         totalFantasyPoints: totalFp,
+        position: row.position ?? null,
         positionRank,
         totalPassYards: Number(row.total_pass_yards) || 0,
         totalRushYards: Number(row.total_rush_yards) || 0,
@@ -376,6 +390,7 @@ export function usePlayer2025Stats(scoringFormatOverride?: ScoringFormat | null)
         const syntheticIdFromName = `defense-${p.name.replace(/\s/g, '-').toLowerCase()}`;
         const defenseStats: Player2025Stats = {
           totalFantasyPoints: d.totalFp,
+          position: 'D/ST',
           positionRank: `D/ST${posRank}`,
           totalPassYards: 0,
           totalRushYards: 0,
@@ -402,5 +417,5 @@ export function usePlayer2025Stats(scoringFormatOverride?: ScoringFormat | null)
     }
 
     return map;
-  }, [rawRows, scoringFormat, defenseBundle]);
+  }, [rawRows, scoringFormat, defenseBundle, enabled]);
 }

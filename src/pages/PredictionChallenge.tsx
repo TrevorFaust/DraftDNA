@@ -53,6 +53,7 @@ import {
   SITE_NAME,
   SEASON,
   PICK_SIX_CATEGORY_PRIZE_USD,
+  PICK_SIX_KICKOFF_ET,
   PICK_SIX_TOTAL_PRIZE_POOL_USD,
   formatContestPrizeUsd,
 } from '@/constants/contest';
@@ -66,12 +67,7 @@ const RECAPTCHA_BASE_H = 80;
 const RECAPTCHA_SCALE = 0.88;
 
 const TOP_N = 6;
-// NFL 2026 season typically starts early September; entries close 8pm ET on first Sunday
-const SEASON_START_DATE = new Date(`${SEASON}-09-01`);
-const SEASON_STARTED = new Date() >= SEASON_START_DATE;
-// 8:00 PM ET, Thursday September 3, 2026 (EDT = UTC-4)
-const ENTRY_DEADLINE_ET = new Date('2026-09-03T20:00:00-04:00');
-const SUBMISSIONS_LOCKED = new Date() >= ENTRY_DEADLINE_ET || SEASON_STARTED;
+const SUBMISSIONS_LOCKED = new Date() >= PICK_SIX_KICKOFF_ET;
 const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'] as const;
 
 const POSITION_SUBHEADERS: Record<string, string> = {
@@ -771,7 +767,9 @@ ${shareUrl}`;
                             {player!.name}
                           </span>
                           {player!.team && (
-                            <span className="shrink-0 text-sm text-muted-foreground">{player!.team}</span>
+                            <span className="shrink-0 text-sm text-muted-foreground">
+                              {player!.team}
+                            </span>
                           )}
                         </div>
                       ))}

@@ -28,6 +28,11 @@ import {
   type StudDudEntry,
 } from '@/utils/studsDuds';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
+import {
+  buildDefenseRankFromList,
+  buildPositionAdpRankMap,
+  resolvePositionAdpRankForDisplay,
+} from '@/utils/positionAdpRank';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import {
   TEAM_ABBREV_TO_FULL_NAME,
@@ -326,12 +331,14 @@ const SortablePlayerWithHandle = ({
   player, 
   rank, 
   onPlayerClick,
-  stats2025
+  stats2025,
+  priorSeasonPosRank,
 }: { 
   player: RankedPlayer; 
   rank: number;
   onPlayerClick: (player: RankedPlayer) => void;
   stats2025?: { avgPointsPerGame: number | null } | undefined;
+  priorSeasonPosRank?: string | null;
 }) => {
   const {
     attributes,
@@ -374,6 +381,7 @@ const SortablePlayerWithHandle = ({
           positionColoredRank
           showGrabHandle
           stats2025={stats2025}
+          priorSeasonPosRank={priorSeasonPosRank}
         />
       </div>
       <div 
@@ -498,6 +506,13 @@ const Rankings = () => {
         }
       : { ...bucket, rookiesOnly: bucket.rookiesOnly };
   const player2025Stats = usePlayer2025Stats(displayBucket.scoringFormat as 'standard' | 'ppr' | 'half_ppr');
+  const positionAdpRankMap = useMemo(() => {
+    const byId = new Map<string, RankedPlayer>();
+    for (const p of [...players, ...communityPlayers]) {
+      if (!byId.has(p.id)) byId.set(p.id, p);
+    }
+    return buildPositionAdpRankMap([...byId.values()]);
+  }, [players, communityPlayers]);
   const positionsAlphabetical = useMemo(() => {
     const base = displayBucket.rookiesOnly ? ['QB', 'RB', 'WR', 'TE'] : ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
     return [...base].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
@@ -864,6 +879,26 @@ const Rankings = () => {
   const communityRankMap = useMemo(
     () => new Map(displayedCommunityPlayers.map((p, i) => [p.id, i + 1])),
     [displayedCommunityPlayers]
+  );
+  const communityDefenseRankFromList = useMemo(
+    () =>
+      buildDefenseRankFromList(
+        displayedCommunityPlayers.map((p, i) => ({
+          id: p.id,
+          position: p.position,
+          rank: i + 1,
+        }))
+      ),
+    [displayedCommunityPlayers]
+  );
+  const dialogPositionAdpRank = useCallback(
+    (p: RankedPlayer) =>
+      resolvePositionAdpRankForDisplay(
+        p,
+        positionAdpRankMap,
+        communityDefenseRankFromList
+      ),
+    [positionAdpRankMap, communityDefenseRankFromList]
   );
 
   const studsDudsVsConsensus = useMemo(() => {
@@ -1958,6 +1993,7 @@ const Rankings = () => {
                         rank={displayedCommunityPlayers.findIndex((p) => p.id === player.id) + 1}
                         onClick={() => handlePlayerClick(player)}
                         positionColoredRank
+                        compactStats
                       />
                     ))}
                   </div>
@@ -2158,6 +2194,7 @@ const Rankings = () => {
                         rank={displayedCommunityPlayers.findIndex((p) => p.id === player.id) + 1}
                         onClick={() => handlePlayerClick(player)}
                         positionColoredRank
+                        compactStats
                       />
                     ))}
                   </div>
@@ -2424,6 +2461,7 @@ const Rankings = () => {
         onOpenChange={setDetailDialogOpen}
         stats2025={selectedPlayer ? player2025Stats.get(selectedPlayer.id) : undefined}
         allStats2025={player2025Stats}
+        positionAdpRank={selectedPlayer ? dialogPositionAdpRank(selectedPlayer) : null}
       />
     </div>
   );

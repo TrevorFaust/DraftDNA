@@ -1,13 +1,13 @@
 import { useCallback, useRef, useState } from "react";
 import { HelpCircle } from "lucide-react";
 import {
-  getNflOlineMetricLeagueRank2025,
-  getNflOlineMetricLeagueTier2025,
-  getNflOlineTeam2025,
+  getOlineMetricLeagueRank,
+  getOlineMetricLeagueTier,
   type NflOlineMetricLeagueTier,
   type NflOlineRawMetricId,
-  type NflOlineTeamRow,
-} from "@/constants/nflOlineTeamRanks2025";
+  type NflOlineTeamView,
+} from "@/types/nflTeamContext2025";
+import { useNflTeamContext } from "@/contexts/NflTeamContext";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,7 +17,7 @@ type MetricRow = {
   label: string;
   description: string;
   metricId: NflOlineRawMetricId;
-  format: (row: NflOlineTeamRow) => string;
+  format: (row: NflOlineTeamView) => string;
 };
 
 const PASS_METRICS: MetricRow[] = [
@@ -110,17 +110,19 @@ function RankedMetricCell({
   data,
   metricId,
   format,
+  allOlineRows,
 }: {
-  data: NflOlineTeamRow | null;
+  data: NflOlineTeamView | null;
   metricId: NflOlineRawMetricId;
-  format: (r: NflOlineTeamRow) => string;
+  format: (r: NflOlineTeamView) => string;
+  allOlineRows: NflOlineTeamView[];
 }) {
   if (!data) {
     return <span className="tabular-nums">—</span>;
   }
   const raw = data[metricId];
-  const rank = getNflOlineMetricLeagueRank2025(metricId, raw);
-  const tier = getNflOlineMetricLeagueTier2025(metricId, raw);
+  const rank = getOlineMetricLeagueRank(allOlineRows, metricId, raw);
+  const tier = getOlineMetricLeagueTier(allOlineRows, metricId, raw);
   return (
     <div className="flex flex-col items-center gap-0.5 tabular-nums">
       <span>{format(data)}</span>
@@ -177,12 +179,14 @@ function MetricsTable({
   right,
   leftHeader,
   rightHeader,
+  allOlineRows,
 }: {
   metrics: MetricRow[];
-  left: NflOlineTeamRow | null;
-  right: NflOlineTeamRow | null;
+  left: NflOlineTeamView | null;
+  right: NflOlineTeamView | null;
   leftHeader: string;
   rightHeader: string;
+  allOlineRows: NflOlineTeamView[];
 }) {
   return (
     <Table>
@@ -203,10 +207,10 @@ function MetricsTable({
               </div>
             </TableCell>
             <TableCell className="text-center align-top">
-              <RankedMetricCell data={left} metricId={m.metricId} format={m.format} />
+              <RankedMetricCell data={left} metricId={m.metricId} format={m.format} allOlineRows={allOlineRows} />
             </TableCell>
             <TableCell className="text-center align-top">
-              <RankedMetricCell data={right} metricId={m.metricId} format={m.format} />
+              <RankedMetricCell data={right} metricId={m.metricId} format={m.format} allOlineRows={allOlineRows} />
             </TableCell>
           </TableRow>
         ))}
@@ -215,7 +219,15 @@ function MetricsTable({
   );
 }
 
-function SingleTeamOlineDetailTables({ row, teamLabel }: { row: NflOlineTeamRow; teamLabel: string }) {
+function SingleTeamOlineDetailTables({
+  row,
+  teamLabel,
+  allOlineRows,
+}: {
+  row: NflOlineTeamView;
+  teamLabel: string;
+  allOlineRows: NflOlineTeamView[];
+}) {
   const blocks: { title: string | null; metrics: MetricRow[] }[] = [
     { title: null, metrics: SUMMARY_RANK_METRICS },
     { title: "Pass blocking", metrics: PASS_METRICS },
@@ -245,7 +257,12 @@ function SingleTeamOlineDetailTables({ row, teamLabel }: { row: NflOlineTeamRow;
                     </div>
                   </TableCell>
                   <TableCell className="text-center align-top">
-                    <RankedMetricCell data={row} metricId={m.metricId} format={m.format} />
+                    <RankedMetricCell
+                      data={row}
+                      metricId={m.metricId}
+                      format={m.format}
+                      allOlineRows={allOlineRows}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -283,6 +300,7 @@ export function OlineTeamRankStatTrigger({
   columnHeaderLeft,
   columnHeaderRight,
 }: OlineTeamRankStatTriggerProps) {
+  const { getOlineForTeam, allOlineRows } = useNflTeamContext();
   const [open, setOpen] = useState(false);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -320,8 +338,8 @@ export function OlineTeamRankStatTrigger({
     if (!next) openModeRef.current = null;
   }, []);
 
-  const left = getNflOlineTeam2025(teamAbbrLeft);
-  const right = getNflOlineTeam2025(teamAbbrRight);
+  const left = getOlineForTeam(teamAbbrLeft);
+  const right = getOlineForTeam(teamAbbrRight);
   const phaseMetrics = mode === "pass" ? PASS_METRICS : RUN_METRICS;
 
   return (
@@ -366,6 +384,7 @@ export function OlineTeamRankStatTrigger({
               right={right}
               leftHeader={columnHeaderLeft}
               rightHeader={columnHeaderRight}
+              allOlineRows={allOlineRows}
             />
             <div>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pass blocking</p>
@@ -375,6 +394,7 @@ export function OlineTeamRankStatTrigger({
                 right={right}
                 leftHeader={columnHeaderLeft}
                 rightHeader={columnHeaderRight}
+                allOlineRows={allOlineRows}
               />
             </div>
             <div>
@@ -385,6 +405,7 @@ export function OlineTeamRankStatTrigger({
                 right={right}
                 leftHeader={columnHeaderLeft}
                 rightHeader={columnHeaderRight}
+                allOlineRows={allOlineRows}
               />
             </div>
           </div>
@@ -395,6 +416,7 @@ export function OlineTeamRankStatTrigger({
             right={right}
             leftHeader={columnHeaderLeft}
             rightHeader={columnHeaderRight}
+            allOlineRows={allOlineRows}
           />
         )}
       </PopoverContent>
@@ -412,6 +434,7 @@ export function OlineSpreadsheetRankTrigger({
   teamLabel: string;
   rankDisplay: string;
 }) {
+  const { getOlineForTeam, allOlineRows } = useNflTeamContext();
   const [open, setOpen] = useState(false);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -449,7 +472,7 @@ export function OlineSpreadsheetRankTrigger({
     if (!next) openModeRef.current = null;
   }, []);
 
-  const row = getNflOlineTeam2025(teamAbbr);
+  const row = getOlineForTeam(teamAbbr);
   if (!row) {
     return <span className="tabular-nums text-muted-foreground">—</span>;
   }
@@ -488,7 +511,7 @@ export function OlineSpreadsheetRankTrigger({
         }}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <SingleTeamOlineDetailTables row={row} teamLabel={teamLabel} />
+        <SingleTeamOlineDetailTables row={row} teamLabel={teamLabel} allOlineRows={allOlineRows} />
       </PopoverContent>
     </Popover>
   );

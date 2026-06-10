@@ -1,0 +1,38 @@
+---
+description: Skill priority, coexistence, and stack context for this project
+alwaysApply: true
+---
+
+# Skill priority and coexistence
+
+## Stack context
+
+This project is a **Vite + React 18 + TypeScript** SPA with **react-router-dom**, **Tailwind**, and **shadcn/ui** — not Next.js and not React Native. Apply Vercel React skills for generic React patterns; ignore Next.js App Router, RSC, and React Native guidance unless the stack changes.
+
+Preserve the existing **Pick Six** visual identity unless the user asks for a redesign.
+
+## Writing (highest priority)
+
+**stop-slop** has priority over all other skills for **wording, tone, and prose** (replies, UI copy, docs, commit/PR text).
+
+When explaining code or debugging, also follow `.cursor/rules/stop-slop-technical.mdc` (technical hedges, passive voice for architecture, scannable lists, code citations).
+
+User Rules and git/PR workflows still win over stylistic preferences.
+
+## Visual / UI design (coexist, resolve conflicts)
+
+Use **ui-ux-pro-max** and **frontend-design** together when possible:
+
+- **ui-ux-pro-max**: accessibility, layout, spacing, interaction states, typography tokens, UX audits, shadcn/Tailwind patterns, product-appropriate style selection.
+- **frontend-design**: distinctive, production-grade visual direction; avoid generic AI aesthetics when building or beautifying UI.
+
+**On conflict, ui-ux-pro-max wins** over frontend-design (accessibility, contrast, touch targets, form UX, responsive rules, and established project patterns take precedence).
+
+frontend-design applies for creative polish and visual distinctiveness only where it does not violate ui-ux-pro-max or the current brand.
+
+## React code quality
+
+- **vercel-react-best-practices**: performance, data fetching patterns, bundle/list optimization (Vite-appropriate subset).
+- **vercel-composition-patterns**: component APIs, compound components, composition over boolean prop sprawl.
+
+These apply to implementation and refactors; they do not override ui-ux-pro-max for visual/UX decisions or stop-slop for prose.
