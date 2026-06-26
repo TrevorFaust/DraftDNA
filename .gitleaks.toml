@@ -1,0 +1,13 @@
+# Allow placeholder values in example env files (not real secrets).
+[allowlist]
+paths = ['''\.env\.example$''', '''^README\.md$''']
+regexes = [
+  '''your-project-id-here''',
+  '''your-publishable-key-here''',
+  '''paste-long-jwt-here''',
+  '''your-domain\.com''',
+  '''your-recaptcha-site-key-here''',
+  '''your-site-key''',
+  '''your-auth-user-uuid''',
+  '''00000000-0000-0000-0000-000000000000''',
+]
