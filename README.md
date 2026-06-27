@@ -1,92 +1,56 @@
-o Draft Board — Fantasy Football Draft Tool
+# DraftDNA — Fantasy Football Draft Tool
 
-A fantasy football web app for creating custom player rankings, running mock drafts, and preparing for draft day. Features league support, multiple scoring formats, CPU opponents with archetype-based draft logic, and the Pick Six prediction challenge.
+Custom NFL fantasy rankings, mock drafts, player research, draft badges, and the free **Pick Six Challenge** (up to $36,000 in prizes).
 
 ## Features
 
-- **Custom Rankings** — Drag-and-drop big board with community ADP and multiple scoring buckets (standard, PPR, half-PPR, dynasty, superflex, rookies-only)
-- **Mock Drafts** — Configurable mock drafts (8–16 teams, snake or linear, customizable rosters) with CPU opponents that follow draft archetypes
-- **Draft Room** — Live draft simulation with timers, CPU draft speeds, and draft history
-- **Badges** — Archetype achievements earned from completed mock drafts
-- **Pick Six Challenge** — Season prediction contest: pick top 6 at each position (QB, RB, WR, TE, K, D/ST) plus tiebreakers
-- **Statistics** — Player stats and visualization
-- **League Settings** — Multi-league support, keepers, position limits, and custom scoring
-- **Guest Mode** — Use rankings and mock drafts without signing in (data stored in localStorage)
+- **Custom Rankings** — Drag-and-drop big board with community ADP, import from other league formats, and scoring buckets (standard, PPR, half-PPR, dynasty, superflex, rookies-only)
+- **Mock Drafts & Draft Room** — 8–16 teams, snake or linear, CPU opponents with archetype-based logic, timers, and draft history
+- **Draft Grades** — Post-draft report with narrative feedback on roster construction
+- **Badges** — Archetype achievements from completed mock drafts
+- **Players & Statistics** — Spreadsheet-style player table, expanded player profiles, 2025 stats, fantasy team depth chart, O-line context, and strength of schedule
+- **Pick Six Challenge** — Predict top 6 at each position (QB, RB, WR, TE, K, D/ST) plus tiebreakers; live partial-credit scoring, dashboard leaderboard, and shareable prediction cards
+- **Leagues & Settings** — Multi-league support, keepers, position limits, custom scoring, account management
+- **Guest Mode** — Rankings and mock drafts without signing in (localStorage)
 
 ## Tech Stack
 
-- **Frontend:** Vite, React, TypeScript, Tailwind CSS, shadcn-ui
-- **Backend:** Supabase (auth, PostgreSQL database)
-- **State & Data:** TanStack Query, React Hook Form, Zod
-- **UI:** dnd-kit (drag-and-drop), Recharts, Lucide icons, Sonner toasts
+- **Frontend:** Vite, React, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend:** Supabase (auth, PostgreSQL)
+- **Data & UI:** TanStack Query, React Hook Form, Zod, dnd-kit, Recharts
 
-## Getting Started
+## About This Repository
 
-### Prerequisites
+This repo is the **source code** for DraftDNA. It is not a turnkey copy of the live site.
 
-- Node.js & npm (recommended: [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
+The app you use in production is backed by a **hosted Supabase project** (database, auth, edge functions) and deployed via **Vercel**. Player pools, ranking baselines, community data, and user accounts live in that backend — they are not bundled here. Without your own Supabase project, migrations applied, and data pipelines run, a clone is mostly an empty UI shell.
 
-### Setup
+If you only want to **use** DraftDNA, visit the live site — you do not need this repo.
+
+### Local development (optional)
+
+For contributors or your own local work:
 
 ```sh
-# 1. Clone the repository
-git clone <YOUR_GIT_URL>
-cd my-nfl-draft-1
-
-# 2. Install dependencies
 npm i
-
-# 3. Configure Supabase (see below)
-cp .env.example .env
-# Edit .env with your Supabase credentials
-
-# 4. Start the development server
+cp .env.example .env   # fill in your Supabase (and optional) keys — see file for comments
 npm run dev
 ```
 
-### Environment Variables
+Required client env vars are documented in `.env.example`. Server-side scripts (rookies import, player sync, baselines) need `SUPABASE_SERVICE_ROLE_KEY` and are listed in `package.json`.
 
-1. Create a project at [Supabase Dashboard](https://supabase.com/dashboard)
-2. Go to **Settings** > **API**
-3. Copy:
-   - **Project URL** → `VITE_SUPABASE_URL`
-   - **Publishable Key** (anon/public) → `VITE_SUPABASE_PUBLISHABLE_KEY`
-
-Edit `.env`:
-
-```env
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key-here
-```
-
-The `.env` file is in `.gitignore`; do not commit it.
-
-## Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server with hot reload |
-| `npm run build` | Production build |
-| `npm run preview` | Preview production build locally |
-| `npm run generate:archetypes` | Generate archetype logic from config |
+Further data setup: `HOW_TO_SYNC_DATA.md`, `sync_instructions.md`. Pick Six verification notes: `PICK_SIX_VERIFICATION.md`.
 
 ## Project Structure
 
 ```
 src/
-├── components/     # UI components, PlayerCard, Navbar, etc.
-├── constants/      # Archetypes, scoring, NFL data
-├── hooks/          # useAuth, useLeagues, useCommunityRankingsBucket, etc.
-├── pages/          # Index, Rankings, MockDraft, DraftRoom, History, Badges, etc.
-├── utils/          # CPU draft logic, archetype detection, storage helpers
+├── components/     # UI, PlayerCard, Navbar, Pick Six share card, etc.
+├── constants/      # Archetypes, scoring, NFL/contest data
+├── hooks/          # Auth, leagues, community rankings, Pick Six live stats
+├── pages/          # Rankings, MockDraft, DraftRoom, PredictionChallenge, etc.
+├── utils/          # CPU draft logic, draft grades, Pick Six scoring
 └── types/          # Database types
-supabase/migrations/  # Database migrations
-scripts/            # Baseline parsing, archetype generation
+supabase/migrations/  # Schema migrations (apply to your Supabase project)
+scripts/            # Data import, archetype generation, sync tooling
 ```
-
-## Data Sync
-
-For syncing player data and baselines between PostgreSQL and Supabase, see:
-
-- `HOW_TO_SYNC_DATA.md` — Syncing `nfl_players_historical` and `public.players`
-- `sync_instructions.md` — Full guide for postgres ↔ nfl_webapp sync
