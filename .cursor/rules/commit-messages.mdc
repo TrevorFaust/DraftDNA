@@ -1,0 +1,38 @@
+---
+description: Git commit message voice — first person, no placeholders
+alwaysApply: true
+---
+
+# Commit messages
+
+Write commit messages as **Trevor describing what he changed** — for a reader on GitHub, not as instructions to Trevor.
+
+## Voice
+
+- First person / author perspective: what was added, updated, or fixed.
+- Prefer clear, specific summaries of the actual diff.
+- Gerund or past-tense narration is fine (`Adding…`, `Updated…`, `Describing…`) when it reads naturally.
+- Imperative mood is also fine when it stays specific (`Add gitleaks CI…`).
+
+## Never use
+
+Placeholder or second-person template text — these must never become the commit subject:
+
+- `Your message describing the changes`
+- `Describe your change in one clear sentence.`
+- `Short description of what changed`
+- `Describe your Pick Six / share updates`
+- Any variant of “your message”, “describe your…”, or “short description of…”
+
+If the diff is not summarized yet, **write the real summary** from the staged changes. Do not commit with placeholder text.
+
+## Examples
+
+| Bad (placeholder / second person) | Good (author describing the work) |
+| --- | --- |
+| Your message describing the changes | Added Pick Six live scoring, fantasy depth chart, and NFL team context |
+| Describe your change in one clear sentence. | Expanded player detail dialog and 2026 strength-of-schedule data |
+| Short description of what changed | Added rookies to the 2026 draft board CSV |
+| Describe your Pick Six / share updates | Updated Pick Six share card, jersey assets, and rankings ramp-up |
+
+When committing on the user’s behalf, always draft the subject from `git diff` / `git status`, in this voice.
