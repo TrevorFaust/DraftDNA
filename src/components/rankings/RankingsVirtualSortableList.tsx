@@ -1,11 +1,13 @@
-import { memo, useCallback, type RefObject } from 'react';
+import { memo, useState, useCallback, type RefObject } from 'react';
 import { useVirtualizer, defaultRangeExtractor, type VirtualItem } from '@tanstack/react-virtual';
 import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { RankedPlayer } from '@/types/database';
 import { RankingsDragRow } from '@/components/rankings/RankingsDragRow';
+import type { CommunityRankTrend } from '@/utils/communityRankTrend';
 
-/** Row height + gap — virtualizer estimate; remeasured after mount. */
-export const RANKINGS_ROW_ESTIMATE_PX = 92;
+/** Fixed row height (card + mb-2 gap) — avoids dynamic measure churn while scrolling. */
+export const RANKINGS_ROW_ESTIMATE_PX = 96;
 
 type Player2025StatsEntry = {
   avgPointsPerGame: number | null;
@@ -21,78 +23,93 @@ type VirtualSortableRowProps = {
   player: RankedPlayer;
   virtualRow: VirtualItem;
   displayAdp: number;
+  communityPosRank?: number | null;
+  myPosRank?: number | null;
+  communityTrend?: CommunityRankTrend | null;
   stats2025?: Player2025StatsEntry;
   onPlayerClick: (player: RankedPlayer) => void;
-  measureElement: (element: Element | null) => void;
+  dragMode: 'edit' | 'compare';
 };
 
 const VirtualSortableRow = memo(function VirtualSortableRow({
   player,
   virtualRow,
   displayAdp,
+  communityPosRank,
+  myPosRank,
+  communityTrend,
   stats2025,
   onPlayerClick,
-  measureElement,
+  dragMode,
 }: VirtualSortableRowProps) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    isDragging,
+  } = useSortable({
     id: player.id,
     index: virtualRow.index,
     animateLayoutChanges: () => false,
     transition: null,
   });
 
-  const setOuterRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node) measureElement(node);
-    },
-    [measureElement]
+  const rowShell = (
+    <RankingsDragRow
+      player={player}
+      rank={player.rank}
+      displayAdp={displayAdp}
+      communityPosRank={communityPosRank}
+      myPosRank={myPosRank}
+      communityTrend={communityTrend}
+      stats2025={stats2025}
+      onPlayerClick={onPlayerClick}
+      isSourceHidden={dragMode === 'compare' && isDragging}
+      dragHandleAttributes={attributes}
+      dragHandleListeners={listeners}
+      dragHandleRef={setActivatorNodeRef}
+      className="mb-2"
+    />
   );
 
   return (
     <div
-      ref={setOuterRef}
       data-index={virtualRow.index}
       style={{
         position: 'absolute',
         top: virtualRow.start,
         left: 0,
         width: '100%',
-        zIndex: 1,
+        height: RANKINGS_ROW_ESTIMATE_PX,
+        zIndex: isDragging ? 0 : 1,
       }}
     >
-      <div ref={setNodeRef}>
-        <RankingsDragRow
-          player={player}
-          rank={player.rank}
-          displayAdp={displayAdp}
-          stats2025={stats2025}
-          onPlayerClick={onPlayerClick}
-          dragHandleAttributes={attributes}
-          dragHandleListeners={listeners}
-          dragHandleRef={setActivatorNodeRef}
-          className="mb-2"
-        />
-      </div>
+      {dragMode === 'compare' ? (
+        <div
+          ref={setNodeRef}
+          style={{
+            transform: CSS.Transform.toString(transform),
+            transition: 'none',
+          }}
+        >
+          {rowShell}
+        </div>
+      ) : (
+        <div ref={setNodeRef}>{rowShell}</div>
+      )}
     </div>
   );
 });
 
 type GapRowProps = {
   virtualRow: VirtualItem;
-  measureElement: (element: Element | null) => void;
 };
 
-const GapRow = memo(function GapRow({ virtualRow, measureElement }: GapRowProps) {
-  const setOuterRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node) measureElement(node);
-    },
-    [measureElement]
-  );
-
+const GapRow = memo(function GapRow({ virtualRow }: GapRowProps) {
   return (
     <div
-      ref={setOuterRef}
       data-index={virtualRow.index}
       aria-hidden
       style={{
@@ -100,6 +117,7 @@ const GapRow = memo(function GapRow({ virtualRow, measureElement }: GapRowProps)
         top: virtualRow.start,
         left: 0,
         width: '100%',
+        height: RANKINGS_ROW_ESTIMATE_PX,
         zIndex: 1,
       }}
     >
@@ -112,6 +130,9 @@ type PinnedActiveSortableProps = {
   player: RankedPlayer;
   topPx: number;
   displayAdp: number;
+  communityPosRank?: number | null;
+  myPosRank?: number | null;
+  communityTrend?: CommunityRankTrend | null;
   stats2025?: Player2025StatsEntry;
 };
 
@@ -120,6 +141,9 @@ const PinnedActiveSortable = memo(function PinnedActiveSortable({
   player,
   topPx,
   displayAdp,
+  communityPosRank,
+  myPosRank,
+  communityTrend,
   stats2025,
 }: PinnedActiveSortableProps) {
   const { setNodeRef, setActivatorNodeRef, attributes, listeners } = useSortable({
@@ -145,6 +169,9 @@ const PinnedActiveSortable = memo(function PinnedActiveSortable({
           player={player}
           rank={player.rank}
           displayAdp={displayAdp}
+          communityPosRank={communityPosRank}
+          myPosRank={myPosRank}
+          communityTrend={communityTrend}
           stats2025={stats2025}
           dragHandleAttributes={attributes}
           dragHandleListeners={listeners}
@@ -157,33 +184,50 @@ const PinnedActiveSortable = memo(function PinnedActiveSortable({
 });
 
 export type RankingsVirtualSortableListProps = {
-  scrollRef: RefObject<HTMLDivElement | null>;
+  /** Legacy ref — kept for edge-scroll handlers on the parent container. */
+  scrollRef?: RefObject<HTMLDivElement | null>;
+  /** Connected scroll element — stateful so the virtualizer mounts rows on first paint. */
+  scrollElement: HTMLDivElement | null;
   items: RankingsListItem[];
   activeDragId: string | null;
-  pinnedActiveTopPx: number | null;
-  pinnedActivePlayer: RankedPlayer | null;
+  dragMode: 'edit' | 'compare';
+  pinnedActiveTopPx?: number | null;
+  pinnedActivePlayer?: RankedPlayer | null;
   getDisplayAdp: (playerId: string, fallback: number) => number;
+  getCommunityPosRank?: (playerId: string) => number | null | undefined;
+  getMyPosRank?: (playerId: string) => number | null | undefined;
+  getCommunityTrend?: (playerId: string, overallRank: number) => CommunityRankTrend | null | undefined;
   player2025Stats: Map<string, Player2025StatsEntry>;
   onPlayerClick: (player: RankedPlayer) => void;
 };
 
 export function RankingsVirtualSortableList({
-  scrollRef,
+  scrollElement,
   items,
   activeDragId,
-  pinnedActiveTopPx,
-  pinnedActivePlayer,
+  dragMode,
+  pinnedActiveTopPx = null,
+  pinnedActivePlayer = null,
   getDisplayAdp,
+  getCommunityPosRank,
+  getMyPosRank,
+  getCommunityTrend,
   player2025Stats,
   onPlayerClick,
 }: RankingsVirtualSortableListProps) {
-  const gapIndex = activeDragId ? items.findIndex((item) => item.kind === 'gap') : -1;
+  const pinnedIndex =
+    dragMode === 'edit' && activeDragId
+      ? items.findIndex((item) => item.kind === 'gap')
+      : activeDragId
+        ? items.findIndex((item) => item.kind === 'player' && item.player.id === activeDragId)
+        : -1;
 
   const virtualizer = useVirtualizer({
     count: items.length,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement: () => scrollElement,
     estimateSize: () => RANKINGS_ROW_ESTIMATE_PX,
-    overscan: 14,
+    overscan: 6,
+    enabled: scrollElement != null && items.length > 0,
     getItemKey: (index) => {
       const item = items[index];
       if (!item) return index;
@@ -191,12 +235,16 @@ export function RankingsVirtualSortableList({
     },
     rangeExtractor: (range) => {
       const next = new Set(defaultRangeExtractor(range));
-      if (gapIndex >= 0) next.add(gapIndex);
+      if (pinnedIndex >= 0) next.add(pinnedIndex);
       return [...next].sort((a, b) => a - b);
     },
   });
 
   const virtualItems = virtualizer.getVirtualItems();
+
+  if (!scrollElement || items.length === 0) {
+    return null;
+  }
 
   return (
     <div
@@ -206,11 +254,17 @@ export function RankingsVirtualSortableList({
         position: 'relative',
       }}
     >
-      {pinnedActivePlayer != null && pinnedActiveTopPx != null ? (
+      {dragMode === 'edit' && pinnedActivePlayer != null && pinnedActiveTopPx != null ? (
         <PinnedActiveSortable
           player={pinnedActivePlayer}
           topPx={pinnedActiveTopPx}
           displayAdp={getDisplayAdp(pinnedActivePlayer.id, pinnedActivePlayer.adp)}
+          communityPosRank={getCommunityPosRank?.(pinnedActivePlayer.id)}
+          myPosRank={getMyPosRank?.(pinnedActivePlayer.id)}
+          communityTrend={getCommunityTrend?.(
+            pinnedActivePlayer.id,
+            getDisplayAdp(pinnedActivePlayer.id, pinnedActivePlayer.adp)
+          )}
           stats2025={player2025Stats.get(pinnedActivePlayer.id)}
         />
       ) : null}
@@ -218,26 +272,41 @@ export function RankingsVirtualSortableList({
         const item = items[virtualRow.index];
         if (!item) return null;
         if (item.kind === 'gap') {
-          return (
-            <GapRow
-              key={`gap-${activeDragId}`}
-              virtualRow={virtualRow}
-              measureElement={virtualizer.measureElement}
-            />
-          );
+          return <GapRow key={`gap-${activeDragId}`} virtualRow={virtualRow} />;
         }
+        const displayAdp = getDisplayAdp(item.player.id, item.player.adp);
         return (
           <VirtualSortableRow
             key={item.player.id}
             player={item.player}
             virtualRow={virtualRow}
-            displayAdp={getDisplayAdp(item.player.id, item.player.adp)}
+            displayAdp={displayAdp}
+            communityPosRank={getCommunityPosRank?.(item.player.id)}
+            myPosRank={getMyPosRank?.(item.player.id)}
+            communityTrend={getCommunityTrend?.(item.player.id, displayAdp)}
             stats2025={player2025Stats.get(item.player.id)}
             onPlayerClick={onPlayerClick}
-            measureElement={virtualizer.measureElement}
+            dragMode={dragMode}
           />
         );
       })}
     </div>
   );
+}
+
+/** Binds parent scroll ref + state setter so virtual lists mount when the container attaches. */
+export function useRankingsScrollContainer(
+  legacyRef: RefObject<HTMLDivElement | null>
+): [HTMLDivElement | null, (node: HTMLDivElement | null) => void] {
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+
+  const bindScrollContainer = useCallback(
+    (node: HTMLDivElement | null) => {
+      legacyRef.current = node;
+      setScrollElement(node);
+    },
+    [legacyRef]
+  );
+
+  return [scrollElement, bindScrollContainer];
 }

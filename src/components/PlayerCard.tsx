@@ -7,6 +7,9 @@ import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
 import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
 import { resolveTeamAbbrForDisplay } from '@/utils/teamMapping';
 import { PlayerHeaderStatsLine } from '@/components/PlayerHeaderStatsLine';
+import { RankingsPosRankCompare } from '@/components/rankings/RankingsPosRankCompare';
+import { Rankings2025PpgCell } from '@/components/rankings/Rankings2025PpgCell';
+import type { CommunityRankTrend } from '@/utils/communityRankTrend';
 
 interface PlayerCardProps {
   player: RankedPlayer;
@@ -19,6 +22,12 @@ interface PlayerCardProps {
   stats2025?: Player2025Stats | null;
   /** Overall ADP rank at position (e.g. 8 = WR8) */
   positionAdpRank?: number | null;
+  /** Community positional rank from rankings list order */
+  communityPosRank?: number | null;
+  /** User positional rank from rankings list order */
+  myPosRank?: number | null;
+  /** Community overall rank trend vs prior snapshot */
+  communityTrend?: CommunityRankTrend | null;
   /** One-line ADP + bye only (rankings lists). Default follows showGrabHandle. */
   compactStats?: boolean;
 }
@@ -52,6 +61,9 @@ export const PlayerCard = ({
   positionColoredRank = false,
   stats2025,
   positionAdpRank,
+  communityPosRank,
+  myPosRank,
+  communityTrend,
   compactStats,
 }: PlayerCardProps) => {
   const useCompactStats = compactStats ?? showGrabHandle;
@@ -102,15 +114,14 @@ export const PlayerCard = ({
         />
       </div>
 
-      {showGrabHandle && (() => {
-        const ppg = stats2025?.avgPointsPerGame ?? (stats2025 && stats2025.gamesPlayed > 0 ? stats2025.totalFantasyPoints / stats2025.gamesPlayed : null);
-        return ppg != null && (
-          <div className="shrink-0 px-3 py-1 border-l border-border/50 flex flex-col justify-center items-center">
-            <span className="text-xs text-muted-foreground">2025 PPG</span>
-            <span className="font-semibold text-sm text-primary">{ppg.toFixed(1)}</span>
-          </div>
-        );
-      })()}
+      <RankingsPosRankCompare
+        position={player.position}
+        communityPosRank={communityPosRank}
+        myPosRank={myPosRank}
+        communityTrend={communityTrend}
+      />
+
+      {useCompactStats && <Rankings2025PpgCell stats2025={stats2025} className="px-3 py-1" />}
 
       {showGrabHandle && (
         <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors p-1">

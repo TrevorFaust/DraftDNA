@@ -17,7 +17,7 @@ const FAST_EDGE_FRAC_CAP = 0.14;
 
 export type ScrollEdgeOptions = { fast?: boolean };
 
-function edgeThresholdHeight(containerHeight: number, fast?: boolean): number {
+export function edgeThresholdHeight(containerHeight: number, fast?: boolean): number {
   const maxPx = fast ? FAST_EDGE_MAX_PX : EDGE_MAX_PX;
   const fracCap = fast ? FAST_EDGE_FRAC_CAP : EDGE_FRAC_CAP;
   const fromFrac = containerHeight * fracCap;

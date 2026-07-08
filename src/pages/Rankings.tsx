@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLeagues } from '@/hooks/useLeagues';
@@ -20,6 +20,7 @@ import {
   allLeaguesBucketStorage,
   getRankingsDraftSessionStorageKey,
   rankingsDraftSessionStorage,
+  rankingsPageSnapshotStorage,
 } from '@/utils/temporaryStorage';
 import { mergeLiveCommunity, mergeRankingsWithDraftOrder } from '@/utils/rankingsCommunityMerge';
 import {
@@ -31,8 +32,10 @@ import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/ut
 import {
   buildDefenseRankFromList,
   buildPositionAdpRankMap,
+  buildPositionRankFromList,
   resolvePositionAdpRankForDisplay,
 } from '@/utils/positionAdpRank';
+import { getCommunityRankTrend, recordCommunityRankSnapshot } from '@/utils/communityRankTrend';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import {
   TEAM_ABBREV_TO_FULL_NAME,
@@ -48,6 +51,7 @@ import {
   DragOverlay,
   KeyboardSensor,
   MouseSensor,
+  PointerSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -66,7 +70,9 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { RankingsDragRow } from '@/components/rankings/RankingsDragRow';
-import { RankingsVirtualSortableList, type RankingsListItem } from '@/components/rankings/RankingsVirtualSortableList';
+import { RankingsVirtualSortableList, useRankingsScrollContainer, type RankingsListItem } from '@/components/rankings/RankingsVirtualSortableList';
+import { RankingsCompareDragPanel } from '@/components/rankings/RankingsCompareDragPanel';
+import { sameIdOrder } from '@/components/rankings/RankingsCompareScrollList';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -114,6 +120,61 @@ const TEAM_SELECT_FA = 'FA' as const;
 
 /** Select value meaning no position / team restriction. */
 const FILTER_ALL = 'all' as const;
+
+function readInitialRankingsPageState(): {
+  players: RankedPlayer[];
+  communityPlayers: RankedPlayer[];
+  communityConsensusForStuds: RankedPlayer[];
+  hasExistingRankings: boolean;
+  isEditMode: boolean;
+  loading: boolean;
+} {
+  const snapshot = rankingsPageSnapshotStorage.get();
+  if (snapshot) {
+    return {
+      players: snapshot.players,
+      communityPlayers: snapshot.communityPlayers,
+      communityConsensusForStuds:
+        snapshot.communityConsensusForStuds.length > 0
+          ? snapshot.communityConsensusForStuds
+          : snapshot.communityPlayers,
+      hasExistingRankings: snapshot.hasExistingRankings,
+      isEditMode: snapshot.isEditMode,
+      loading: false,
+    };
+  }
+
+  if (typeof window !== 'undefined') {
+    const settings = tempSettingsStorage.get();
+    const scoringFormat = (settings?.scoringFormat as string) || 'ppr';
+    const leagueType = (settings?.leagueType as string) || 'season';
+    const isSuperflex = Boolean(settings?.isSuperflex);
+    const rookiesOnly = Boolean(settings?.rookiesOnly);
+    const bucketKey = `${scoringFormat}/${leagueType}/${isSuperflex}/${rookiesOnly}`;
+    const tempRankings = tempRankingsStorage.get(bucketKey);
+    if (tempRankings && tempRankings.length > 0) {
+      return {
+        players: tempRankings,
+        communityPlayers: tempRankings,
+        communityConsensusForStuds: tempRankings,
+        hasExistingRankings: true,
+        isEditMode: false,
+        loading: false,
+      };
+    }
+  }
+
+  return {
+    players: [],
+    communityPlayers: [],
+    communityConsensusForStuds: [],
+    hasExistingRankings: false,
+    isEditMode: false,
+    loading: true,
+  };
+}
+
+const initialRankingsPageState = readInitialRankingsPageState();
 
 const RANKINGS_TEAM_FILTER_OPTIONS: { value: string; label: string }[] = (() => {
   const list = Object.entries(TEAM_ABBREV_TO_FULL_NAME).map(([abbr, full]) => ({
@@ -481,13 +542,17 @@ const Rankings = () => {
   const bucket = useCommunityRankingsBucket(user ? undefined : guestSettingsVersion);
   const { teamNames: defenseTeamNames, teams: nflTeams } = useNflTeams();
   const navigate = useNavigate();
-  const [players, setPlayers] = useState<RankedPlayer[]>([]);
-  const [communityPlayers, setCommunityPlayers] = useState<RankedPlayer[]>([]);
+  const [players, setPlayers] = useState<RankedPlayer[]>(initialRankingsPageState.players);
+  const [communityPlayers, setCommunityPlayers] = useState<RankedPlayer[]>(
+    initialRankingsPageState.communityPlayers
+  );
   /** Pure RPC community order (excludes you) for studs/duds — same scale as Draft Stats. */
-  const [communityConsensusForStuds, setCommunityConsensusForStuds] = useState<RankedPlayer[]>([]);
+  const [communityConsensusForStuds, setCommunityConsensusForStuds] = useState<RankedPlayer[]>(
+    initialRankingsPageState.communityConsensusForStuds
+  );
   const [communityRawExcludingMe, setCommunityRawExcludingMe] = useState<{ player_id: string; avg_rank: number; sample_count: number }[] | null>(null);
   const allPlayersDataRef = useRef<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialRankingsPageState.loading);
   const [saving, setSaving] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -495,8 +560,10 @@ const Rankings = () => {
   const [selectedTeam, setSelectedTeam] = useState<string>(FILTER_ALL);
   const [selectedPlayer, setSelectedPlayer] = useState<RankedPlayer | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [hasExistingRankings, setHasExistingRankings] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [hasExistingRankings, setHasExistingRankings] = useState(
+    initialRankingsPageState.hasExistingRankings
+  );
+  const [isEditMode, setIsEditMode] = useState(initialRankingsPageState.isEditMode);
   /** Ref-only preview order during drag — avoids re-rendering the full list on every pointer move. */
   const dragListIdsRef = useRef<string[] | null>(null);
   const dragBaselineIdsRef = useRef<string[] | null>(null);
@@ -517,6 +584,9 @@ const Rankings = () => {
     active: Active;
   } | null>(null);
   const dragPinnedTopRef = useRef<number | null>(null);
+  const dragUsesVirtualListRef = useRef(false);
+  const dragPreviewRafRef = useRef<number | null>(null);
+  const dragPreviewPendingRef = useRef<string[] | null>(null);
   const [pinnedActivePlayer, setPinnedActivePlayer] = useState<RankedPlayer | null>(null);
   const [hasCommunityConsensus, setHasCommunityConsensus] = useState(false);
   const [allLeaguesBucketScoring, setAllLeaguesBucketScoring] = useState<'standard' | 'ppr' | 'half_ppr'>('ppr');
@@ -528,6 +598,9 @@ const Rankings = () => {
   const myRankingsScrollRef1 = useRef<HTMLDivElement>(null);
   const myRankingsScrollRef2 = useRef<HTMLDivElement>(null);
   const myRankingsScrollRef3 = useRef<HTMLDivElement>(null);
+  const [myRankingsScrollEl1, bindMyRankingsScroll1] = useRankingsScrollContainer(myRankingsScrollRef1);
+  const [myRankingsScrollEl2, bindMyRankingsScroll2] = useRankingsScrollContainer(myRankingsScrollRef2);
+  const [myRankingsScrollEl3, bindMyRankingsScroll3] = useRankingsScrollContainer(myRankingsScrollRef3);
   const bucketRef = useRef<string>('');
   // Ref to latest fetchPlayers so refetch-after-bucket-change uses current bucket, not stale closure
   const fetchPlayersRef = useRef<() => void>(() => {});
@@ -553,6 +626,7 @@ const Rankings = () => {
   const selectedLeagueIdRef = useRef<string | null>(null);
   // When we skip applying state due to stale fetch, finally should only clear loading (no refetch)
   const staleFetchReturnedRef = useRef(false);
+  const hasRankingsOnScreenRef = useRef(initialRankingsPageState.players.length > 0);
 
   const [importTemplateDialogOpen, setImportTemplateDialogOpen] = useState(false);
   const [templateOptions, setTemplateOptions] = useState<RankingTemplateOption[]>([]);
@@ -669,6 +743,53 @@ const Rankings = () => {
     },
     [rankingsSessionDraftKey]
   );
+
+  const persistRankingsPageSnapshot = useCallback(
+    (
+      nextPlayers: RankedPlayer[],
+      nextCommunity: RankedPlayer[],
+      nextConsensus: RankedPlayer[],
+      nextHasExisting: boolean,
+      nextEditMode: boolean
+    ) => {
+      if (nextPlayers.length === 0) return;
+      rankingsPageSnapshotStorage.save({
+        v: 1,
+        bucketKey,
+        leagueId: selectedLeague?.id ?? null,
+        players: nextPlayers,
+        communityPlayers: nextCommunity,
+        communityConsensusForStuds: nextConsensus,
+        hasExistingRankings: nextHasExisting,
+        isEditMode: nextEditMode,
+      });
+    },
+    [bucketKey, selectedLeague?.id]
+  );
+
+  useEffect(() => {
+    hasRankingsOnScreenRef.current = players.length > 0 || communityPlayers.length > 0;
+  }, [players.length, communityPlayers.length]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      persistRankingsPageSnapshot(
+        players,
+        communityPlayers,
+        communityConsensusForStuds,
+        hasExistingRankings,
+        isEditMode
+      );
+    }, 0);
+    return () => window.clearTimeout(handle);
+  }, [
+    players,
+    communityPlayers,
+    communityConsensusForStuds,
+    hasExistingRankings,
+    isEditMode,
+    persistRankingsPageSnapshot,
+  ]);
 
   const loadTemplateOptions = useCallback(async () => {
     const debugBase = {
@@ -1001,6 +1122,58 @@ const Rankings = () => {
       ),
     [displayedCommunityPlayers]
   );
+  const communityPosRankMap = useMemo(
+    () =>
+      buildPositionRankFromList(
+        displayedCommunityPlayers.map((p, i) => ({
+          id: p.id,
+          position: p.position,
+          rank: i + 1,
+        }))
+      ),
+    [displayedCommunityPlayers]
+  );
+  const myPosRankMap = useMemo(
+    () =>
+      buildPositionRankFromList(
+        players.map((p) => ({
+          id: p.id,
+          position: p.position,
+          rank: p.rank,
+        }))
+      ),
+    [players]
+  );
+  const getCommunityPosRank = useCallback(
+    (playerId: string) => communityPosRankMap.get(playerId) ?? null,
+    [communityPosRankMap]
+  );
+  const getMyPosRank = useCallback(
+    (playerId: string) => myPosRankMap.get(playerId) ?? null,
+    [myPosRankMap]
+  );
+  const getCommunityTrend = useCallback(
+    (playerId: string, overallRank: number) =>
+      getCommunityRankTrend(bucketKey, playerId, overallRank),
+    [bucketKey]
+  );
+  const getPlayerRankCardMeta = useCallback(
+    (playerId: string) => {
+      const overallRank = communityRankMap.get(playerId);
+      return {
+        communityPosRank: getCommunityPosRank(playerId),
+        myPosRank: getMyPosRank(playerId),
+        communityTrend:
+          overallRank != null ? getCommunityTrend(playerId, overallRank) ?? null : null,
+      };
+    },
+    [communityRankMap, getCommunityPosRank, getMyPosRank, getCommunityTrend]
+  );
+
+  useEffect(() => {
+    if (displayedCommunityPlayers.length === 0) return;
+    recordCommunityRankSnapshot(bucketKey, communityRankMap);
+  }, [bucketKey, communityRankMap, displayedCommunityPlayers.length]);
   const dialogPositionAdpRank = useCallback(
     (p: RankedPlayer) =>
       resolvePositionAdpRankForDisplay(
@@ -1239,7 +1412,9 @@ const Rankings = () => {
         staleFetchReturnedRef.current = true;
         fetchInProgressRef.current = false;
         // Trigger fetch for current context so data actually loads (the correct fetch was skipped earlier due to "in progress")
-        setLoading(true);
+        if (!hasRankingsOnScreenRef.current) {
+          setLoading(true);
+        }
         queueMicrotask(() => fetchPlayersRef.current());
         return;
       }
@@ -1554,7 +1729,9 @@ const Rankings = () => {
       const nowKey = bucketRef.current;
       if (nowKey !== currentBucketKey) {
         isRefetchAfterBucketChangeRef.current = true;
-        setLoading(true);
+        if (!hasRankingsOnScreenRef.current) {
+          setLoading(true);
+        }
         fetchPlayersRef.current();
         return;
       }
@@ -1621,7 +1798,9 @@ const Rankings = () => {
     // Otherwise the effect cleanup can clear the timeout on re-run and the deferred fetch never runs (stuck loading / wrong view).
     if (deferredFetchScheduledRef.current && selectedLeagueIdRef.current === null) {
       deferredFetchScheduledRef.current = false;
-      setLoading(true);
+      if (!hasRankingsOnScreenRef.current) {
+        setLoading(true);
+      }
       fetchPlayers();
       return;
     }
@@ -1629,7 +1808,9 @@ const Rankings = () => {
     // When logged in with leagues but selectedLeague still null, defer so selectedLeague
     // restoration from localStorage can commit (avoids fetching with wrong bucket then overwriting).
     if (user && leagues.length > 0 && selectedLeague === null) {
-      setLoading(true);
+      if (!hasRankingsOnScreenRef.current) {
+        setLoading(true);
+      }
       deferredFetchScheduledRef.current = true;
       const t = setTimeout(() => {
         deferredFetchScheduledRef.current = false;
@@ -1650,7 +1831,9 @@ const Rankings = () => {
       };
     }
 
-    setLoading(true);
+    if (!hasRankingsOnScreenRef.current) {
+      setLoading(true);
+    }
     fetchPlayers();
   }, [fetchPlayers, user, authLoading, leaguesLoading, isAllLeagues, leagues.length, selectedLeague, bucket.scoringFormat, bucket.leagueType, bucket.isSuperflex, bucket.rookiesOnly]);
 
@@ -1793,6 +1976,12 @@ const Rankings = () => {
     dragBaselineIdsRef.current = null;
     lastDragOverRef.current = null;
     dragPinnedTopRef.current = null;
+    dragUsesVirtualListRef.current = false;
+    dragPreviewPendingRef.current = null;
+    if (dragPreviewRafRef.current != null) {
+      cancelAnimationFrame(dragPreviewRafRef.current);
+      dragPreviewRafRef.current = null;
+    }
     rankingsDragPointerRef.current = null;
     setDragPreviewIds(null);
     setShowDropGap(false);
@@ -1821,8 +2010,43 @@ const Rankings = () => {
     );
     if (next.join('|') === current.join('|')) return;
     dragListIdsRef.current = next;
-    setDragPreviewIds(next);
+    if (!dragUsesVirtualListRef.current) return;
+
+    dragPreviewPendingRef.current = next;
+    if (dragPreviewRafRef.current != null) return;
+    dragPreviewRafRef.current = requestAnimationFrame(() => {
+      dragPreviewRafRef.current = null;
+      const pending = dragPreviewPendingRef.current;
+      if (pending) setDragPreviewIds(pending);
+    });
   }, []);
+
+  const commitRankingsPreview = useCallback(
+    (preview: string[], baseline: string[], activeId: string) => {
+      if (sameIdOrder(preview, baseline)) return;
+
+      startTransition(() => {
+        setPlayers((current) => {
+          let updatedPlayers: RankedPlayer[];
+          if (positionFilterActive) {
+            updatedPlayers = applyMidpointFromPreviewOrder(current, preview, activeId, baseline);
+          } else if (otherFilterActive) {
+            updatedPlayers = applySlotFromPreviewOrder(current, preview);
+          } else {
+            updatedPlayers = applyFullListFromPreviewOrder(current, preview);
+          }
+          persistRankingsSessionDraft(updatedPlayers, isEditMode);
+          return updatedPlayers;
+        });
+      });
+    },
+    [
+      positionFilterActive,
+      otherFilterActive,
+      isEditMode,
+      persistRankingsSessionDraft,
+    ]
+  );
 
   const handleDragEnd = (event: DragEndEvent) => {
     const baseline = dragBaselineIdsRef.current;
@@ -1848,18 +2072,7 @@ const Rankings = () => {
       return;
     }
 
-    const activeId = String(event.active.id);
-
-    let updatedPlayers: RankedPlayer[];
-    if (positionFilterActive) {
-      updatedPlayers = applyMidpointFromPreviewOrder(players, preview, activeId, baseline);
-    } else if (otherFilterActive) {
-      updatedPlayers = applySlotFromPreviewOrder(players, preview);
-    } else {
-      updatedPlayers = applyFullListFromPreviewOrder(players, preview);
-    }
-    setPlayers(updatedPlayers);
-    persistRankingsSessionDraft(updatedPlayers, isEditMode);
+    commitRankingsPreview(preview, baseline, String(event.active.id));
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -1867,34 +2080,41 @@ const Rankings = () => {
     const ids = dragSourcePlayers.map((p) => p.id);
     dragBaselineIdsRef.current = ids;
     dragListIdsRef.current = ids;
-    setDragPreviewIds(ids);
-    setShowDropGap(false);
     setActiveDragId(String(event.active.id));
 
-    requestAnimationFrame(() => {
-      setShowDropGap(true);
-    });
-
     const ae = event.activatorEvent;
+    let scrollContainer: HTMLDivElement | null = null;
     if (ae && 'clientX' in ae && 'clientY' in ae) {
       const pe = ae as PointerEvent;
       rankingsDragPointerRef.current = { x: pe.clientX, y: pe.clientY };
       const target = pe.target instanceof Node ? pe.target : null;
-      const container = rankingsScrollContainersRef.current.find(
-        (el) => el && target && el.contains(target)
-      );
-      if (container) setDragOverlayWidth(container.clientWidth);
+      scrollContainer =
+        rankingsScrollContainersRef.current.find(
+          (el) => el && target && el.contains(target)
+        ) ?? null;
+      if (scrollContainer) setDragOverlayWidth(scrollContainer.clientWidth);
+    }
+
+    const usesVirtualList = scrollContainer === myRankingsScrollRef2.current;
+    dragUsesVirtualListRef.current = usesVirtualList;
+
+    if (usesVirtualList) {
+      setDragPreviewIds(ids);
+      setShowDropGap(false);
+      requestAnimationFrame(() => {
+        setShowDropGap(true);
+      });
 
       const initial = event.active.rect.current.initial;
-      if (container && initial) {
-        const containerRect = container.getBoundingClientRect();
-        dragPinnedTopRef.current = initial.top - containerRect.top + container.scrollTop;
+      if (scrollContainer && initial) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        dragPinnedTopRef.current = initial.top - containerRect.top + scrollContainer.scrollTop;
       }
     }
 
     const dragged = dragSourcePlayers.find((p) => p.id === String(event.active.id));
     if (dragged) {
-      setPinnedActivePlayer(dragged);
+      if (usesVirtualList) setPinnedActivePlayer(dragged);
       setDragOverlay({
         player: dragged,
         displayAdp: getDisplayAdp(dragged.id, dragged.adp),
@@ -2215,7 +2435,9 @@ const Rankings = () => {
                 </div>
                 <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
                   <div className="space-y-2">
-                    {filteredCommunityPlayers.map((player) => (
+                    {filteredCommunityPlayers.map((player) => {
+                      const rankMeta = getPlayerRankCardMeta(player.id);
+                      return (
                       <PlayerCard
                         key={player.id}
                         player={player}
@@ -2223,8 +2445,13 @@ const Rankings = () => {
                         onClick={() => handlePlayerClick(player)}
                         positionColoredRank
                         compactStats
+                        stats2025={player2025Stats.get(player.id)}
+                        communityPosRank={rankMeta.communityPosRank}
+                        myPosRank={rankMeta.myPosRank}
+                        communityTrend={rankMeta.communityTrend}
                       />
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -2258,50 +2485,17 @@ const Rankings = () => {
                 <p className="text-sm text-muted-foreground mb-3">
                   Drag to reorder your personal rankings
                 </p>
-                <div ref={myRankingsScrollRef1} className="h-[480px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin" style={{ touchAction: 'pan-y' }}>
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={rankingsListCollisionDetection}
-                    measuring={rankingsMeasuringConfig}
-                    modifiers={[restrictToVerticalAxis]}
-                    onDragEnd={handleDragEnd}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDragMove={handleDragMove}
-                    onDragCancel={handleDragCancel}
-                    autoScroll={autoScrollConfig}
-                  >
-                    <RampUpScrollHandler containerRef={myRankingsScrollRef1} />
-                    <SortableContext
-                      items={sortableItemIds}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <RankingsVirtualSortableList
-                        scrollRef={myRankingsScrollRef1}
-                        items={displayListItems}
-                        activeDragId={activeDragId}
-                        pinnedActiveTopPx={showDropGap ? dragPinnedTopRef.current : null}
-                        pinnedActivePlayer={showDropGap ? pinnedActivePlayer : null}
-                        getDisplayAdp={getDisplayAdp}
-                        player2025Stats={player2025Stats}
-                        onPlayerClick={handlePlayerClick}
-                      />
-                    </SortableContext>
-                    <DragOverlay adjustScale={false} dropAnimation={null} style={{ zIndex: 9999 }}>
-                      {dragOverlay ? (
-                        <div style={{ width: dragOverlayWidth, boxSizing: 'border-box' }}>
-                          <RankingsDragRow
-                            player={dragOverlay.player}
-                            rank={dragOverlay.player.rank}
-                            displayAdp={dragOverlay.displayAdp}
-                            stats2025={player2025Stats.get(dragOverlay.player.id)}
-                            isOverlay
-                          />
-                        </div>
-                      ) : null}
-                    </DragOverlay>
-                  </DndContext>
-                </div>
+                <RankingsCompareDragPanel
+                  scrollContainerRef={myRankingsScrollRef1}
+                  bindScrollContainer={bindMyRankingsScroll1}
+                  players={dragSourcePlayers}
+                  getDisplayAdp={getDisplayAdp}
+                  getPlayerRankCardMeta={getPlayerRankCardMeta}
+                  player2025Stats={player2025Stats}
+                  onPlayerClick={handlePlayerClick}
+                  onCommitPreview={commitRankingsPreview}
+                  scrollClassName="h-[480px] overflow-y-auto pr-2 scrollbar-thin"
+                />
               </div>
             </div>
 
@@ -2390,7 +2584,7 @@ const Rankings = () => {
           </>
         ) : (isEditMode || (!user && !hasExistingRankings)) ? (
           // Edit Mode - Drag and drop rankings (for logged-in users editing, or non-logged-in users who haven't finalized)
-          <div ref={myRankingsScrollRef2} className="h-[70vh] min-h-[500px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin" style={{ touchAction: 'pan-y' }}>
+          <div ref={bindMyRankingsScroll2} className="h-[70vh] min-h-[500px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin" style={{ touchAction: 'pan-y' }}>
           <DndContext
             sensors={sensors}
             collisionDetection={rankingsListCollisionDetection}
@@ -2409,12 +2603,16 @@ const Rankings = () => {
               strategy={verticalListSortingStrategy}
             >
               <RankingsVirtualSortableList
-                scrollRef={myRankingsScrollRef2}
+                scrollElement={myRankingsScrollEl2}
                 items={displayListItems}
                 activeDragId={activeDragId}
+                dragMode="edit"
                 pinnedActiveTopPx={showDropGap ? dragPinnedTopRef.current : null}
                 pinnedActivePlayer={showDropGap ? pinnedActivePlayer : null}
                 getDisplayAdp={getDisplayAdp}
+                getCommunityPosRank={getCommunityPosRank}
+                getMyPosRank={getMyPosRank}
+                getCommunityTrend={getCommunityTrend}
                 player2025Stats={player2025Stats}
                 onPlayerClick={handlePlayerClick}
               />
@@ -2426,6 +2624,12 @@ const Rankings = () => {
                     player={dragOverlay.player}
                     rank={dragOverlay.player.rank}
                     displayAdp={dragOverlay.displayAdp}
+                    communityPosRank={getCommunityPosRank(dragOverlay.player.id)}
+                    myPosRank={getMyPosRank(dragOverlay.player.id)}
+                    communityTrend={getCommunityTrend(
+                      dragOverlay.player.id,
+                      dragOverlay.displayAdp
+                    )}
                     stats2025={player2025Stats.get(dragOverlay.player.id)}
                     isOverlay
                   />
@@ -2446,7 +2650,9 @@ const Rankings = () => {
                 </div>
                 <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
                   <div className="space-y-2">
-                    {filteredCommunityPlayers.map((player) => (
+                    {filteredCommunityPlayers.map((player) => {
+                      const rankMeta = getPlayerRankCardMeta(player.id);
+                      return (
                       <PlayerCard
                         key={player.id}
                         player={player}
@@ -2454,8 +2660,13 @@ const Rankings = () => {
                         onClick={() => handlePlayerClick(player)}
                         positionColoredRank
                         compactStats
+                        stats2025={player2025Stats.get(player.id)}
+                        communityPosRank={rankMeta.communityPosRank}
+                        myPosRank={rankMeta.myPosRank}
+                        communityTrend={rankMeta.communityTrend}
                       />
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -2489,50 +2700,17 @@ const Rankings = () => {
                 <p className="text-sm text-muted-foreground mb-3">
                   Drag the handle to adjust rankings
                 </p>
-                <div ref={myRankingsScrollRef3} className="h-[480px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin" style={{ touchAction: 'pan-y' }}>
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={rankingsListCollisionDetection}
-                    measuring={rankingsMeasuringConfig}
-                    modifiers={[restrictToVerticalAxis]}
-                    onDragEnd={handleDragEnd}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDragMove={handleDragMove}
-                    onDragCancel={handleDragCancel}
-                    autoScroll={autoScrollConfig}
-                  >
-                    <RampUpScrollHandler containerRef={myRankingsScrollRef3} />
-                    <SortableContext
-                      items={sortableItemIds}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <RankingsVirtualSortableList
-                        scrollRef={myRankingsScrollRef1}
-                        items={displayListItems}
-                        activeDragId={activeDragId}
-                        pinnedActiveTopPx={showDropGap ? dragPinnedTopRef.current : null}
-                        pinnedActivePlayer={showDropGap ? pinnedActivePlayer : null}
-                        getDisplayAdp={getDisplayAdp}
-                        player2025Stats={player2025Stats}
-                        onPlayerClick={handlePlayerClick}
-                      />
-                    </SortableContext>
-                    <DragOverlay adjustScale={false} dropAnimation={null} style={{ zIndex: 9999 }}>
-                      {dragOverlay ? (
-                        <div style={{ width: dragOverlayWidth, boxSizing: 'border-box' }}>
-                          <RankingsDragRow
-                            player={dragOverlay.player}
-                            rank={dragOverlay.player.rank}
-                            displayAdp={dragOverlay.displayAdp}
-                            stats2025={player2025Stats.get(dragOverlay.player.id)}
-                            isOverlay
-                          />
-                        </div>
-                      ) : null}
-                    </DragOverlay>
-                  </DndContext>
-                </div>
+                <RankingsCompareDragPanel
+                  scrollContainerRef={myRankingsScrollRef3}
+                  bindScrollContainer={bindMyRankingsScroll3}
+                  players={dragSourcePlayers}
+                  getDisplayAdp={getDisplayAdp}
+                  getPlayerRankCardMeta={getPlayerRankCardMeta}
+                  player2025Stats={player2025Stats}
+                  onPlayerClick={handlePlayerClick}
+                  onCommitPreview={commitRankingsPreview}
+                  scrollClassName="h-[480px] overflow-y-auto pr-2 scrollbar-thin"
+                />
               </div>
             </div>
 

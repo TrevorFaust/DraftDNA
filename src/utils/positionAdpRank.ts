@@ -2,6 +2,7 @@ import { getFullTeamName } from '@/utils/teamMapping';
 import { isDefenseLikePosition } from '@/utils/pickSixScoring';
 
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
+const LIST_RANK_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K']);
 
 export function normalizePositionForAdpLabel(position: string): string {
   const p = position.trim().toUpperCase();
@@ -9,10 +10,22 @@ export function normalizePositionForAdpLabel(position: string): string {
   return p;
 }
 
+function normalizePositionForListRank(position: string): string | null {
+  const pos = normalizePositionForAdpLabel(position);
+  if (LIST_RANK_POSITIONS.has(pos)) return pos;
+  if (isDefenseLikePosition(pos)) return 'D/ST';
+  return null;
+}
+
 /** Whether this position shows a Pos ADP / positional rank label on player UI. */
 export function showsPositionalAdpRank(position: string): boolean {
   const pos = normalizePositionForAdpLabel(position);
   return SKILL_POSITIONS.has(pos) || isDefenseLikePosition(pos);
+}
+
+/** Whether this position shows a positional rank from a rankings list (QB–TE, K, D/ST). */
+export function showsPositionalListRank(position: string): boolean {
+  return normalizePositionForListRank(position) != null;
 }
 
 /** Overall ADP order within position (1 = earliest ADP at that position). */
@@ -41,13 +54,25 @@ export function buildPositionAdpRankMap(
 export function buildDefenseRankFromList(
   players: { id: string; position: string; rank: number }[]
 ): Map<string, number> {
+  return buildPositionRankFromList(players);
+}
+
+/**
+ * Positional rank by order in a rankings list (`rank` 1 = top of list).
+ * QB/RB/WR/TE/K/D/ST each get their own 1…n sequence.
+ */
+export function buildPositionRankFromList(
+  players: { id: string; position: string; rank: number }[]
+): Map<string, number> {
   const sorted = [...players].sort((a, b) => a.rank - b.rank);
-  let defCount = 0;
+  const counters = new Map<string, number>();
   const out = new Map<string, number>();
   for (const p of sorted) {
-    if (!isDefenseLikePosition(p.position)) continue;
-    defCount += 1;
-    out.set(p.id, defCount);
+    const pos = normalizePositionForListRank(p.position);
+    if (!pos) continue;
+    const next = (counters.get(pos) ?? 0) + 1;
+    counters.set(pos, next);
+    out.set(p.id, next);
   }
   return out;
 }

@@ -6,6 +6,9 @@ import type { RankedPlayer } from '@/types/database';
 import { PositionBadge } from '@/components/PositionBadge';
 import { cn } from '@/lib/utils';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
+import { RankingsPosRankCompare } from '@/components/rankings/RankingsPosRankCompare';
+import { Rankings2025PpgCell } from '@/components/rankings/Rankings2025PpgCell';
+import type { CommunityRankTrend } from '@/utils/communityRankTrend';
 
 function getPositionRankClass(position: string) {
   switch (position.toUpperCase()) {
@@ -31,6 +34,9 @@ export type RankingsDragRowProps = {
   player: RankedPlayer;
   rank: number;
   displayAdp: number;
+  communityPosRank?: number | null;
+  myPosRank?: number | null;
+  communityTrend?: CommunityRankTrend | null;
   stats2025?: { avgPointsPerGame: number | null; gamesPlayed?: number; totalFantasyPoints?: number };
   onPlayerClick?: (player: RankedPlayer) => void;
   isOverlay?: boolean;
@@ -40,6 +46,8 @@ export type RankingsDragRowProps = {
   dragHandleAttributes?: DraggableAttributes;
   dragHandleListeners?: SyntheticListenerMap;
   dragHandleRef?: (element: HTMLButtonElement | null) => void;
+  /** Custom pointer drag (compare view) — no dnd-kit on the row. */
+  onHandlePointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void;
   style?: CSSProperties;
   className?: string;
 };
@@ -49,6 +57,9 @@ export const RankingsDragRow = memo(function RankingsDragRow({
   player,
   rank,
   displayAdp,
+  communityPosRank,
+  myPosRank,
+  communityTrend,
   stats2025,
   onPlayerClick,
   isOverlay = false,
@@ -57,20 +68,17 @@ export const RankingsDragRow = memo(function RankingsDragRow({
   dragHandleAttributes,
   dragHandleListeners,
   dragHandleRef,
+  onHandlePointerDown,
   style,
   className,
 }: RankingsDragRowProps) {
-  const ppg =
-    stats2025?.avgPointsPerGame ??
-    (stats2025 && stats2025.gamesPlayed && stats2025.gamesPlayed > 0
-      ? (stats2025.totalFantasyPoints ?? 0) / stats2025.gamesPlayed
-      : null);
-
   return (
     <div
+      data-rankings-drag-row
+      data-player-id={player.id}
       style={style}
       className={cn(
-        'glass-card p-3 flex items-center gap-3 select-none touch-none',
+        'glass-card p-3 flex items-center gap-3',
         isOverlay && 'border-primary shadow-lg ring-1 ring-primary/40 cursor-grabbing',
         isSourceGhost && 'opacity-40 border-dashed border-2 border-primary/60 bg-primary/5 min-h-[84px]',
         isSourceHidden && 'opacity-0',
@@ -111,24 +119,33 @@ export const RankingsDragRow = memo(function RankingsDragRow({
             {player.bye_week != null ? ` · Bye ${player.bye_week}` : ''}
           </p>
         </div>
-        {ppg != null && (
-          <div className="shrink-0 px-2 border-l border-border/50 text-center">
-            <span className="block text-[10px] text-muted-foreground leading-tight">2025 PPG</span>
-            <span className="font-semibold text-sm text-primary">{ppg.toFixed(1)}</span>
-          </div>
-        )}
+        <RankingsPosRankCompare
+          position={player.position}
+          communityPosRank={communityPosRank}
+          myPosRank={myPosRank}
+          communityTrend={communityTrend}
+        />
+        <Rankings2025PpgCell stats2025={stats2025} />
       </div>
-      {!isOverlay && (
+      {!isOverlay ? (
         <button
           type="button"
           ref={dragHandleRef}
           aria-label={`Drag to reorder ${player.name}`}
           className="shrink-0 w-10 h-full min-h-[44px] flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
-          {...dragHandleAttributes}
-          {...dragHandleListeners}
+          {...(onHandlePointerDown
+            ? { onPointerDown: onHandlePointerDown }
+            : { ...dragHandleAttributes, ...dragHandleListeners })}
         >
           <GripVertical className="w-4 h-4" />
         </button>
+      ) : (
+        <div
+          aria-hidden
+          className="shrink-0 w-10 h-full min-h-[44px] flex items-center justify-center text-muted-foreground pointer-events-none"
+        >
+          <GripVertical className="w-4 h-4" />
+        </div>
       )}
     </div>
   );

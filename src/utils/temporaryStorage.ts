@@ -137,6 +137,66 @@ export const tempRankingsStorage = {
   },
 };
 
+const RANKINGS_PAGE_SNAPSHOT_KEY = 'rankings_page_snapshot_v1';
+
+export type RankingsPageSnapshot = {
+  v: 1;
+  bucketKey: string;
+  leagueId: string | null;
+  players: RankedPlayer[];
+  communityPlayers: RankedPlayer[];
+  communityConsensusForStuds: RankedPlayer[];
+  hasExistingRankings: boolean;
+  isEditMode: boolean;
+};
+
+/** Last rendered rankings view — instant restore on refresh while network fetch runs. */
+export const rankingsPageSnapshotStorage = {
+  get(): RankingsPageSnapshot | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = sessionStorage.getItem(RANKINGS_PAGE_SNAPSHOT_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as RankingsPageSnapshot;
+      if (parsed?.v !== 1 || !Array.isArray(parsed.players) || parsed.players.length === 0) {
+        return null;
+      }
+      return {
+        v: 1,
+        bucketKey: parsed.bucketKey ?? '',
+        leagueId: parsed.leagueId ?? null,
+        players: parsed.players,
+        communityPlayers: Array.isArray(parsed.communityPlayers) ? parsed.communityPlayers : [],
+        communityConsensusForStuds: Array.isArray(parsed.communityConsensusForStuds)
+          ? parsed.communityConsensusForStuds
+          : [],
+        hasExistingRankings: Boolean(parsed.hasExistingRankings),
+        isEditMode: Boolean(parsed.isEditMode),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  save(snapshot: RankingsPageSnapshot): void {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem(RANKINGS_PAGE_SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch {
+      /* quota or private mode */
+    }
+  },
+
+  clear(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.removeItem(RANKINGS_PAGE_SNAPSHOT_KEY);
+    } catch {
+      /* ignore */
+    }
+  },
+};
+
 // Temporary Settings Storage
 export const tempSettingsStorage = {
   save: (settings: {
