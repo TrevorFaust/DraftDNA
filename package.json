@@ -58,6 +58,7 @@
     "@react-three/fiber": "^8.17.10",
     "@supabase/supabase-js": "^2.86.0",
     "@tanstack/react-query": "^5.83.0",
+    "@tanstack/react-virtual": "^3.14.5",
     "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

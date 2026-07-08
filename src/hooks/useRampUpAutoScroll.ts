@@ -1,39 +1,70 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useDndContext } from '@dnd-kit/core';
 
-/** Time held in the edge zone before reaching {@link MAX_SPEED} (ms). */
 const RAMP_UP_MS = 2000;
+const FAST_RAMP_UP_MS = 180;
 const BASE_SPEED = 1;
+const FAST_BASE_SPEED = 14;
 const MAX_SPEED = 45;
+const FAST_MAX_SPEED = 80;
 const INTERVAL_MS = 8;
 
-/**
- * Auto-scroll only in a thin band at the top/bottom (~one player card), not a large
- * fraction of the viewport — avoids scrolling when nudging a row up/down by one slot.
- */
 const EDGE_MIN_PX = 36;
 const EDGE_MAX_PX = 72;
+const FAST_EDGE_MAX_PX = 100;
 const EDGE_FRAC_CAP = 0.08;
+const FAST_EDGE_FRAC_CAP = 0.14;
 
-function edgeThresholdHeight(containerHeight: number): number {
-  const fromFrac = containerHeight * EDGE_FRAC_CAP;
-  return Math.max(EDGE_MIN_PX, Math.min(EDGE_MAX_PX, fromFrac));
+export type ScrollEdgeOptions = { fast?: boolean };
+
+function edgeThresholdHeight(containerHeight: number, fast?: boolean): number {
+  const maxPx = fast ? FAST_EDGE_MAX_PX : EDGE_MAX_PX;
+  const fracCap = fast ? FAST_EDGE_FRAC_CAP : EDGE_FRAC_CAP;
+  const fromFrac = containerHeight * fracCap;
+  return Math.max(EDGE_MIN_PX, Math.min(maxPx, fromFrac));
+}
+
+/** True when pointer is in the top/bottom scroll band of a scroll container. */
+export function isPointerInScrollEdgeZone(
+  pointerX: number,
+  pointerY: number,
+  containerEl: HTMLElement | null,
+  options?: ScrollEdgeOptions
+): boolean {
+  if (!containerEl) return false;
+  const rect = containerEl.getBoundingClientRect();
+  if (pointerX < rect.left || pointerX > rect.right) return false;
+  const threshold = edgeThresholdHeight(rect.height, options?.fast);
+  return pointerY <= rect.top + threshold || pointerY >= rect.bottom - threshold;
+}
+
+export function isPointerInAnyScrollEdgeZone(
+  pointerX: number,
+  pointerY: number,
+  containers: readonly (HTMLElement | null)[],
+  options?: ScrollEdgeOptions
+): boolean {
+  return containers.some((el) => isPointerInScrollEdgeZone(pointerX, pointerY, el, options));
+}
+
+function rampFactorForElapsed(elapsedMs: number, rampUpMs: number): number {
+  const t = Math.min(1, elapsedMs / rampUpMs);
+  return t * t;
 }
 
 /**
- * Ease-in cubic: keeps scroll gentle for most of the ramp; only approaches
- * max speed near the end of {@link RAMP_UP_MS} so short edge hovers don't overshoot.
+ * Custom auto-scroll in a thin top/bottom band. Use `fast` on long rankings lists so edge
+ * holds ramp to full speed quickly instead of waiting ~2s.
  */
-function rampFactorForElapsed(elapsedMs: number): number {
-  const t = Math.min(1, elapsedMs / RAMP_UP_MS);
-  return t * t * t;
-}
+export function useRampUpAutoScroll(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  options?: ScrollEdgeOptions
+) {
+  const fast = options?.fast ?? false;
+  const rampUpMs = fast ? FAST_RAMP_UP_MS : RAMP_UP_MS;
+  const baseSpeed = fast ? FAST_BASE_SPEED : BASE_SPEED;
+  const maxSpeed = fast ? FAST_MAX_SPEED : MAX_SPEED;
 
-/**
- * Custom auto-scroll: only the top/bottom ~36–72px strip (and pointer over the list)
- * counts as the scroll zone; ramp-up stays slow then reaches max after ~2s held there.
- */
-export function useRampUpAutoScroll(containerRef: React.RefObject<HTMLDivElement | null>) {
   const { active } = useDndContext();
   const pointerRef = useRef({ x: 0, y: 0 });
   const enteredZoneAtRef = useRef<number | null>(null);
@@ -45,7 +76,7 @@ export function useRampUpAutoScroll(containerRef: React.RefObject<HTMLDivElement
     if (!el || !active) return;
 
     const rect = el.getBoundingClientRect();
-    const thresholdHeight = edgeThresholdHeight(rect.height);
+    const thresholdHeight = edgeThresholdHeight(rect.height, fast);
     const { x: px, y: py } = pointerRef.current;
     const overColumn = px >= rect.left && px <= rect.right;
 
@@ -69,8 +100,8 @@ export function useRampUpAutoScroll(containerRef: React.RefObject<HTMLDivElement
       enteredZoneAtRef.current = now;
     }
     const elapsed = now - enteredZoneAtRef.current;
-    const rampFactor = rampFactorForElapsed(elapsed);
-    const speed = BASE_SPEED + (MAX_SPEED - BASE_SPEED) * rampFactor;
+    const rampFactor = rampFactorForElapsed(elapsed, rampUpMs);
+    const speed = baseSpeed + (maxSpeed - baseSpeed) * rampFactor;
 
     const canScrollUp = el.scrollTop > 0;
     const canScrollDown = el.scrollTop < el.scrollHeight - el.clientHeight - 1;
@@ -82,7 +113,7 @@ export function useRampUpAutoScroll(containerRef: React.RefObject<HTMLDivElement
     } else if (!canScrollUp || !canScrollDown) {
       enteredZoneAtRef.current = null;
     }
-  }, [active, containerRef]);
+  }, [active, containerRef, baseSpeed, fast, maxSpeed, rampUpMs]);
 
   useEffect(() => {
     if (!active) {
