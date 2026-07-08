@@ -210,10 +210,92 @@ function buildCommunityFromRpc(
   return result.map((p, index) => ({ ...p, rank: index + 1 }));
 }
 
+function computeMidpointTargetRank(
+  prevRank: number,
+  nextRank: number,
+  isFirst: boolean,
+  isLast: boolean
+): number {
+  if (isLast) return prevRank + 1;
+  if (isFirst) return Math.max(1, Math.round(nextRank / 2));
+  if (nextRank - prevRank > 1) return Math.round((prevRank + nextRank) / 2);
+  return prevRank + 1;
+}
+
+/** Remove one player, then insert at targetRank; everyone at/above target shifts +1. */
+function applyRankInsert(
+  allPlayers: RankedPlayer[],
+  activeId: string,
+  targetRank: number
+): RankedPlayer[] {
+  const active = allPlayers.find((p) => p.id === activeId);
+  if (!active) return allPlayers;
+
+  const oldRank = active.rank;
+  if (oldRank === targetRank) return allPlayers;
+
+  const afterRemove = allPlayers
+    .filter((p) => p.id !== activeId)
+    .map((p) => ({
+      ...p,
+      rank: p.rank > oldRank ? p.rank - 1 : p.rank,
+    }));
+
+  const inserted = afterRemove.map((p) => ({
+    ...p,
+    rank: p.rank >= targetRank ? p.rank + 1 : p.rank,
+  }));
+
+  inserted.push({ ...active, rank: targetRank });
+  return inserted.sort((a, b) => a.rank - b.rank);
+}
+
 /**
- * After reordering the filtered subset (position/team/search), reassign integer ranks so that
- * subset keeps the same multiset of global rank slots. Avoids midpoint ties with the old rank
- * (which caused the list to snap back after drop).
+ * Position-filter drag: land at the midpoint of neighboring same-position global ranks
+ * (e.g. between QB #120 and QB #128 → rank 124), shifting other players as needed.
+ */
+function movePlayerInPositionFilterWithMidpoint(
+  allPlayers: RankedPlayer[],
+  filteredOrdered: RankedPlayer[],
+  activeId: string,
+  overId: string,
+  pointerY: number | null,
+  overRect: { top: number; height: number } | null
+): RankedPlayer[] {
+  const sortedFiltered = [...filteredOrdered].sort((a, b) => a.rank - b.rank);
+  const filteredIds = sortedFiltered.map((p) => p.id);
+
+  const newOrderIds =
+    pointerY != null && overRect
+      ? reorderIdsWithPointerBias(filteredIds, activeId, overId, pointerY, overRect)
+      : (() => {
+          const oldF = sortedFiltered.findIndex((p) => p.id === activeId);
+          const newF = sortedFiltered.findIndex((p) => p.id === overId);
+          if (oldF < 0 || newF < 0) return filteredIds;
+          return arrayMove(sortedFiltered, oldF, newF).map((p) => p.id);
+        })();
+
+  const newIndex = newOrderIds.indexOf(activeId);
+  if (newIndex < 0) return allPlayers;
+
+  const byId = new Map(allPlayers.map((p) => [p.id, p]));
+  const reorderedFiltered = newOrderIds
+    .map((id) => byId.get(id))
+    .filter((p): p is RankedPlayer => p != null);
+
+  const prevRank = newIndex > 0 ? reorderedFiltered[newIndex - 1]!.rank : 0;
+  const isLast = newIndex === reorderedFiltered.length - 1;
+  const isFirst = newIndex === 0;
+  const maxRank = allPlayers.reduce((m, p) => Math.max(m, p.rank), 0);
+  const nextRank = isLast ? maxRank + 1 : reorderedFiltered[newIndex + 1]!.rank;
+
+  const targetRank = computeMidpointTargetRank(prevRank, nextRank, isFirst, isLast);
+  return applyRankInsert(allPlayers, activeId, targetRank);
+}
+
+/**
+ * After reordering the filtered subset (team/search), reassign integer ranks so that
+ * subset keeps the same multiset of global rank slots.
  */
 function applySlotReorderAfterFilteredPermutation(
   allPlayers: RankedPlayer[],
@@ -1654,23 +1736,41 @@ const Rankings = () => {
       return;
     }
 
+    const pointerY = rankingsDragPointerYRef.current;
+    const overRect =
+      over.rect != null
+        ? { top: over.rect.top, height: over.rect.height }
+        : null;
     rankingsDragPointerYRef.current = null;
 
-    const useFilteredDrag =
-      selectedPosition !== FILTER_ALL ||
-      selectedTeam !== FILTER_ALL ||
-      searchTerm.trim() !== '';
-    if (useFilteredDrag) {
-      const updated = movePlayersByIds(players, activeId, effectiveOverId);
-      setPlayers(updated);
-      persistRankingsSessionDraft(updated, isEditMode);
-      return;
-    }
+    const positionFilterActive = selectedPosition !== FILTER_ALL;
+    const otherFilterActive =
+      selectedTeam !== FILTER_ALL || searchTerm.trim() !== '';
 
-    const updatedPlayers = movePlayersByIds(players, activeId, effectiveOverId);
+    let updatedPlayers: RankedPlayer[];
+    if (positionFilterActive) {
+      updatedPlayers = movePlayerInPositionFilterWithMidpoint(
+        players,
+        filteredPlayers,
+        activeId,
+        effectiveOverId,
+        pointerY,
+        overRect
+      );
+    } else if (otherFilterActive) {
+      updatedPlayers = applyFilteredListReorderByArrayMove(
+        players,
+        filteredPlayers,
+        activeId,
+        effectiveOverId
+      );
+    } else {
+      updatedPlayers = movePlayersByIds(players, activeId, effectiveOverId);
+    }
     setPlayers(updatedPlayers);
     persistRankingsSessionDraft(updatedPlayers, isEditMode);
   };
+
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id));
