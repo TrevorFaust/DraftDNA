@@ -74,6 +74,7 @@ import { RankingsVirtualSortableList, useRankingsScrollContainer, type RankingsL
 import { RankingsCompareDragPanel } from '@/components/rankings/RankingsCompareDragPanel';
 import { sameIdOrder } from '@/components/rankings/RankingsCompareScrollList';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -87,6 +88,7 @@ import {
   applyUserRankingsBucketMatch,
   userRankingBucketFromDisplayBucket,
   formatRankingBucketImportSubtitle,
+  formatRankingBucketLabel,
   userRankingBucketsEqual,
   scanUserRankingsImportPoolByLeague,
   fetchUserRankingsPlayerIdsFlexibleForLeague,
@@ -95,6 +97,9 @@ import {
   rankingImportPlayerPoolsMatch,
 } from '@/utils/userRankingsBucket';
 import type { UserRankingBucketDb } from '@/utils/userRankingsBucket';
+import { RankingsSpreadsheetImportPanel } from '@/components/rankings/RankingsSpreadsheetImportPanel';
+import { RankingsExportButtons } from '@/components/rankings/RankingsExportButtons';
+import type { FinalizedImportSummary } from '@/utils/rankingsSpreadsheet/matchPlayers';
 import { useNflTeams } from '@/hooks/useNflTeams';
 import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
 import {
@@ -1073,6 +1078,24 @@ const Rankings = () => {
       }
     },
     [user, players, persistRankingsSessionDraft, displayBucket.rookiesOnly]
+  );
+
+  const applySpreadsheetImport = useCallback(
+    (orderedPlayerIds: string[], summary: FinalizedImportSummary) => {
+      const next = mergeRankingsWithDraftOrder(players, orderedPlayerIds);
+      setPlayers(next);
+      setIsEditMode(true);
+      persistRankingsSessionDraft(next, true);
+      setImportTemplateDialogOpen(false);
+
+      const importedCount = summary.matchedCount + summary.adjustedCount;
+      const parts = [`${importedCount} player${importedCount === 1 ? '' : 's'} imported`];
+      if (summary.adjustedCount > 0) parts.push(`${summary.adjustedCount} confirmed manually`);
+      if (summary.excludedCount > 0) parts.push(`${summary.excludedCount} not in our database (excluded)`);
+      if (summary.duplicateCount > 0) parts.push(`${summary.duplicateCount} duplicate rows skipped`);
+      toast.success(`${parts.join(' · ')}. Adjust as needed, then finalize.`);
+    },
+    [players, persistRankingsSessionDraft]
   );
 
   const onImportTemplateDialogOpenChange = useCallback((open: boolean) => {
@@ -2332,14 +2355,14 @@ const Rankings = () => {
                 size="sm"
                 onClick={() => setImportTemplateDialogOpen(true)}
                 className="h-auto min-h-9 flex-col gap-0.5 py-2 px-4 min-w-[13rem] border-border/80 justify-center"
-                aria-label="Import rankings: copy player order from another saved list"
+                aria-label="Import or export rankings"
               >
                 <span className="flex items-center justify-center gap-2">
                   <LayoutTemplate className="w-4 h-4 shrink-0" />
-                  <span className="text-sm font-medium leading-none">Import rankings</span>
+                  <span className="text-sm font-medium leading-none">Import/Export rankings</span>
                 </span>
                 <span className="text-[10px] font-normal text-muted-foreground leading-tight text-center">
-                  From another league or format
+                  Upload a list or download yours
                 </span>
               </Button>
             )}
@@ -2827,80 +2850,104 @@ const Rankings = () => {
         )}
 
         <Dialog open={importTemplateDialogOpen} onOpenChange={onImportTemplateDialogOpenChange}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-center sm:text-left tracking-wide">Import rankings</DialogTitle>
+              <DialogTitle className="text-center sm:text-left tracking-wide">Import &amp; export rankings</DialogTitle>
               <DialogDescription className="text-center sm:text-left">
-                Import player order from another saved list that uses the same player pool. Rookie-only lists can only
-                import from other rookie-only lists. Once imported, drag to make any adjustments and finalize to save.
+                Upload a spreadsheet or PDF, copy order from another league, or download your current board.
               </DialogDescription>
             </DialogHeader>
-            {loadingTemplateOptions ? (
-              <div className="flex justify-center py-8">
-                <BrandedLoader size={44} />
-              </div>
-            ) : templateOptions.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-4 space-y-3">
-                {importListEmptyKind === 'rookies-mismatch' ? (
-                  <p>
-                    There are no saved lists with the same player pool as this screen. Full rankings and rookie-only use
-                    different pools — switch rookie mode or finalize a list in the matching pool first.
-                  </p>
-                ) : importListEmptyKind === 'only-this-list' ? (
-                  <p>
-                    Your saved rankings for other formats are already this list. Import another league or scoring type
-                    first, or use <span className="text-foreground">Reset to ADP</span> / drag to reorder.
-                  </p>
+            <Tabs defaultValue="upload" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="upload">Upload file</TabsTrigger>
+                <TabsTrigger value="template">From other league</TabsTrigger>
+                <TabsTrigger value="export">Export</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="template" className="pt-3">
+                {loadingTemplateOptions ? (
+                  <div className="flex justify-center py-8">
+                    <BrandedLoader size={44} />
+                  </div>
+                ) : templateOptions.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-4 space-y-3">
+                    {importListEmptyKind === 'rookies-mismatch' ? (
+                      <p>
+                        There are no saved lists with the same player pool as this screen. Full rankings and rookie-only
+                        use different pools — switch rookie mode or finalize a list in the matching pool first.
+                      </p>
+                    ) : importListEmptyKind === 'only-this-list' ? (
+                      <p>
+                        Your saved rankings for other formats are already this list. Import another league or scoring
+                        type first, or use <span className="text-foreground">Reset to ADP</span> / drag to reorder.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <p>
+                          No sources found: no other finalized league rankings in your account for this player pool, and
+                          no other saved boards in this browser for that pool. Open Rankings under another
+                          scoring/league type in this browser (your boards persist locally), finalize when ready, or use{' '}
+                          <span className="text-foreground">Reset to ADP</span>.
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          When sources exist, each row shows your league name with the format on a second line;
+                          device-only boards show the format first, then a note that they are not saved to your account
+                          yet. For diagnostic logs, open DevTools →{' '}
+                          <span className="font-medium text-foreground">Console</span> (not Sources or Network), then
+                          filter for <code className="text-xs">[Import rankings]</code> — that line only appears when
+                          the import list is still empty after loading.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <div className="space-y-2">
-                    <p>
-                      No sources found: no other finalized league rankings in your account for this player pool, and no
-                      other saved boards in this browser for that pool. Open Rankings under another scoring/league type in
-                      this browser (your boards persist locally), finalize when ready, or use{' '}
-                      <span className="text-foreground">Reset to ADP</span>.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      When sources exist, each row shows your league name with the format on a second line; device-only
-                      boards show the format first, then a note that they are not saved to your account yet. For
-                      diagnostic logs, open DevTools →{' '}
-                      <span className="font-medium text-foreground">Console</span> (not Sources or Network), then
-                      filter for <code className="text-xs">[Import rankings]</code> — that line only appears when the
-                      import list is still empty after loading.
-                    </p>
+                  <div
+                    className="max-h-[min(60vh,320px)] min-h-0 overflow-y-auto overflow-x-hidden space-y-2 pr-2 scrollbar-thin rounded-md bg-muted/30 py-1.5"
+                    style={{ touchAction: 'pan-y' }}
+                  >
+                    {templateOptions.map((opt, idx) => (
+                      <Button
+                        key={
+                          opt.kind === 'guest'
+                            ? opt.bucketKey
+                            : opt.kind === 'account-any-flex'
+                              ? `any-flex-${idx}`
+                              : opt.kind === 'account-null-flex'
+                                ? `null-flex-${idx}`
+                                : `flex-${opt.league_id}-${idx}`
+                        }
+                        variant="secondary"
+                        className="w-full justify-start text-left h-auto py-3 px-3 whitespace-normal"
+                        onClick={() => void applyRankingTemplate(opt)}
+                      >
+                        <span className="flex w-full min-w-0 flex-col items-start gap-0.5 text-left">
+                          <span className="w-full truncate font-medium text-foreground">{opt.title}</span>
+                          <span className="w-full text-xs font-normal text-muted-foreground">{opt.subtitle}</span>
+                        </span>
+                      </Button>
+                    ))}
                   </div>
                 )}
-              </div>
-            ) : (
-              <div
-                className="max-h-[min(60vh,320px)] min-h-0 overflow-y-auto overflow-x-hidden space-y-2 pr-2 scrollbar-thin rounded-md bg-muted/30 py-1.5"
-                style={{ touchAction: 'pan-y' }}
-              >
-                {templateOptions.map((opt, idx) => (
-                  <Button
-                    key={
-                      opt.kind === 'guest'
-                        ? opt.bucketKey
-                        : opt.kind === 'account-any-flex'
-                          ? `any-flex-${idx}`
-                          : opt.kind === 'account-null-flex'
-                            ? `null-flex-${idx}`
-                            : `flex-${opt.league_id}-${idx}`
-                    }
-                    variant="secondary"
-                    className="w-full justify-start text-left h-auto py-3 px-3 whitespace-normal"
-                    onClick={() => void applyRankingTemplate(opt)}
-                  >
-                    <span className="flex w-full min-w-0 flex-col items-start gap-0.5 text-left">
-                      <span className="w-full truncate font-medium text-foreground">{opt.title}</span>
-                      <span className="w-full text-xs font-normal text-muted-foreground">{opt.subtitle}</span>
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            )}
+              </TabsContent>
+
+              <TabsContent value="upload" className="pt-3">
+                <RankingsSpreadsheetImportPanel
+                  pool={players}
+                  onApply={applySpreadsheetImport}
+                />
+              </TabsContent>
+
+              <TabsContent value="export" className="pt-3">
+                <RankingsExportButtons
+                  players={players}
+                  bucket={userRankingBucketFromDisplayBucket(displayBucket)}
+                  bucketLabel={formatRankingBucketLabel(userRankingBucketFromDisplayBucket(displayBucket))}
+                />
+              </TabsContent>
+            </Tabs>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setImportTemplateDialogOpen(false)}>
-                Cancel
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>

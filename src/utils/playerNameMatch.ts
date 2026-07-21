@@ -3,7 +3,8 @@ export function normPlayerName(v: string): string {
   return v
     .trim()
     .replace(/\s+/g, ' ')
-    .replace(/['`]/g, "'")
+    // Drop apostrophes so "Tre' Harris" and "Tre Harris" (and Ja'Marr / JaMarr) share a key.
+    .replace(/[''`\u2018\u2019\u00B4]/g, '')
     .replace(/\./g, '')
     .toLowerCase();
 }

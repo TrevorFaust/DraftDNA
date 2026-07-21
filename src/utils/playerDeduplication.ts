@@ -1,7 +1,16 @@
+import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
+
 function isDefenseLikePosition(position: string | null | undefined): boolean {
   if (position == null || position === '') return false;
   const u = position.trim().toUpperCase();
   return u === 'D/ST' || u === 'DEF' || u === 'DST';
+}
+
+const CANONICAL_DEFENSE_NAMES = new Set(NFL_DEFENSE_TEAM_NAMES);
+
+/** Drops relocated/defunct team rows (e.g. Oakland Raiders, San Diego Chargers, St. Louis Rams). */
+function isLegacyDefenseRow(row: { position?: string | null; name: string }): boolean {
+  return isDefenseLikePosition(row.position) && !CANONICAL_DEFENSE_NAMES.has(row.name);
 }
 
 type SeasonMergeRow = {
@@ -24,8 +33,9 @@ export function mergePlayerPoolAcrossSeasons<T extends SeasonMergeRow>(
   priorSeason: number,
   currentSeason: number
 ): T[] {
-  const current = rows.filter((r) => Number(r.season) === currentSeason);
-  const prior = rows.filter((r) => Number(r.season) === priorSeason);
+  const liveRows = rows.filter((r) => !isLegacyDefenseRow(r));
+  const current = liveRows.filter((r) => Number(r.season) === currentSeason);
+  const prior = liveRows.filter((r) => Number(r.season) === priorSeason);
 
   const currentEspn = new Set(
     current.map((p) => p.espn_id).filter((id): id is string => !!id).map(String)
