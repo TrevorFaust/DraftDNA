@@ -14,7 +14,8 @@ import { tempDraftStorage, tempRankingsStorage, getOrCreateGuestSessionId, getRa
 import { mergeRankingsWithDraftOrder } from '@/utils/rankingsCommunityMerge';
 import { computeStudsDuds, type StudDudEntry } from '@/utils/studsDuds';
 import { fetchRookiesRankings, filterPlayersToRookieIds, type RookieRankRow } from '@/utils/rookiesFilter';
-import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
+import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
+import { fetchMergedPlayerPool } from '@/utils/playerPoolFetch';
 import { buildPositionAdpRankMap } from '@/utils/positionAdpRank';
 import { cn } from '@/lib/utils';
 import { BrandedLoader } from '@/components/BrandedLoader';
@@ -216,53 +217,11 @@ const Statistics = () => {
   // Fetch players and rankings (same logic as Rankings page)
   const fetchPlayers = useCallback(async () => {
     try {
-      // Single pass: non-D/ST by ADP then D/ST (avoids duplicate full table scan)
-      let nonDefensePlayers: any[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error: nonDefenseError } = await supabase
-          .from('players')
-          .select('*')
-          .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
-          .neq('position', 'D/ST')
-          .order('adp', { ascending: true })
-          .range(from, from + pageSize - 1);
-
-        if (nonDefenseError) throw nonDefenseError;
-        
-        if (data && data.length > 0) {
-          nonDefensePlayers = [...nonDefensePlayers, ...data];
-          from += pageSize;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      nonDefensePlayers = mergePlayerPoolAcrossSeasons(
-        nonDefensePlayers,
-        PLAYER_POOL_PRIOR_SEASON,
-        PLAYER_POOL_CURRENT_SEASON
-      );
-      
-      const { data: allDefensePlayers, error: defenseError } = await supabase
-        .from('players')
-        .select('*')
-        .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
-        .eq('position', 'D/ST')
-        .order('created_at', { ascending: false });
-      
-      if (defenseError) throw defenseError;
-
-      let defensePlayers = mergePlayerPoolAcrossSeasons(
-        allDefensePlayers || [],
-        PLAYER_POOL_PRIOR_SEASON,
-        PLAYER_POOL_CURRENT_SEASON
-      );
-      defensePlayers = defensePlayers.sort((a, b) => a.name.localeCompare(b.name));
+      const pool = await fetchMergedPlayerPool();
+      let nonDefensePlayers = pool.filter((p) => p.position !== 'D/ST');
+      let defensePlayers = pool
+        .filter((p) => p.position === 'D/ST')
+        .sort((a, b) => a.name.localeCompare(b.name));
 
       const merged = [
         ...(nonDefensePlayers || []),
@@ -1359,8 +1318,11 @@ const Statistics = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <BrandedLoader />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="flex min-h-[70vh] items-center justify-center px-4">
+          <BrandedLoader />
+        </main>
       </div>
     );
   }

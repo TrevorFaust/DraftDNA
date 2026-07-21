@@ -4,7 +4,7 @@ import type { RankedPlayer } from '@/types/database';
  * Rankings studs/duds: only your ranks 1..N and community consensus ranks 1..N count.
  * Draft Stats uses {@link computeStudsDuds} with `compareMode: 'full'` instead.
  */
-export const STUDS_DUDS_RANKINGS_WINDOW = 200;
+export const STUDS_DUDS_RANKINGS_WINDOW = 300;
 
 export type StudsDudsCompareMode = 'window' | 'full';
 

@@ -394,8 +394,11 @@ const MockDraft = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <BrandedLoader />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="flex min-h-[70vh] items-center justify-center px-4">
+          <BrandedLoader />
+        </main>
       </div>
     );
   }
@@ -629,7 +632,7 @@ const MockDraft = () => {
               disabled={loading}
             >
               {loading ? (
-                <BrandedLoader size={34} force3D />
+                <BrandedLoader size={34} />
               ) : (
                 <>
                   <ClipboardList className="w-5 h-5" />

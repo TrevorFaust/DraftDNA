@@ -25,7 +25,11 @@ export type FantasyDepthLookup = {
   ) => FantasyDepthSlot | null;
 };
 
-async function fetchDepthRows(season: number) {
+const depthCache = new Map<number, { at: number; rows: Awaited<ReturnType<typeof fetchDepthRowsUncached>> }>();
+const depthInflight = new Map<number, Promise<Awaited<ReturnType<typeof fetchDepthRowsUncached>>>>();
+const DEPTH_STALE_MS = 30 * 60 * 1000;
+
+async function fetchDepthRowsUncached(season: number) {
   const pageSize = 1000;
   const rows: Array<{
     team_abbr: string;
@@ -48,6 +52,23 @@ async function fetchDepthRows(season: number) {
     from += pageSize;
   }
   return rows;
+}
+
+async function fetchDepthRows(season: number) {
+  const cached = depthCache.get(season);
+  if (cached && Date.now() - cached.at < DEPTH_STALE_MS) return cached.rows;
+  const inflight = depthInflight.get(season);
+  if (inflight) return inflight;
+  const p = fetchDepthRowsUncached(season)
+    .then((rows) => {
+      depthCache.set(season, { at: Date.now(), rows });
+      return rows;
+    })
+    .finally(() => {
+      depthInflight.delete(season);
+    });
+  depthInflight.set(season, p);
+  return p;
 }
 
 export function useFantasyTeamDepth(season: number = FANTASY_DEPTH_SEASON): FantasyDepthLookup {

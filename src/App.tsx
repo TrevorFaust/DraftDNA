@@ -22,6 +22,7 @@ import LeagueSettings from "./pages/LeagueSettings";
 import NotFound from "./pages/NotFound";
 import { Footer } from "./components/Footer";
 import { BrandedLoader } from "./components/BrandedLoader";
+import { Navbar } from "./components/Navbar";
 import { FantasyDepthProvider } from "@/contexts/FantasyDepthContext";
 import { NflTeamContextProvider } from "@/contexts/NflTeamContext";
 
@@ -31,18 +32,34 @@ const Badges = lazy(() => import("./pages/Badges").then((m) => ({ default: m.def
 
 function PageFallback() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
-      <BrandedLoader size={36} />
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <BrandedLoader size={36} />
+      </div>
     </div>
   );
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
         <ScrollToTop />
         <AuthProvider>
           <LeaguesProvider>

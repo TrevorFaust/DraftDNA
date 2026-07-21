@@ -991,8 +991,11 @@ export default function LeagueSettings() {
   // Early returns for loading and "no league selected" states
   if (authLoading || leaguesLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <BrandedLoader />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="flex min-h-[70vh] items-center justify-center px-4">
+          <BrandedLoader />
+        </main>
       </div>
     );
   }

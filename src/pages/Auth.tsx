@@ -168,8 +168,18 @@ const Auth = () => {
       if (isLogin) {
         const { error } = await signIn(email.trim(), password);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
+          const msg = (error.message ?? '').toLowerCase();
+          if (msg.includes('invalid login credentials')) {
             toast.error('Invalid email or password. Please try again.');
+          } else if (
+            msg.includes('failed to fetch') ||
+            msg.includes('network') ||
+            msg.includes('authretryable') ||
+            msg.includes('522')
+          ) {
+            toast.error(
+              'Cannot reach the server (Supabase timed out). This is usually a temporary outage — wait a minute and try again. Guest mode still works for browsing.'
+            );
           } else {
             toast.error(error.message);
           }
@@ -295,7 +305,7 @@ const Auth = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <BrandedLoader />
+        <BrandedLoader size={40} label="Checking session…" />
       </div>
     );
   }

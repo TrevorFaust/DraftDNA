@@ -34,6 +34,7 @@ import {
   fetchCommunityRankingsForDraft,
 } from '@/utils/communityRankingsMerge';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
+import { fetchMergedPlayerPool } from '@/utils/playerPoolFetch';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { selectCpuPick, assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
 import {
@@ -337,34 +338,7 @@ const DraftRoom = () => {
       }
 
       if (allPlayersData.length === 0 && !isRookiesOnly) {
-        let seedRows: any[] = [];
-        let fromSeed = 0;
-        const pageSizeSeed = 1000;
-        let moreSeed = true;
-        while (moreSeed) {
-          const { data, error } = await supabase
-            .from('players')
-            .select('*')
-            .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
-            .order('adp', { ascending: true })
-            .range(fromSeed, fromSeed + pageSizeSeed - 1);
-          if (error) {
-            console.error('DraftRoom: Error seeding players:', error);
-            break;
-          }
-          if (data && data.length > 0) {
-            seedRows = [...seedRows, ...data];
-            fromSeed += pageSizeSeed;
-            moreSeed = data.length === pageSizeSeed;
-          } else {
-            moreSeed = false;
-          }
-        }
-        allPlayersData = mergePlayerPoolAcrossSeasons(
-          seedRows,
-          PLAYER_POOL_PRIOR_SEASON,
-          PLAYER_POOL_CURRENT_SEASON
-        );
+        allPlayersData = await fetchMergedPlayerPool();
       }
 
       if (!isRookiesOnly) {
@@ -1952,8 +1926,11 @@ const DraftRoom = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <BrandedLoader label="Loading draft..." />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="flex min-h-[70vh] items-center justify-center px-4">
+          <BrandedLoader label="Loading draft..." />
+        </main>
       </div>
     );
   }

@@ -96,6 +96,32 @@ function isStaleRefreshTokenError(error: unknown): boolean {
 }
 
 /**
+ * Dead/poisoned refresh tokens often surface as CORS `Failed to fetch` on `/auth/v1/token`
+ * (error responses without Access-Control-Allow-Origin). Keeping auto-refresh on then stalls every query.
+ */
+function isAuthNetworkOrCorsFailure(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('network request failed') ||
+    msg.includes('load failed') ||
+    msg.includes('err_failed')
+  );
+}
+
+async function clearBrokenLocalSession(reasonToast?: string): Promise<void> {
+  setAuthAutoRefresh(false);
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    /* ignore */
+  }
+  wipeLocalSupabaseAuthTokens();
+  if (reasonToast) toast.info(reasonToast);
+}
+
+/**
  * Recovery sessions must finish on /recover-password or /auth (must sit inside BrowserRouter).
  * Uses JWT amr + context flag so we redirect even if PASSWORD_RECOVERY fires late (e.g. mobile).
  */
@@ -165,17 +191,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           wipeLocalSupabaseAuthTokens();
         }
 
-        // Migrate temporary data when user signs in (transition from no user to user)
+        // Migrate guest localStorage in the background — never block auth callbacks / UI.
         if (event === 'SIGNED_IN' && session?.user && !previousUser && !hasMigratedRef.current) {
           hasMigratedRef.current = true;
-          try {
-            const result = await migrateAllTemporaryData(session.user.id);
-            if (result.draftsMigrated > 0 || result.rankingsMigrated) {
-              console.log(`Migrated ${result.draftsMigrated} drafts and ${result.rankingsMigrated ? 'rankings' : 'no rankings'}`);
-            }
-          } catch (error) {
-            console.error('Error migrating temporary data:', error);
-          }
+          const uid = session.user.id;
+          void migrateAllTemporaryData(uid)
+            .then((result) => {
+              if (result.draftsMigrated > 0 || result.rankingsMigrated) {
+                console.log(
+                  `Migrated ${result.draftsMigrated} drafts and ${result.rankingsMigrated ? 'rankings' : 'no rankings'}`
+                );
+              }
+            })
+            .catch((error) => {
+              console.error('Error migrating temporary data:', error);
+            });
         }
 
         // Reset migration flag when user signs out
@@ -187,58 +217,111 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Validate session with the server (getSession alone can return a cached row while refresh_token in storage is dead).
+    // Paint immediately from local session, then validate in the background.
+    // Waiting on getUser() alone hung for 30–60s+ when refresh_token/CORS failed.
+    const AUTH_VALIDATE_MS = 5_000;
     void (async () => {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { session: localSession },
+        error: localSessionError,
+      } = await supabase.auth.getSession();
 
-      if (userError) {
-        if (isStaleRefreshTokenError(userError)) {
-          setAuthAutoRefresh(false);
-          await supabase.auth.signOut({ scope: 'local' });
-          wipeLocalSupabaseAuthTokens();
-          toast.info('Your session expired. Please sign in again.');
-          setSession(null);
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-        // Offline or transient server error: keep cached session so the app still works without network.
-        const {
-          data: { session: cached },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-        if (sessionError || !cached) {
-          setAuthAutoRefresh(false);
-          setSession(null);
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-        if (cached.access_token && accessTokenIsPasswordRecovery(cached.access_token)) {
+      if (!localSessionError && localSession) {
+        if (localSession.access_token && accessTokenIsPasswordRecovery(localSession.access_token)) {
           markPasswordRecoveryPending();
           setPasswordRecoveryActive(true);
         }
-        previousUserRef.current = cached.user ?? null;
-        setSession(cached);
-        setUser(cached.user);
-        setLoading(false);
+        previousUserRef.current = localSession.user ?? null;
+        setSession(localSession);
+        setUser(localSession.user);
+      } else {
+        previousUserRef.current = null;
+        setSession(null);
+        setUser(null);
+      }
+      setLoading(false);
+
+      type GetUserResult = Awaited<ReturnType<typeof supabase.auth.getUser>>;
+      let userData: GetUserResult['data'] | null = null;
+      let userError: GetUserResult['error'] | null = null;
+      try {
+        const raced = await Promise.race([
+          supabase.auth.getUser().then((r) => ({ kind: 'ok' as const, r })),
+          new Promise<{ kind: 'timeout' }>((resolve) =>
+            setTimeout(() => resolve({ kind: 'timeout' }), AUTH_VALIDATE_MS)
+          ),
+        ]);
+        if (raced.kind === 'timeout') {
+          // Keep local session; skip auto-refresh until a later successful validation.
+          if (localSession) setAuthAutoRefresh(false);
+          return;
+        }
+        userData = raced.r.data;
+        userError = raced.r.error;
+      } catch (e) {
+        userError = e as GetUserResult['error'];
+      }
+
+      if (userError) {
+        if (isStaleRefreshTokenError(userError)) {
+          await clearBrokenLocalSession('Your session expired. Please sign in again.');
+          setSession(null);
+          setUser(null);
+          return;
+        }
+
+        const cached = localSession;
+        if (!cached) {
+          setAuthAutoRefresh(false);
+          setSession(null);
+          setUser(null);
+          return;
+        }
+
+        if (isAuthNetworkOrCorsFailure(userError)) {
+          const expiresAtMs = (cached.expires_at ?? 0) * 1000;
+          const accessStillValid = expiresAtMs > Date.now() + 60_000;
+          if (accessStillValid) {
+            setAuthAutoRefresh(false);
+            return;
+          }
+
+          try {
+            const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+            if (
+              refreshError ||
+              !refreshed.session ||
+              isStaleRefreshTokenError(refreshError) ||
+              isAuthNetworkOrCorsFailure(refreshError)
+            ) {
+              await clearBrokenLocalSession('Your session expired. Please sign in again.');
+              setSession(null);
+              setUser(null);
+              return;
+            }
+            if (refreshed.session.access_token && accessTokenIsPasswordRecovery(refreshed.session.access_token)) {
+              markPasswordRecoveryPending();
+              setPasswordRecoveryActive(true);
+            }
+            previousUserRef.current = refreshed.session.user ?? null;
+            setSession(refreshed.session);
+            setUser(refreshed.session.user);
+            setAuthAutoRefresh(true);
+            return;
+          } catch {
+            await clearBrokenLocalSession('Your session expired. Please sign in again.');
+            setSession(null);
+            setUser(null);
+            return;
+          }
+        }
+
+        // Transient errors: keep local session.
         setAuthAutoRefresh(true);
         return;
       }
 
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        setAuthAutoRefresh(false);
-        setSession(null);
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
+      const session = (await supabase.auth.getSession()).data.session;
       if (!session && readPasswordRecoveryPending()) {
         clearPasswordRecoveryPending();
         setPasswordRecoveryActive(false);
@@ -247,11 +330,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         markPasswordRecoveryPending();
         setPasswordRecoveryActive(true);
       }
-      previousUserRef.current = userData.user ?? session?.user ?? null;
+      previousUserRef.current = userData?.user ?? session?.user ?? null;
       setSession(session);
-      setUser(userData.user ?? session?.user ?? null);
-      setLoading(false);
-      if (userData.user ?? session?.user) setAuthAutoRefresh(true);
+      setUser(userData?.user ?? session?.user ?? null);
+      if (userData?.user ?? session?.user) setAuthAutoRefresh(true);
       else setAuthAutoRefresh(false);
     })();
 

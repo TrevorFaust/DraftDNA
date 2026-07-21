@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Tables } from '@/integrations/supabase/types';

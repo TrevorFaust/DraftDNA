@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useScoringFormat } from '@/hooks/useScoringFormat';
 import { getFantasyPointsForFormat } from '@/utils/fantasyPoints';
@@ -81,6 +82,96 @@ type RawRow = {
   k_fg_att_60?: number | null;
 };
 
+type DefensePlayerRow = { id: string; team: string | null; name: string; position: string };
+
+type Games2025ScheduleRow = {
+  week: number;
+  home_team: string;
+  away_team: string;
+  home_score: number | null;
+  away_score: number | null;
+};
+
+export type Player2025SeasonRawBundle = {
+  rawRows: RawRow[];
+  defenseBundle: {
+    players: DefensePlayerRow[];
+    teamStatsRows: Record<string, unknown>[];
+    gamesRows: Games2025ScheduleRow[];
+  } | null;
+};
+
+export const PLAYER_2025_STATS_QUERY_KEY = ['player-2025-season-stats'] as const;
+
+/** Season totals barely change day to day — share one fetch across Rankings, Stats, History, Pick Six, etc. */
+const PLAYER_2025_STATS_STALE_MS = 60 * 60 * 1000;
+const PLAYER_2025_STATS_GC_MS = 2 * 60 * 60 * 1000;
+
+/** Columns used by defenseFantasy2025 (avoid select * on team_stats_2025). */
+const TEAM_STATS_2025_COLUMNS = [
+  'team',
+  'week',
+  'fumble_recovery_opp',
+  'fumble_recoveries',
+  'def_fumbles',
+  'sack_fumble_lost',
+  'fg_blocked',
+  'field_goals_blocked',
+  'pat_blocked',
+  'xp_blocked',
+  'extra_point_blocked',
+  'extra_points_blocked',
+  'def_pa',
+  'points_allowed',
+  'pts_allowed',
+  'points_against',
+  'pa',
+  'total_yards',
+  'total_yards_allowed',
+  'rushing_yards',
+  'passing_yards',
+  'sack_yards_lost',
+  'def_tds',
+  'def_td',
+  'interception_return_tds',
+  'interception_return_td',
+  'int_return_tds',
+  'int_return_td',
+  'pick_sixes',
+  'pick_six',
+  'fumble_recovery_tds',
+  'fumble_recovery_td',
+  'fumble_return_tds',
+  'fumble_return_td',
+  'defensive_fumble_recovery_tds',
+  'special_teams_tds',
+  'special_teams_td',
+  'special_team_tds',
+  'st_tds',
+  'st_td',
+  'kickoff_return_tds',
+  'kick_return_tds',
+  'kick_return_td',
+  'krtd',
+  'punt_return_tds',
+  'punt_return_td',
+  'prtd',
+  'blocked_field_goal_return_tds',
+  'blocked_fg_return_tds',
+  'blocked_kick_return_tds',
+  'blkkrtd',
+  'def_interceptions',
+  'def_int',
+  'interceptions',
+  'def_sacks',
+  'defensive_sacks',
+  'sacks',
+  'def_safties',
+  'def_safeties',
+  'safeties',
+  'sf',
+].join(',');
+
 function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -97,22 +188,316 @@ function isDefensePosition(p: string | null | undefined): boolean {
   return u === 'D/ST' || u === 'DEF' || u === 'DST';
 }
 
-type DefensePlayerRow = { id: string; team: string | null; name: string; position: string };
-
-type Games2025ScheduleRow = {
-  week: number;
-  home_team: string;
-  away_team: string;
-  home_score: number | null;
-  away_score: number | null;
-};
-
 function statsTeamAbbrKey(rawTeam: string): string {
   const abbr = teamFieldToAbbr(rawTeam) ?? rawTeam.trim().toUpperCase();
   return canonicalTeamAbbr(abbr) ?? abbr;
 }
 
-/** Fetch 2025 season fantasy totals and position rank for all players. Returns a map of playerId -> stats.
+async function fetchPlayer2025SeasonRaw(): Promise<Player2025SeasonRawBundle> {
+  const [rpcRes, tsRes, gamesRes, plRes] = await Promise.all([
+    (supabase.rpc as any)('get_player_2025_season_stats'),
+    (supabase as any).from('team_stats_2025').select(TEAM_STATS_2025_COLUMNS).lte('week', 18),
+    supabase
+      .from('games_2025')
+      .select('week, home_team, away_team, home_score, away_score')
+      .eq('season', 2025)
+      .eq('game_type', 'REG')
+      .lte('week', 18),
+    supabase
+      .from('players')
+      .select('id, team, name, position')
+      .eq('season', PLAYER_POOL_PRIOR_SEASON)
+      .in('position', ['D/ST', 'DEF', 'DST']),
+  ]);
+
+  let rawRows: RawRow[] = [];
+  if (rpcRes.error) {
+    console.warn('Failed to fetch player 2025 season stats:', rpcRes.error);
+  } else {
+    rawRows = Array.isArray(rpcRes.data) ? rpcRes.data : [];
+  }
+
+  let playersRes = plRes;
+  if (plRes.error) {
+    const fallback = await supabase
+      .from('players')
+      .select('id, team, name, position')
+      .eq('season', PLAYER_POOL_PRIOR_SEASON)
+      .eq('position', 'D/ST');
+    if (!fallback.error) {
+      playersRes = fallback as typeof plRes;
+    }
+  }
+
+  // If narrow column select fails (schema drift), fall back to * once.
+  let teamStatsRows = (tsRes.data ?? []) as Record<string, unknown>[];
+  let tsError = tsRes.error;
+  if (tsError) {
+    console.warn('Narrow team_stats_2025 select failed; retrying with *:', tsError);
+    const retry = await (supabase as any).from('team_stats_2025').select('*').lte('week', 18);
+    tsError = retry.error;
+    teamStatsRows = (retry.data ?? []) as Record<string, unknown>[];
+  }
+
+  if (tsError || gamesRes.error || playersRes.error) {
+    if (tsError) console.warn('Failed to fetch team_stats_2025 for defense PPG:', tsError);
+    if (gamesRes.error) console.warn('Failed to fetch games_2025 for defense PPG:', gamesRes.error);
+    if (playersRes.error) console.warn('Failed to fetch D/ST players for PPG:', playersRes.error);
+    return { rawRows, defenseBundle: null };
+  }
+
+  const players = (playersRes.data ?? [])
+    .filter((p: any) => p?.id && isDefensePosition(p.position))
+    .map((p: any) => ({
+      id: String(p.id),
+      team: p.team ?? null,
+      name: String(p.name ?? ''),
+      position: String(p.position ?? ''),
+    })) as DefensePlayerRow[];
+
+  return {
+    rawRows,
+    defenseBundle: {
+      players,
+      teamStatsRows,
+      gamesRows: (gamesRes.data ?? []) as Games2025ScheduleRow[],
+    },
+  };
+}
+
+function buildPlayer2025StatsMap(
+  bundle: Player2025SeasonRawBundle | undefined,
+  scoringFormat: ScoringFormat
+): Map<string, Player2025Stats> {
+  const map = new Map<string, Player2025Stats>();
+  if (!bundle) return map;
+
+  const { rawRows, defenseBundle } = bundle;
+
+  for (const row of rawRows) {
+    const playerId = row.player_id != null ? String(row.player_id) : null;
+    if (!playerId) continue;
+
+    const totalFp = getFantasyPointsForFormat(
+      scoringFormat,
+      row.total_fp_standard ?? null,
+      row.total_fp_ppr ?? null,
+      Number(row.total_receptions) ?? null
+    );
+    if (totalFp == null) continue;
+
+    const pos = (row.position || '').replace(/[^A-Z0-9/]/gi, '') || '?';
+    const posRank = row.position_rank != null ? row.position_rank : 0;
+    const positionRank = `${pos}${posRank}`;
+
+    const posNorm = String(row.position ?? '')
+      .trim()
+      .toUpperCase();
+    const kickerSeason: KickerSeasonTotals2025 | null =
+      posNorm === 'K'
+        ? {
+            patMade: Number(row.k_pat_made) || 0,
+            patAtt: Number(row.k_pat_att) || 0,
+            fgMade: Number(row.k_fg_made) || 0,
+            fgAtt: Number(row.k_fg_att) || 0,
+            fgMade0To39: Number(row.k_fg_0039) || 0,
+            fgMade40To49: Number(row.k_fg_4049) || 0,
+            fgMade50To59: Number(row.k_fg_5059) || 0,
+            fgMade60Plus: Number(row.k_fg_60) || 0,
+            fgAtt0To39: toFiniteNumber(row.k_fg_att_0039),
+            fgAtt40To49: toFiniteNumber(row.k_fg_att_4049),
+            fgAtt50To59: toFiniteNumber(row.k_fg_att_5059),
+            fgAtt60Plus: toFiniteNumber(row.k_fg_att_60),
+          }
+        : null;
+
+    map.set(playerId, {
+      totalFantasyPoints: totalFp,
+      position: row.position ?? null,
+      positionRank,
+      totalPassYards: Number(row.total_pass_yards) || 0,
+      totalRushYards: Number(row.total_rush_yards) || 0,
+      totalRecYards: Number(row.total_rec_yards) || 0,
+      totalPassTds: Number(row.total_pass_tds) || 0,
+      totalRushTds: Number(row.total_rush_tds) || 0,
+      totalRecTds: Number(row.total_rec_tds) || 0,
+      totalInterceptions: Number(row.total_interceptions) || 0,
+      totalTargets: Number(row.total_targets) || 0,
+      totalReceptions: Number(row.total_receptions) || 0,
+      totalDefSacks: 0,
+      totalDefInterceptions: 0,
+      totalDefFumbleRecoveries: 0,
+      totalDefTds: 0,
+      gamesPlayed: Number(row.games_played) || 0,
+      avgPointsPerGame: (() => {
+        const gp = Number(row.games_played) || 0;
+        return gp > 0 ? totalFp / gp : null;
+      })(),
+      kickerSeason,
+    });
+  }
+
+  /** D/ST: offense RPC has no defense; mirror PlayerDetailDialog weekly scoring (DB `fantasy_points` often null). */
+  if (defenseBundle?.players?.length && defenseBundle.teamStatsRows?.length && defenseBundle.gamesRows?.length) {
+    const opponentStatsByTeamWeek = new Map<string, Record<string, unknown>>();
+    for (const row of defenseBundle.teamStatsRows) {
+      const rawTeam = row.team != null ? String(row.team) : '';
+      const teamKey = statsTeamAbbrKey(rawTeam);
+      const wk = toFiniteNumber(row.week);
+      if (!teamKey || wk == null) continue;
+      opponentStatsByTeamWeek.set(`${teamKey}__${wk}`, row as Record<string, unknown>);
+    }
+
+    const teamGamesByAbbr = new Map<string, Map<number, { opponent: string; pointsAllowed: number | null }>>();
+    for (const g of defenseBundle.gamesRows) {
+      const wk = g.week;
+      if (typeof wk !== 'number') continue;
+      const homeKey = statsTeamAbbrKey(g.home_team);
+      const awayKey = statsTeamAbbrKey(g.away_team);
+      if (homeKey) {
+        const m = teamGamesByAbbr.get(homeKey) ?? new Map();
+        m.set(wk, {
+          opponent: g.away_team,
+          pointsAllowed: toFiniteNumber(g.away_score),
+        });
+        teamGamesByAbbr.set(homeKey, m);
+      }
+      if (awayKey) {
+        const m = teamGamesByAbbr.get(awayKey) ?? new Map();
+        m.set(wk, {
+          opponent: g.home_team,
+          pointsAllowed: toFiniteNumber(g.home_score),
+        });
+        teamGamesByAbbr.set(awayKey, m);
+      }
+    }
+
+    const statsByTeamWeek = new Map<string, Map<number, Record<string, unknown>>>();
+    for (const row of defenseBundle.teamStatsRows) {
+      const rawTeam = row.team != null ? String(row.team) : '';
+      const teamKey = statsTeamAbbrKey(rawTeam);
+      const wk = toFiniteNumber(row.week);
+      if (!teamKey || wk == null) continue;
+      const inner = statsByTeamWeek.get(teamKey) ?? new Map();
+      inner.set(wk, row as Record<string, unknown>);
+      statsByTeamWeek.set(teamKey, inner);
+    }
+
+    const defenseTotalsByTeam = new Map<
+      string,
+      {
+        teamKey: string;
+        totalFp: number;
+        gamesPlayed: number;
+        sacks: number;
+        interceptions: number;
+        fumbleRecoveries: number;
+        tds: number;
+      }
+    >();
+    for (const p of defenseBundle.players) {
+      const abbr = resolveTeamAbbrForDisplay(p.team, p.position, p.name);
+      if (!abbr || abbr === 'FA') continue;
+      const teamKey = canonicalTeamAbbr(abbr) ?? abbr;
+      if (defenseTotalsByTeam.has(teamKey)) continue;
+      const teamGames = teamGamesByAbbr.get(teamKey);
+      const ownByWeek = statsByTeamWeek.get(teamKey);
+      if (!teamGames?.size) continue;
+
+      let totalFp = 0;
+      let gamesPlayed = 0;
+      let sacks = 0;
+      let interceptions = 0;
+      let fumbleRecoveries = 0;
+      let tds = 0;
+      for (let week = 1; week <= 18; week++) {
+        const game = teamGames.get(week);
+        const s = ownByWeek?.get(week);
+        const oppAbbr = game?.opponent ? statsTeamAbbrKey(game.opponent) : '';
+        const opponentStats =
+          oppAbbr && game?.opponent
+            ? opponentStatsByTeamWeek.get(`${oppAbbr}__${week}`) ??
+              opponentStatsByTeamWeek.get(`${game.opponent}__${week}`)
+            : undefined;
+
+        const input = buildDefenseFantasyGameInput(week, teamKey, game, s, opponentStats);
+        if (input == null) continue;
+        const wkFp = calculateDefenseFantasyPoints(input);
+        if (wkFp == null) continue;
+        totalFp += wkFp;
+        gamesPlayed += 1;
+        sacks += input.def_sacks ?? 0;
+        interceptions += input.def_interceptions ?? 0;
+        fumbleRecoveries +=
+          input.fumble_recovery_opp != null
+            ? input.fumble_recovery_opp
+            : (input.def_fumbles ?? 0) + (input.opponent_sack_fumble_lost ?? 0);
+        tds +=
+          (input.def_tds ?? 0) +
+          (input.def_fumble_recovery_tds ?? 0) +
+          (input.def_special_teams_tds ?? 0);
+      }
+
+      if (gamesPlayed <= 0) continue;
+      defenseTotalsByTeam.set(teamKey, {
+        teamKey,
+        totalFp,
+        gamesPlayed,
+        sacks,
+        interceptions,
+        fumbleRecoveries,
+        tds,
+      });
+    }
+
+    const rankedTeams = Array.from(defenseTotalsByTeam.values()).sort((a, b) => b.totalFp - a.totalFp);
+    const rankByTeamKey = new Map<string, number>();
+    rankedTeams.forEach((d, i) => {
+      rankByTeamKey.set(d.teamKey, i + 1);
+    });
+
+    for (const p of defenseBundle.players) {
+      const abbr = resolveTeamAbbrForDisplay(p.team, p.position, p.name);
+      if (!abbr || abbr === 'FA') continue;
+      const teamKey = canonicalTeamAbbr(abbr) ?? abbr;
+      const d = defenseTotalsByTeam.get(teamKey);
+      const posRank = rankByTeamKey.get(teamKey);
+      if (!d || !posRank) continue;
+
+      const syntheticIdFromName = `defense-${p.name.replace(/\s/g, '-').toLowerCase()}`;
+      const defenseStats: Player2025Stats = {
+        totalFantasyPoints: d.totalFp,
+        position: 'D/ST',
+        positionRank: `D/ST${posRank}`,
+        totalPassYards: 0,
+        totalRushYards: 0,
+        totalRecYards: 0,
+        totalPassTds: 0,
+        totalRushTds: 0,
+        totalRecTds: 0,
+        totalInterceptions: 0,
+        totalTargets: 0,
+        totalReceptions: 0,
+        totalDefSacks: d.sacks,
+        totalDefInterceptions: d.interceptions,
+        totalDefFumbleRecoveries: d.fumbleRecoveries,
+        totalDefTds: d.tds,
+        gamesPlayed: d.gamesPlayed,
+        avgPointsPerGame: d.gamesPlayed > 0 ? d.totalFp / d.gamesPlayed : null,
+        kickerSeason: null,
+      };
+      map.set(p.id, defenseStats);
+      map.set(syntheticIdFromName, defenseStats);
+      map.set(`defense-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, defenseStats);
+      map.set(`defense-${teamKey.toLowerCase()}`, defenseStats);
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Fetch 2025 season fantasy totals and position rank for all players. Returns a map of playerId -> stats.
  * @param scoringFormatOverride - When provided (e.g. from Rankings bucket), use this instead of the selected league's format.
  *  Ensures PPG/total points reflect the current bucket (standard, half_ppr, ppr) when switching leagues.
  * @param options.enabled - When false, skips network fetch and returns an empty map.
@@ -124,298 +509,20 @@ export function usePlayer2025Stats(
   const enabled = options?.enabled !== false;
   const leagueFormat = useScoringFormat();
   const scoringFormat = (scoringFormatOverride ?? leagueFormat) as ScoringFormat;
-  const [rawRows, setRawRows] = useState<RawRow[]>([]);
-  const [defenseBundle, setDefenseBundle] = useState<{
-    players: DefensePlayerRow[];
-    teamStatsRows: Record<string, unknown>[];
-    gamesRows: Games2025ScheduleRow[];
-  } | null>(null);
 
-  useEffect(() => {
-    if (!enabled) {
-      setRawRows([]);
-      setDefenseBundle(null);
-      return;
-    }
-    (async () => {
-      const [rpcRes, tsRes, gamesRes, plRes] = await Promise.all([
-        (supabase.rpc as any)('get_player_2025_season_stats'),
-        (supabase as any).from('team_stats_2025').select('*').lte('week', 18),
-        supabase
-          .from('games_2025')
-          .select('week, home_team, away_team, home_score, away_score')
-          .eq('season', 2025)
-          .eq('game_type', 'REG')
-          .lte('week', 18),
-        supabase
-          .from('players')
-          .select('id, team, name, position')
-          .eq('season', PLAYER_POOL_PRIOR_SEASON)
-          .in('position', ['D/ST', 'DEF', 'DST']),
-      ]);
-
-      if (rpcRes.error) {
-        console.warn('Failed to fetch player 2025 season stats:', rpcRes.error);
-      } else {
-        setRawRows(Array.isArray(rpcRes.data) ? rpcRes.data : []);
-      }
-
-      let playersRes = plRes;
-      if (plRes.error) {
-        const fallback = await supabase
-          .from('players')
-          .select('id, team, name, position')
-          .eq('season', PLAYER_POOL_PRIOR_SEASON)
-          .eq('position', 'D/ST');
-        if (!fallback.error) {
-          playersRes = fallback as typeof plRes;
-        }
-      }
-
-      if (tsRes.error || gamesRes.error || playersRes.error) {
-        if (tsRes.error) console.warn('Failed to fetch team_stats_2025 for defense PPG:', tsRes.error);
-        if (gamesRes.error) console.warn('Failed to fetch games_2025 for defense PPG:', gamesRes.error);
-        if (playersRes.error) console.warn('Failed to fetch D/ST players for PPG:', playersRes.error);
-        setDefenseBundle(null);
-        return;
-      }
-
-      const players = (playersRes.data ?? [])
-        .filter((p: any) => p?.id && isDefensePosition(p.position))
-        .map((p: any) => ({
-          id: String(p.id),
-          team: p.team ?? null,
-          name: String(p.name ?? ''),
-          position: String(p.position ?? ''),
-        })) as DefensePlayerRow[];
-
-      setDefenseBundle({
-        players,
-        teamStatsRows: (tsRes.data ?? []) as Record<string, unknown>[],
-        gamesRows: (gamesRes.data ?? []) as Games2025ScheduleRow[],
-      });
-    })();
-  }, [enabled]);
+  const { data } = useQuery({
+    queryKey: PLAYER_2025_STATS_QUERY_KEY,
+    queryFn: fetchPlayer2025SeasonRaw,
+    enabled,
+    staleTime: PLAYER_2025_STATS_STALE_MS,
+    gcTime: PLAYER_2025_STATS_GC_MS,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
+  });
 
   return useMemo(() => {
     if (!enabled) return new Map<string, Player2025Stats>();
-    const map = new Map<string, Player2025Stats>();
-    for (const row of rawRows) {
-      const playerId = row.player_id != null ? String(row.player_id) : null;
-      if (!playerId) continue;
-
-      const totalFp = getFantasyPointsForFormat(
-        scoringFormat,
-        row.total_fp_standard ?? null,
-        row.total_fp_ppr ?? null,
-        Number(row.total_receptions) ?? null
-      );
-      if (totalFp == null) continue;
-
-      const pos = (row.position || '').replace(/[^A-Z0-9/]/gi, '') || '?';
-      const posRank = row.position_rank != null ? row.position_rank : 0;
-      const positionRank = `${pos}${posRank}`;
-
-      const posNorm = String(row.position ?? '')
-        .trim()
-        .toUpperCase();
-      const kickerSeason: KickerSeasonTotals2025 | null =
-        posNorm === 'K'
-          ? {
-              patMade: Number(row.k_pat_made) || 0,
-              patAtt: Number(row.k_pat_att) || 0,
-              fgMade: Number(row.k_fg_made) || 0,
-              fgAtt: Number(row.k_fg_att) || 0,
-              fgMade0To39: Number(row.k_fg_0039) || 0,
-              fgMade40To49: Number(row.k_fg_4049) || 0,
-              fgMade50To59: Number(row.k_fg_5059) || 0,
-              fgMade60Plus: Number(row.k_fg_60) || 0,
-              fgAtt0To39: toFiniteNumber(row.k_fg_att_0039),
-              fgAtt40To49: toFiniteNumber(row.k_fg_att_4049),
-              fgAtt50To59: toFiniteNumber(row.k_fg_att_5059),
-              fgAtt60Plus: toFiniteNumber(row.k_fg_att_60),
-            }
-          : null;
-
-      map.set(playerId, {
-        totalFantasyPoints: totalFp,
-        position: row.position ?? null,
-        positionRank,
-        totalPassYards: Number(row.total_pass_yards) || 0,
-        totalRushYards: Number(row.total_rush_yards) || 0,
-        totalRecYards: Number(row.total_rec_yards) || 0,
-        totalPassTds: Number(row.total_pass_tds) || 0,
-        totalRushTds: Number(row.total_rush_tds) || 0,
-        totalRecTds: Number(row.total_rec_tds) || 0,
-        totalInterceptions: Number(row.total_interceptions) || 0,
-        totalTargets: Number(row.total_targets) || 0,
-        totalReceptions: Number(row.total_receptions) || 0,
-        totalDefSacks: 0,
-        totalDefInterceptions: 0,
-        totalDefFumbleRecoveries: 0,
-        totalDefTds: 0,
-        gamesPlayed: Number(row.games_played) || 0,
-        avgPointsPerGame: (() => {
-          const gp = Number(row.games_played) || 0;
-          return gp > 0 ? totalFp / gp : null;
-        })(),
-        kickerSeason,
-      });
-    }
-
-    /** D/ST: offense RPC has no defense; mirror PlayerDetailDialog weekly scoring (DB `fantasy_points` often null). */
-    if (defenseBundle?.players?.length && defenseBundle.teamStatsRows?.length && defenseBundle.gamesRows?.length) {
-      const opponentStatsByTeamWeek = new Map<string, Record<string, unknown>>();
-      for (const row of defenseBundle.teamStatsRows) {
-        const rawTeam = row.team != null ? String(row.team) : '';
-        const teamKey = statsTeamAbbrKey(rawTeam);
-        const wk = toFiniteNumber(row.week);
-        if (!teamKey || wk == null) continue;
-        opponentStatsByTeamWeek.set(`${teamKey}__${wk}`, row as Record<string, unknown>);
-      }
-
-      const teamGamesByAbbr = new Map<string, Map<number, { opponent: string; pointsAllowed: number | null }>>();
-      for (const g of defenseBundle.gamesRows) {
-        const wk = g.week;
-        if (typeof wk !== 'number') continue;
-        const homeKey = statsTeamAbbrKey(g.home_team);
-        const awayKey = statsTeamAbbrKey(g.away_team);
-        if (homeKey) {
-          const m = teamGamesByAbbr.get(homeKey) ?? new Map();
-          m.set(wk, {
-            opponent: g.away_team,
-            pointsAllowed: toFiniteNumber(g.away_score),
-          });
-          teamGamesByAbbr.set(homeKey, m);
-        }
-        if (awayKey) {
-          const m = teamGamesByAbbr.get(awayKey) ?? new Map();
-          m.set(wk, {
-            opponent: g.home_team,
-            pointsAllowed: toFiniteNumber(g.home_score),
-          });
-          teamGamesByAbbr.set(awayKey, m);
-        }
-      }
-
-      const statsByTeamWeek = new Map<string, Map<number, Record<string, unknown>>>();
-      for (const row of defenseBundle.teamStatsRows) {
-        const rawTeam = row.team != null ? String(row.team) : '';
-        const teamKey = statsTeamAbbrKey(rawTeam);
-        const wk = toFiniteNumber(row.week);
-        if (!teamKey || wk == null) continue;
-        const inner = statsByTeamWeek.get(teamKey) ?? new Map();
-        inner.set(wk, row as Record<string, unknown>);
-        statsByTeamWeek.set(teamKey, inner);
-      }
-
-      const defenseTotalsByTeam = new Map<string, {
-        teamKey: string;
-        totalFp: number;
-        gamesPlayed: number;
-        sacks: number;
-        interceptions: number;
-        fumbleRecoveries: number;
-        tds: number;
-      }>();
-      for (const p of defenseBundle.players) {
-        const abbr = resolveTeamAbbrForDisplay(p.team, p.position, p.name);
-        if (!abbr || abbr === 'FA') continue;
-        const teamKey = canonicalTeamAbbr(abbr) ?? abbr;
-        if (defenseTotalsByTeam.has(teamKey)) continue;
-        const teamGames = teamGamesByAbbr.get(teamKey);
-        const ownByWeek = statsByTeamWeek.get(teamKey);
-        if (!teamGames?.size) continue;
-
-        let totalFp = 0;
-        let gamesPlayed = 0;
-        let sacks = 0;
-        let interceptions = 0;
-        let fumbleRecoveries = 0;
-        let tds = 0;
-        for (let week = 1; week <= 18; week++) {
-          const game = teamGames.get(week);
-          const s = ownByWeek?.get(week);
-          const oppAbbr = game?.opponent ? statsTeamAbbrKey(game.opponent) : '';
-          const opponentStats =
-            oppAbbr && game?.opponent
-              ? opponentStatsByTeamWeek.get(`${oppAbbr}__${week}`) ??
-                opponentStatsByTeamWeek.get(`${game.opponent}__${week}`)
-              : undefined;
-
-          const input = buildDefenseFantasyGameInput(week, teamKey, game, s, opponentStats);
-          if (input == null) continue;
-          const wkFp = calculateDefenseFantasyPoints(input);
-          if (wkFp == null) continue;
-          totalFp += wkFp;
-          gamesPlayed += 1;
-          sacks += input.def_sacks ?? 0;
-          interceptions += input.def_interceptions ?? 0;
-          fumbleRecoveries +=
-            input.fumble_recovery_opp != null
-              ? input.fumble_recovery_opp
-              : (input.def_fumbles ?? 0) + (input.opponent_sack_fumble_lost ?? 0);
-          tds +=
-            (input.def_tds ?? 0) +
-            (input.def_fumble_recovery_tds ?? 0) +
-            (input.def_special_teams_tds ?? 0);
-        }
-
-        if (gamesPlayed <= 0) continue;
-        defenseTotalsByTeam.set(teamKey, {
-          teamKey,
-          totalFp,
-          gamesPlayed,
-          sacks,
-          interceptions,
-          fumbleRecoveries,
-          tds,
-        });
-      }
-
-      const rankedTeams = Array.from(defenseTotalsByTeam.values()).sort((a, b) => b.totalFp - a.totalFp);
-      const rankByTeamKey = new Map<string, number>();
-      rankedTeams.forEach((d, i) => {
-        rankByTeamKey.set(d.teamKey, i + 1);
-      });
-
-      for (const p of defenseBundle.players) {
-        const abbr = resolveTeamAbbrForDisplay(p.team, p.position, p.name);
-        if (!abbr || abbr === 'FA') continue;
-        const teamKey = canonicalTeamAbbr(abbr) ?? abbr;
-        const d = defenseTotalsByTeam.get(teamKey);
-        const posRank = rankByTeamKey.get(teamKey);
-        if (!d || !posRank) continue;
-
-        const syntheticIdFromName = `defense-${p.name.replace(/\s/g, '-').toLowerCase()}`;
-        const defenseStats: Player2025Stats = {
-          totalFantasyPoints: d.totalFp,
-          position: 'D/ST',
-          positionRank: `D/ST${posRank}`,
-          totalPassYards: 0,
-          totalRushYards: 0,
-          totalRecYards: 0,
-          totalPassTds: 0,
-          totalRushTds: 0,
-          totalRecTds: 0,
-          totalInterceptions: 0,
-          totalTargets: 0,
-          totalReceptions: 0,
-          totalDefSacks: d.sacks,
-          totalDefInterceptions: d.interceptions,
-          totalDefFumbleRecoveries: d.fumbleRecoveries,
-          totalDefTds: d.tds,
-          gamesPlayed: d.gamesPlayed,
-          avgPointsPerGame: d.gamesPlayed > 0 ? d.totalFp / d.gamesPlayed : null,
-          kickerSeason: null,
-        };
-        map.set(p.id, defenseStats);
-        map.set(syntheticIdFromName, defenseStats);
-        map.set(`defense-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, defenseStats);
-        map.set(`defense-${teamKey.toLowerCase()}`, defenseStats);
-      }
-    }
-
-    return map;
-  }, [rawRows, scoringFormat, defenseBundle, enabled]);
+    return buildPlayer2025StatsMap(data, scoringFormat);
+  }, [data, scoringFormat, enabled]);
 }

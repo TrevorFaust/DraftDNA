@@ -25,7 +25,7 @@ import {
   PLAYER_POOL_PRIOR_SEASON,
   PLAYER_POOL_CURRENT_SEASON,
 } from "@/constants/playerPoolSeason";
-import { mergePlayerPoolAcrossSeasons } from "@/utils/playerDeduplication";
+import { fetchMergedPlayerPool } from "@/utils/playerPoolFetch";
 import { useNflTeams } from "@/hooks/useNflTeams";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeagues } from "@/hooks/useLeagues";
@@ -478,32 +478,7 @@ export default function PlayersSpreadsheet() {
         const isSf = displayBucket.isSuperflex;
         const rookiesOnly = displayBucket.rookiesOnly && leagueType === "dynasty";
 
-        let allPlayersData: any[] = [];
-        let from = 0;
-        const pageSize = 1000;
-        let hasMore = true;
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from("players")
-            .select("*")
-            .in("season", [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
-            .order("adp", { ascending: true })
-            .range(from, from + pageSize - 1);
-          if (error) throw error;
-          if (data && data.length > 0) {
-            allPlayersData = [...allPlayersData, ...data];
-            from += pageSize;
-            hasMore = data.length === pageSize;
-          } else {
-            hasMore = false;
-          }
-        }
-
-        allPlayersData = mergePlayerPoolAcrossSeasons(
-          allPlayersData,
-          PLAYER_POOL_PRIOR_SEASON,
-          PLAYER_POOL_CURRENT_SEASON
-        );
+        let allPlayersData: any[] = await fetchMergedPlayerPool();
 
         const defenseTeamAbbrByName = new Map(
           (nflTeams || [])
@@ -565,7 +540,9 @@ export default function PlayersSpreadsheet() {
             : (safePlayers.map((p, index) => ({ ...p, rank: index + 1 })) as RankedPlayer[]);
 
         setPlayers(ordered);
+        setLoading(false);
 
+        // Ages load after the table paints — don't block first paint on players_info batches.
         const espnIds = Array.from(
           new Set(
             ordered
@@ -587,7 +564,6 @@ export default function PlayersSpreadsheet() {
       } catch (error) {
         console.error("Failed to load spreadsheet players:", error);
         setPlayers([]);
-      } finally {
         setLoading(false);
       }
     })();
@@ -788,8 +764,11 @@ export default function PlayersSpreadsheet() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <BrandedLoader />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="flex min-h-[70vh] items-center justify-center px-4">
+          <BrandedLoader />
+        </main>
       </div>
     );
   }

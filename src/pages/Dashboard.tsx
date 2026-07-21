@@ -79,8 +79,11 @@ const Dashboard = () => {
 
   if (authLoading || (user && leaguesLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <BrandedLoader />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="flex min-h-[70vh] items-center justify-center px-4">
+          <BrandedLoader />
+        </main>
       </div>
     );
   }

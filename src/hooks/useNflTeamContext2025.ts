@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { canonicalTeamAbbr } from '@/utils/teamMapping';
 import type {
@@ -37,15 +37,98 @@ const EMPTY: NflTeamContextLookup = {
   getSosOppWinPct: () => null,
 };
 
+const CACHE_KEY = 'draftdna_nfl_team_context_2025_v1';
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 12_000;
+
+/** Columns used by Player Stats / SOS / O-line UI — avoid select('*'). */
+const TEAM_CONTEXT_SELECT = [
+  'team_abbr',
+  'oline_unit_rank',
+  'oline_pass_rank',
+  'oline_run_rank',
+  'oline_pressure_pct',
+  'oline_pressure_roe',
+  'oline_pass_block_pff',
+  'oline_pass_block_win_rate_pct',
+  'oline_adj_ybco_per_att',
+  'oline_run_block_pff',
+  'oline_run_block_win_rate_pct',
+  'off_ppg',
+  'off_pass_ypg',
+  'off_rush_ypg',
+  'def_ppg_allowed',
+  'def_ypg_allowed',
+  'games_played',
+  'off_ppg_rank',
+  'off_pass_ypg_rank',
+  'off_rush_ypg_rank',
+  'def_ppg_allowed_rank',
+  'def_ypg_allowed_rank',
+  'sos_2026_rank',
+  'sos_2026_opp_win_pct',
+].join(',');
+
 let sharedPromise: Promise<NflTeamContext2025Row[]> | null = null;
+let memoryCache: { at: number; rows: NflTeamContext2025Row[] } | null = null;
+
+function readSessionCache(): NflTeamContext2025Row[] | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at: number; rows: NflTeamContext2025Row[] };
+    if (!parsed?.rows?.length || Date.now() - parsed.at > CACHE_TTL_MS) return null;
+    return parsed.rows;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionCache(rows: NflTeamContext2025Row[]) {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), rows }));
+  } catch {
+    /* ignore quota */
+  }
+}
 
 async function fetchAllTeamContext(): Promise<NflTeamContext2025Row[]> {
-  const { data, error } = await supabase
+  if (memoryCache && Date.now() - memoryCache.at < CACHE_TTL_MS) {
+    return memoryCache.rows;
+  }
+  const sessionRows = readSessionCache();
+  if (sessionRows) {
+    memoryCache = { at: Date.now(), rows: sessionRows };
+    return sessionRows;
+  }
+
+  const query = (supabase as any)
     .from('nfl_team_context_2025')
-    .select('*')
+    .select(TEAM_CONTEXT_SELECT)
     .order('team_abbr');
-  if (error) throw error;
-  return (data ?? []) as NflTeamContext2025Row[];
+
+  const result = await Promise.race([
+    query.then((r: { data: unknown; error: { message?: string } | null }) => r),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Team context timed out')), FETCH_TIMEOUT_MS)
+    ),
+  ]);
+
+  if (result.error) throw result.error;
+  let rows = (result.data ?? []) as NflTeamContext2025Row[];
+
+  // Fallback if narrow select fails on older schema
+  if (rows.length === 0) {
+    const retry = await (supabase as any).from('nfl_team_context_2025').select('*').order('team_abbr');
+    if (retry.error) throw retry.error;
+    rows = (retry.data ?? []) as NflTeamContext2025Row[];
+  }
+
+  memoryCache = { at: Date.now(), rows };
+  writeSessionCache(rows);
+  return rows;
 }
 
 function buildLookup(rows: NflTeamContext2025Row[]): NflTeamContextLookup {
@@ -87,9 +170,12 @@ function buildLookup(rows: NflTeamContext2025Row[]): NflTeamContextLookup {
 
 /** Single cached fetch of all 32 rows from `nfl_team_context_2025`. */
 export function useNflTeamContext2025(enabled = true): NflTeamContextLookup {
-  const [lookup, setLookup] = useState<NflTeamContextLookup>(() =>
-    enabled ? { ...EMPTY, loading: true } : EMPTY
-  );
+  const [lookup, setLookup] = useState<NflTeamContextLookup>(() => {
+    if (!enabled) return EMPTY;
+    const cached = memoryCache?.rows ?? readSessionCache();
+    if (cached?.length) return buildLookup(cached);
+    return { ...EMPTY, loading: true };
+  });
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -100,10 +186,15 @@ export function useNflTeamContext2025(enabled = true): NflTeamContextLookup {
     }
 
     if (!sharedPromise) {
-      sharedPromise = fetchAllTeamContext();
+      sharedPromise = fetchAllTeamContext().finally(() => {
+        /* keep sharedPromise set on success so remounts reuse; clear only on failure below */
+      });
     }
 
-    setLookup((prev) => ({ ...prev, loading: true, error: null }));
+    const hadCache = (memoryCache?.rows?.length ?? 0) > 0 || (readSessionCache()?.length ?? 0) > 0;
+    if (!hadCache) {
+      setLookup((prev) => ({ ...prev, loading: true, error: null }));
+    }
 
     sharedPromise
       .then((rows) => {
@@ -113,6 +204,7 @@ export function useNflTeamContext2025(enabled = true): NflTeamContextLookup {
       .catch((e) => {
         if (!mountedRef.current) return;
         sharedPromise = null;
+        memoryCache = null;
         setLookup({
           ...EMPTY,
           error: e instanceof Error ? e.message : 'Failed to load team context',

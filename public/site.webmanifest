@@ -9,9 +9,9 @@
   "icons": [
     {
       "src": "/dna_image.png",
-      "sizes": "512x512",
+      "sizes": "141x236",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

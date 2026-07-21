@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/Navbar';
 import { ListOrdered, ArrowRight, Table2, ClipboardList } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
-import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickSixMark } from '@/components/PickSixIcon';
 import {
   SEASON,
@@ -49,17 +48,9 @@ function InfinityGlyph({ className }: { className?: string }) {
 }
 
 const Index = () => {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <BrandedLoader />
-      </div>
-    );
-  }
-
-  // If logged in, go to dashboard; if not, still allow access to features
+  // Do not block the landing page on auth validation — users leave if the spinner sits for a minute.
   const ctaPath = user ? '/dashboard' : '/rankings';
   const ctaText = user ? 'Go to Dashboard' : 'Start Ranking Players';
 

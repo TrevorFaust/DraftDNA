@@ -127,7 +127,10 @@ export default function PredictionChallenge() {
   const [htmlIsLight, setHtmlIsLight] = useState(
     () => typeof document !== 'undefined' && document.documentElement.classList.contains('light')
   );
-  const playerStats = usePlayer2025Stats();
+  const playerStats = usePlayer2025Stats(undefined, {
+    // Share card fantasy totals only — don't block Pick Six entry on the heavy season-stats RPC.
+    enabled: shareDialogOpen,
+  });
 
   const termsDialogOpen = user != null && termsAccepted === false;
 
@@ -536,8 +539,11 @@ ${shareUrl}`;
 
   if (authLoading || (user && loading) || (user && termsAccepted === null)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <BrandedLoader />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="flex min-h-[70vh] items-center justify-center px-4">
+          <BrandedLoader />
+        </main>
       </div>
     );
   }

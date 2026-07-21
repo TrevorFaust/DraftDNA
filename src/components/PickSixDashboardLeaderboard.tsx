@@ -360,7 +360,7 @@ export function PickSixDashboardLeaderboard() {
 
       {loading ? (
         <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground py-6">
-          <BrandedLoader size={32} force3D />
+          <BrandedLoader size={32} />
           Loading…
         </div>
       ) : entriesError ? (

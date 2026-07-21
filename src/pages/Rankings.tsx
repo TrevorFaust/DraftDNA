@@ -28,7 +28,8 @@ import {
   STUDS_DUDS_RANKINGS_WINDOW,
   type StudDudEntry,
 } from '@/utils/studsDuds';
-import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
+import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
+import { fetchMergedPlayerPool } from '@/utils/playerPoolFetch';
 import {
   buildDefenseRankFromList,
   buildPositionAdpRankMap,
@@ -99,6 +100,7 @@ import {
 import type { UserRankingBucketDb } from '@/utils/userRankingsBucket';
 import { RankingsSpreadsheetImportPanel } from '@/components/rankings/RankingsSpreadsheetImportPanel';
 import { RankingsExportButtons } from '@/components/rankings/RankingsExportButtons';
+import { RankingsColumnExportMenu } from '@/components/rankings/RankingsColumnExportMenu';
 import type { FinalizedImportSummary } from '@/utils/rankingsSpreadsheet/matchPlayers';
 import { useNflTeams } from '@/hooks/useNflTeams';
 import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
@@ -182,12 +184,14 @@ function readInitialRankingsPageState(): {
 const initialRankingsPageState = readInitialRankingsPageState();
 
 const RANKINGS_TEAM_FILTER_OPTIONS: { value: string; label: string }[] = (() => {
-  const list = Object.entries(TEAM_ABBREV_TO_FULL_NAME).map(([abbr, full]) => ({
-    value: canonicalTeamAbbr(abbr) ?? abbr,
-    label: full,
-  }));
-  list.sort((a, b) => a.label.localeCompare(b.label));
-  return list;
+  const byAbbr = new Map<string, string>();
+  for (const [abbr, full] of Object.entries(TEAM_ABBREV_TO_FULL_NAME)) {
+    const value = canonicalTeamAbbr(abbr) ?? abbr;
+    if (!byAbbr.has(value)) byAbbr.set(value, full);
+  }
+  return Array.from(byAbbr.entries())
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 })();
 
 type TeamFilterable = {
@@ -542,7 +546,7 @@ function compareRankingTemplateOptions(
 
 const Rankings = () => {
   const { user, loading: authLoading } = useAuth();
-  const { selectedLeague, leagues, loading: leaguesLoading } = useLeagues();
+  const { selectedLeague, setSelectedLeague, leagues, loading: leaguesLoading } = useLeagues();
   const [guestSettingsVersion, setGuestSettingsVersion] = useState(0);
   const bucket = useCommunityRankingsBucket(user ? undefined : guestSettingsVersion);
   const { teamNames: defenseTeamNames, teams: nflTeams } = useNflTeams();
@@ -1252,37 +1256,8 @@ const Rankings = () => {
 
     fetchInProgressRef.current = true;
     try {
-      // Fetch all players (including defenses) - they're just regular players with position 'D/ST'
-      // Use range query to fetch all players (Supabase default limit is 1000)
-      let allPlayersData: any[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error: playersError } = await supabase
-          .from('players')
-          .select('*')
-          .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
-          .order('adp', { ascending: true })
-          .range(from, from + pageSize - 1);
-
-        if (playersError) throw playersError;
-        
-        if (data && data.length > 0) {
-          allPlayersData = [...allPlayersData, ...data];
-          from += pageSize;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      allPlayersData = mergePlayerPoolAcrossSeasons(
-        allPlayersData,
-        PLAYER_POOL_PRIOR_SEASON,
-        PLAYER_POOL_CURRENT_SEASON
-      );
+      // Shared cached player pool (narrow columns) — avoids re-paginating select('*') on every visit.
+      let allPlayersData: any[] = await fetchMergedPlayerPool();
 
       // Use teams table for D/ST list when available; fallback to constant (see useNflTeams)
       const defenseNamesList = defenseTeamNames.length > 0 ? defenseTeamNames : NFL_DEFENSE_TEAM_NAMES;
@@ -2157,6 +2132,48 @@ const Rankings = () => {
     clearDragListState();
   };
 
+  const exportBucket = useMemo(
+    () => userRankingBucketFromDisplayBucket(displayBucket),
+    [displayBucket.scoringFormat, displayBucket.leagueType, displayBucket.isSuperflex, displayBucket.rookiesOnly]
+  );
+
+  /** Re-enter full-screen edit after finalize (including from All leagues compare view). */
+  const enterEditRankings = useCallback(() => {
+    if (user && isAllLeagues) {
+      const targetId =
+        allLeaguesSelectedMatchingLeagueId ??
+        matchingLeaguesForBucket[0]?.id ??
+        null;
+      if (!targetId) {
+        toast.info('Create or select a league for this scoring setup before editing.');
+        return;
+      }
+      const league =
+        matchingLeaguesForBucket.find((l) => l.id === targetId) ??
+        leagues.find((l) => l.id === targetId) ??
+        null;
+      if (!league) {
+        toast.error('Could not open that league for editing.');
+        return;
+      }
+      persistRankingsSessionDraft(players, true);
+      setSelectedLeague(league);
+      setIsEditMode(true);
+      return;
+    }
+    persistRankingsSessionDraft(players, true);
+    setIsEditMode(true);
+  }, [
+    user,
+    isAllLeagues,
+    allLeaguesSelectedMatchingLeagueId,
+    matchingLeaguesForBucket,
+    leagues,
+    players,
+    persistRankingsSessionDraft,
+    setSelectedLeague,
+  ]);
+
   const finalizeRankings = async () => {
     if (!user) {
       const guestSessionId = getOrCreateGuestSessionId();
@@ -2239,8 +2256,11 @@ const Rankings = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <BrandedLoader />
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="flex min-h-[70vh] items-center justify-center px-4">
+          <BrandedLoader />
+        </main>
       </div>
     );
   }
@@ -2377,14 +2397,11 @@ const Rankings = () => {
                 Finalize Rankings
               </Button>
             )}
-            {((!user && !isEditMode) || (!isAllLeagues && !isEditMode)) && (
+            {(!user || !isAllLeagues || matchingLeaguesForBucket.length > 0) && !isEditMode && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  persistRankingsSessionDraft(players, true);
-                  setIsEditMode(true);
-                }}
+                onClick={enterEditRankings}
                 className="gap-2"
               >
                 <Edit className="w-4 h-4" />
@@ -2455,6 +2472,13 @@ const Rankings = () => {
                 <div className="flex flex-wrap items-center gap-2 mb-3 pb-2 border-b border-border">
                   <Users className="w-5 h-5 text-accent shrink-0" />
                   <h2 className="font-display text-xl tracking-wide shrink-0">COMMUNITY RANKINGS</h2>
+                  <div className="ml-auto">
+                    <RankingsColumnExportMenu
+                      players={filteredCommunityPlayers}
+                      bucket={exportBucket}
+                      boardLabel="Community"
+                    />
+                  </div>
                 </div>
                 <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
                   <div className="space-y-2">
@@ -2504,6 +2528,13 @@ const Rankings = () => {
                       </SelectContent>
                     </Select>
                   )}
+                  <div className="ml-auto">
+                    <RankingsColumnExportMenu
+                      players={dragSourcePlayers}
+                      bucket={exportBucket}
+                      boardLabel="My"
+                    />
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
                   Drag to reorder your personal rankings
@@ -2670,6 +2701,13 @@ const Rankings = () => {
                 <div className="flex flex-wrap items-center gap-2 mb-3 pb-2 border-b border-border">
                   <Users className="w-5 h-5 text-accent shrink-0" />
                   <h2 className="font-display text-xl tracking-wide shrink-0">COMMUNITY RANKINGS</h2>
+                  <div className="ml-auto">
+                    <RankingsColumnExportMenu
+                      players={filteredCommunityPlayers}
+                      bucket={exportBucket}
+                      boardLabel="Community"
+                    />
+                  </div>
                 </div>
                 <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
                   <div className="space-y-2">
@@ -2719,6 +2757,13 @@ const Rankings = () => {
                       </SelectContent>
                     </Select>
                   )}
+                  <div className="ml-auto">
+                    <RankingsColumnExportMenu
+                      players={dragSourcePlayers}
+                      bucket={exportBucket}
+                      boardLabel="My"
+                    />
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
                   Drag the handle to adjust rankings
