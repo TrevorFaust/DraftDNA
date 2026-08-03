@@ -1,8 +1,9 @@
 /**
  * Draft letter grade (A+ … F-).
  *
- * v3: harder curve (C is typical), fixes fake "steals" from missing ADP (999),
- * roster-quality pillar (backups, same-team WRs, elite tiers), richer taglines.
+ * v5: value = pick − ADP (positive = faller/steal). Keepers are value-neutral
+ * (no fake steals from late-round keepers). Curve centered ~B for solid drafts;
+ * clean process + elites unlock As; tanks land D/F.
  */
 
 import { analyzeRosterComposition } from '@/utils/draftGradeComposition';
@@ -52,6 +53,8 @@ export interface DraftGradePick {
     team?: string | null;
   } | null;
   is_autodraft?: boolean;
+  /** League keeper auto-assigned this round — excluded from ADP value/steals/reaches. */
+  is_keeper?: boolean;
 }
 
 export interface DraftGradeOptions {
@@ -97,7 +100,11 @@ export interface DraftGradeResult {
   summary: string;
 }
 
-/** Centered ~B (75): solid drafts land B-/B+, As rare, Cs/Ds for real mistakes. */
+/**
+ * Centered ~B (75): chalk ADP drafts land B-/B, steals+elites unlock As,
+ * structural mistakes land C/D, and extreme tanks land F+/F/F- without
+ * collapsing every bad draft to zero.
+ */
 const GRADE_SCALE: { min: number; grade: LetterGrade }[] = [
   { min: 93, grade: 'A+' },
   { min: 88, grade: 'A' },
@@ -127,6 +134,7 @@ interface ParsedPick {
   name: string | null;
   playerId: string | null;
   is_autodraft?: boolean;
+  is_keeper: boolean;
 }
 
 function normalizePosition(position?: string | null): string {
@@ -188,6 +196,23 @@ function isChaosDraft(chaosArchetype?: string | null): boolean {
   return Boolean(chaosArchetype?.trim());
 }
 
+function isReachHeavyBoard(opts: {
+  reachCount: number;
+  avgValueSpots: number;
+  negativeValuePickCount: number;
+  premiumSlotMiss: boolean;
+  earlyTeamWr2Count: number;
+}): boolean {
+  return (
+    opts.reachCount >= 4 ||
+    opts.avgValueSpots < -6 ||
+    opts.negativeValuePickCount >= 5 ||
+    opts.premiumSlotMiss ||
+    // Only extreme WR2 stacking counts as board-break — 2 depth WRs is common chalk.
+    opts.earlyTeamWr2Count >= 4
+  );
+}
+
 function computeSynergyScore(
   picks: ParsedPick[],
   opts: {
@@ -204,7 +229,7 @@ function computeSynergyScore(
   const { numTeams, numRounds, chaosArchetype, realStealCount, reachCount, avgValueSpots, consensusPickRate, rosterPenalty } =
     opts;
   const skillPicks = picks.filter((p) => isSkillPosition(p.pos));
-  let score = 70;
+  let score = 74;
   const chaos = isChaosDraft(chaosArchetype);
 
   const rb1Round = firstPositionRound(picks, 'RB');
@@ -229,13 +254,15 @@ function computeSynergyScore(
   if (zeroRb && wrHeavyEarly) score += 3;
   if (heroRb && wr1Round != null && wr1Round <= 5) score += 2;
 
+  // Pure chalk is fine — slight ding only when almost every skill pick is dead-on ADP
+  // with no steals. (Ultra-consensus still hard-caps the final score later.)
   const queueOnly =
     skillPicks.length >= 6 &&
-    consensusPickRate >= 0.68 &&
-    realStealCount <= 1 &&
-    reachCount <= 2 &&
-    Math.abs(avgValueSpots) < numTeams * 0.3;
-  if (queueOnly) score -= 14;
+    consensusPickRate >= 0.82 &&
+    realStealCount === 0 &&
+    reachCount <= 1 &&
+    Math.abs(avgValueSpots) < numTeams * 0.2;
+  if (queueOnly) score -= 4;
 
   if (realStealCount >= 2 && (heroRb || zeroRb || wrHeavyEarly)) score += 2;
   if (chaos && realStealCount + reachCount >= 3) score += 1;
@@ -265,11 +292,13 @@ export function computeDraftGrade(
   if (withPlayer.length === 0) return null;
 
   const parsed: ParsedPick[] = withPlayer.map((pick) => {
+    const is_keeper = Boolean(pick.is_keeper);
     const { adp, rawAdp } = resolveAdp(pick.player?.adp, pick.pick_number, poolSize);
     return {
       pick_number: pick.pick_number,
       round_number: pick.round_number,
       pos: normalizePosition(pick.player?.position),
+      // Keepers keep real ADP for roster/depth context, but value math skips them.
       adp,
       rawAdp,
       nflTeam: nflTeamTag(pick.player?.team),
@@ -277,6 +306,7 @@ export function computeDraftGrade(
       name: pick.player?.name?.trim() || null,
       playerId: pick.player?.id?.trim() || null,
       is_autodraft: pick.is_autodraft,
+      is_keeper,
     };
   });
 
@@ -311,7 +341,8 @@ export function computeDraftGrade(
   const byeCounts = new Map<number, number>();
 
   const specialTeamsEarliestRound = Math.max(10, Math.ceil(numTeams * 1.25));
-  const stealThreshold = numTeams;
+  // Mild falls count — humans notice ~¾-round value, not only full-round steals.
+  const stealThreshold = Math.max(6, Math.ceil(numTeams * 0.75));
   const reachThreshold = -numTeams;
   const severeReachThreshold = -numTeams * 2;
   const consensusBand = numTeams * 0.35;
@@ -324,9 +355,17 @@ export function computeDraftGrade(
   const earlyKDefRound = Math.max(8, Math.ceil(numTeams * 0.85));
   let earlyKickerName: string | null = null;
   let earlyDefenseName: string | null = null;
-
   for (const pick of parsed) {
-    const rawValue = pick.adp - pick.pick_number;
+    if (pick.is_keeper) {
+      // Keepers: roster context only. No ADP value, steals, reaches, or autodraft ding.
+      if (typeof pick.bye_week === 'number' && pick.bye_week > 0) {
+        byeCounts.set(pick.bye_week, (byeCounts.get(pick.bye_week) ?? 0) + 1);
+      }
+      continue;
+    }
+
+    // Positive = player fell (ADP earlier than pick). Negative = reached.
+    const rawValue = pick.pick_number - pick.adp;
     const hasMarket = pick.rawAdp > 0 && pick.rawAdp <= poolSize + 12;
     const skill = isSkillPosition(pick.pos);
     const autodraftWeight = pick.is_autodraft ? 0.8 : 1;
@@ -391,16 +430,16 @@ export function computeDraftGrade(
   const roundsOfValue = avgValueSpots / numTeams;
   const consensusPickRate = skillPickCount > 0 ? consensusSkillPicks / skillPickCount : 0;
 
-  const valueScore = Math.max(0, Math.min(100, 68 + roundsOfValue * 20));
+  const valueScore = Math.max(0, Math.min(100, 74 + roundsOfValue * 22));
 
-  let processScore = 68;
+  let processScore = 72;
   processScore -= earlySpecialTeams * 5;
   processScore -= Math.max(0, severeReachCount) * 4;
   processScore -= Math.max(0, reachCount - 1) * 2;
   processScore += Math.min(realStealCount, 4) * 2;
   processScore -= autodraftCount * 1;
   const maxByeStack = Math.max(0, ...byeCounts.values());
-  const byeClusterPenalty = maxByeStack >= 4 ? 6 : maxByeStack >= 3 ? 3 : 0;
+  const byeClusterPenalty = maxByeStack >= 5 ? 5 : maxByeStack >= 4 ? 3 : maxByeStack >= 3 ? 2 : 0;
   processScore -= byeClusterPenalty;
   processScore = Math.max(0, Math.min(100, processScore));
 
@@ -412,6 +451,7 @@ export function computeDraftGrade(
     rawAdp: p.rawAdp,
     nflTeam: p.nflTeam,
     name: p.name,
+    is_keeper: p.is_keeper,
   }));
   const poolForDepth =
     options.playerPool?.map((p) => ({
@@ -456,8 +496,10 @@ export function computeDraftGrade(
     numericScore -= 3;
   }
 
-  if (consensusPickRate >= 0.78 && realStealCount === 0 && rosterQuality.eliteTierCount < 2) {
-    numericScore = Math.min(numericScore, 82);
+  const draftedElite = rosterQuality.draftedEliteTierCount;
+  // Pure chalk without elites costs a little — does not hard-block A-band.
+  if (consensusPickRate >= 0.78 && realStealCount === 0 && draftedElite < 2) {
+    numericScore -= 3;
   }
 
   const positionalValue = analyzePositionalDraftValue(parsed);
@@ -483,10 +525,28 @@ export function computeDraftGrade(
     poolForDepth
   );
   if (earlyStructure.penalty > 0) {
-    numericScore -= earlyStructure.penalty;
+    // Clean chalk boards (no reaches, real anchors) shouldn't lose a full letter
+    // to WR-depth / late-QB heuristics alone.
+    const chalkSoftened =
+      reachCount === 0 &&
+      realStealCount <= 1 &&
+      draftedElite >= 2 &&
+      avgValueSpots >= -2;
+    const earlyPen = chalkSoftened
+      ? Math.ceil(earlyStructure.penalty * 0.35)
+      : earlyStructure.penalty;
+    numericScore -= earlyPen;
   }
   if (earlyStructure.maxNumericScore != null) {
-    numericScore = Math.min(numericScore, earlyStructure.maxNumericScore);
+    const chalkSoftened =
+      reachCount === 0 &&
+      realStealCount <= 1 &&
+      draftedElite >= 2 &&
+      avgValueSpots >= -2;
+    const cap = chalkSoftened
+      ? Math.max(earlyStructure.maxNumericScore, 86)
+      : earlyStructure.maxNumericScore;
+    numericScore = Math.min(numericScore, cap);
   }
   const structureNote =
     earlyStructure.narrativeNote ??
@@ -494,46 +554,119 @@ export function computeDraftGrade(
 
   if (
     !earlyStructure.premiumSlotMiss &&
-    rosterQuality.eliteTierCount >= 3 &&
+    draftedElite >= 3 &&
+    realStealCount >= 2 &&
+    avgValueSpots >= 4
+  ) {
+    numericScore = Math.min(96, Math.max(numericScore + 6, 90));
+  } else if (
+    !earlyStructure.premiumSlotMiss &&
+    draftedElite >= 3 &&
     realStealCount >= 1 &&
     numericScore < 86
   ) {
     numericScore = Math.min(92, numericScore + 5);
   } else if (
     !earlyStructure.premiumSlotMiss &&
-    rosterQuality.eliteTierCount >= 4 &&
+    draftedElite >= 4 &&
     numericScore < 88
   ) {
     numericScore = Math.min(94, numericScore + 4);
   }
 
+  const boardReachHeavy = isReachHeavyBoard({
+    reachCount,
+    avgValueSpots,
+    negativeValuePickCount,
+    premiumSlotMiss: earlyStructure.premiumSlotMiss,
+    earlyTeamWr2Count: earlyStructure.earlyTeamWr2Count,
+  });
+
+  const cleanProcess =
+    earlySpecialTeams === 0 &&
+    !earlyStructure.premiumSlotMiss &&
+    !boardReachHeavy &&
+    reachCount <= 1;
+
+  // Human-good boards: drafted elites + clean process unlock As without gamed ADP.
+  if (
+    cleanProcess &&
+    draftedElite >= 2 &&
+    avgValueSpots >= 2 &&
+    reachCount === 0 &&
+    (realStealCount >= 1 || avgValueSpots >= 3)
+  ) {
+    numericScore = Math.min(95, Math.max(numericScore, 93)); // A+
+  } else if (
+    cleanProcess &&
+    draftedElite >= 2 &&
+    avgValueSpots >= 1 &&
+    reachCount <= 1 &&
+    numericScore < 90
+  ) {
+    numericScore = Math.min(91, Math.max(numericScore, 88)); // A
+  } else if (
+    cleanProcess &&
+    draftedElite >= 2 &&
+    avgValueSpots >= -0.5 &&
+    reachCount <= 2 &&
+    numericScore < 87
+  ) {
+    numericScore = Math.min(87, Math.max(numericScore, 85)); // A-
+  } else if (
+    cleanProcess &&
+    draftedElite >= 2 &&
+    avgValueSpots >= -1.5 &&
+    reachCount <= 1 &&
+    numericScore >= 72 &&
+    numericScore < 81
+  ) {
+    numericScore = Math.min(83, Math.max(numericScore, 81)); // B+
+  } else if (
+    cleanProcess &&
+    draftedElite >= 1 &&
+    avgValueSpots >= -3 &&
+    reachCount <= 2 &&
+    earlySpecialTeams === 0 &&
+    numericScore >= 62 &&
+    numericScore < 71
+  ) {
+    // Solid chalk with one real anchor — keep out of C+ when process was clean.
+    numericScore = Math.min(74, Math.max(numericScore, 71)); // B-
+  } else if (
+    !earlyStructure.premiumSlotMiss &&
+    !boardReachHeavy &&
+    realStealCount >= 2 &&
+    draftedElite >= 2 &&
+    avgValueSpots >= 5 &&
+    reachCount <= 1
+  ) {
+    numericScore = Math.min(95, Math.max(numericScore, 93)); // A+ (steal-heavy)
+  }
+
   if (avgValueSpots < -4) {
-    numericScore -= Math.min(14, Math.round(Math.abs(avgValueSpots) * 1.2));
+    numericScore -= Math.min(10, Math.round(Math.abs(avgValueSpots) * 0.9));
   }
   if (negativeValuePickCount >= 6) {
-    numericScore -= 8;
+    numericScore -= 6;
   } else if (negativeValuePickCount >= 4) {
-    numericScore -= 4;
+    numericScore -= 3;
   }
   if (reachCount >= 6) {
-    numericScore -= 10;
+    numericScore -= 8;
   } else if (reachCount >= 4) {
-    numericScore -= 6;
+    numericScore -= 5;
   }
+  // Reach-heavy boards lose points above; no hard ceiling so elite value can still recover.
   if (reachCount >= 4 && realStealCount <= 1) {
-    numericScore = Math.min(numericScore, 72);
+    numericScore -= 4;
   }
   if (severeReachCount >= 3 || (reachCount >= 5 && avgValueSpots < -6)) {
-    numericScore = Math.min(numericScore, 65);
+    numericScore -= 6;
   }
 
   const priorSeasonAdj = priorSeasonGradeAdjustment(priorSeasonProfile);
-  const reachHeavy =
-    reachCount >= 4 ||
-    avgValueSpots < -6 ||
-    negativeValuePickCount >= 5 ||
-    earlyStructure.premiumSlotMiss ||
-    earlyStructure.earlyTeamWr2Count >= 2;
+  const reachHeavy = boardReachHeavy;
   if (positionalValue.penalty < 10 && !reachHeavy) {
     numericScore += priorSeasonAdj.bonus;
     numericScore -= priorSeasonAdj.penalty;
@@ -555,6 +688,20 @@ export function computeDraftGrade(
 
   if (realStealCount >= 2 && reachCount <= realStealCount + 1 && numericScore < 80) {
     numericScore = Math.min(84, numericScore + 4);
+  }
+
+  // After late penalties, solid chalk can get nudged out of C+ — re-apply here.
+  if (
+    earlySpecialTeams === 0 &&
+    !earlyStructure.premiumSlotMiss &&
+    !boardReachHeavy &&
+    draftedElite >= 1 &&
+    avgValueSpots >= -3 &&
+    reachCount <= 3 &&
+    numericScore >= 62 &&
+    numericScore < 71
+  ) {
+    numericScore = Math.min(74, Math.max(numericScore, 71));
   }
 
   numericScore = Math.max(0, Math.min(100, numericScore));
@@ -640,6 +787,7 @@ export function toDraftGradePicks(
     pick_number: number;
     round_number: number;
     is_autodraft?: boolean;
+    is_keeper?: boolean;
     player?: DraftGradePick['player'];
   }[]
 ): DraftGradePick[] {
@@ -647,6 +795,7 @@ export function toDraftGradePicks(
     pick_number: pick.pick_number,
     round_number: pick.round_number,
     is_autodraft: pick.is_autodraft,
+    is_keeper: pick.is_keeper,
     player: pick.player,
   }));
 }

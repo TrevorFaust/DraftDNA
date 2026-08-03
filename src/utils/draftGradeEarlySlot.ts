@@ -36,9 +36,10 @@ function hasMarketAdp(p: EarlySlotPick, poolSize: number): boolean {
   return p.rawAdp > 0 && p.rawAdp <= poolSize + 12;
 }
 
+/** Positive = fell to you; negative = reached ahead of ADP. */
 function valueSpots(p: EarlySlotPick): number {
   const adp = p.rawAdp > 0 ? p.rawAdp : p.pick_number;
-  return adp - p.pick_number;
+  return p.pick_number - adp;
 }
 
 function isWrReach(p: EarlySlotPick, numTeams: number, poolSize: number): boolean {
@@ -182,8 +183,9 @@ function lateQbWithEarlyWrPenalty(
     (wrReachCount >= 2 ? 2 : wrReachCount >= 1 ? 1 : 0) +
     (!goodLateQb ? 1 : 0);
 
-  const penalty = severity >= 5 ? 8 : severity >= 3 ? 5 : 3;
-  const maxCap = penalty >= 8 ? 70 : penalty >= 5 ? 72 : null;
+  const penalty = severity >= 5 ? 6 : severity >= 3 ? 4 : 2;
+  // No hard strategy ceiling — late QB + messy WR run costs points only.
+  const maxCap = null;
 
   const reasonText =
     reasons.length === 1
@@ -208,11 +210,12 @@ export function isPremiumSlotReach(
   if (pick.pick_number > PREMIUM_PICK_MAX) return false;
   if (!hasMarketAdp(pick, poolSize)) return false;
   if (!['RB', 'WR', 'QB', 'TE'].includes(pick.pos)) return false;
+  // How many spots ahead of ADP (reach size).
   const tierGap = pick.rawAdp - pick.pick_number;
   return tierGap >= Math.max(5, Math.floor(numTeams * 0.45));
 }
 
-/** Positive ADP−pick at 1.01 is not a steal when you reached vs the true top tier. */
+/** A top-slot "steal" is fake when the pick was actually a premium reach. */
 export function isFalseEarlySteal(
   pick: EarlySlotPick,
   numTeams: number,
@@ -247,7 +250,8 @@ export function analyzeEarlyDraftStructure(
     premiumSlotMiss = true;
     const gap = Math.round(first.rawAdp - first.pick_number);
     penalty += 10 + Math.min(6, gap);
-    maxNumericScore = 70;
+    // Soft ceiling only — an elite recovery can still clear A-band.
+    maxNumericScore = 92;
     const who = first.name ?? 'your first pick';
     narrativeNote =
       first.pick_number === 1
@@ -286,22 +290,24 @@ export function analyzeEarlyDraftStructure(
     if (p.round_number <= 8) {
       earlyTeamWr2Count += 1;
       penalty += p.round_number <= 5 ? 2 : 1;
-    } else if (p.round_number >= 9) {
+    } else if (p.round_number >= 9 && p.round_number <= 12) {
+      // Bench WR depth in R13+ is normal — only mid-late secondary WRs ding.
       lateWr2Count += 1;
       penalty += 1;
     }
   }
 
-  if (lateWr2Count >= 2) {
+  if (lateWr2Count >= 3) {
     earlyTeamWr2Count += lateWr2Count;
-    maxNumericScore = maxNumericScore != null ? Math.min(maxNumericScore, 74) : 76;
+    // Penalty only — bench WR depth must not hard-block A+.
     penalty += 2;
     const lateNote =
       'You added multiple secondary wideouts in the back half of the draft when clearer starters were still available.';
     narrativeNote = narrativeNote ? `${narrativeNote} ${lateNote}` : lateNote;
-  } else if (earlyTeamWr2Count >= 2) {
-    maxNumericScore = maxNumericScore != null ? Math.min(maxNumericScore, 74) : 76;
+  } else if (earlyTeamWr2Count >= 3) {
     penalty += 2;
+  } else if (earlyTeamWr2Count >= 2) {
+    penalty += 1;
   }
 
   const firstQb = sorted.find((p) => p.pos === 'QB');

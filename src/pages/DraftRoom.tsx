@@ -2039,10 +2039,17 @@ const DraftRoom = () => {
                 .map((pick) => {
                   const pl = players.find((p) => p.id === pick.player_id);
                   if (!pl) return null;
+                  const isKeeper = keepers.some(
+                    (k) =>
+                      k.player_id === pick.player_id &&
+                      k.round_number === pick.round_number &&
+                      k.team_number === pick.team_number
+                  );
                   return {
                     pick_number: pick.pick_number,
                     round_number: pick.round_number,
                     is_autodraft: pick.is_autodraft,
+                    is_keeper: isKeeper,
                     player: {
                       id: pl.id,
                       name: pl.name,

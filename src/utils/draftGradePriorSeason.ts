@@ -139,7 +139,7 @@ function getRank(
 
 function valueSpotsForPick(p: PriorSeasonPickInput): number {
   const adp = p.adp != null && p.adp > 0 ? p.adp : p.pick_number;
-  return adp - p.pick_number;
+  return p.pick_number - adp;
 }
 
 /** ~3 rounds ahead of ADP (same scale as draft grade reaches). */

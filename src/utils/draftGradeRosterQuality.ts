@@ -44,6 +44,7 @@ export interface RosterQualityPick {
   rawAdp: number;
   nflTeam: string | null;
   name?: string | null;
+  is_keeper?: boolean;
 }
 
 function ordinalAtPosition(pick: RosterQualityPick, picks: RosterQualityPick[]): number {
@@ -81,6 +82,14 @@ function isRound1Anchor(p: RosterQualityPick, numTeams: number): boolean {
   return false;
 }
 
+/** Early-round stud RB/WR that still counts as an elite tier piece. */
+function isEarlyEliteSkill(p: RosterQualityPick, numTeams: number): boolean {
+  if (p.pos !== 'RB' && p.pos !== 'WR') return false;
+  if (p.round_number === 1) return false; // counted by isRound1Anchor
+  if (p.round_number > 3) return false;
+  return p.adp <= numTeams * 2.5;
+}
+
 function isEliteQbTiming(p: RosterQualityPick, numTeams: number): boolean {
   if (p.pos !== 'QB') return false;
   const roundCap = Math.ceil(numTeams * 2.2);
@@ -94,7 +103,7 @@ function isEarlyQbReach(
   isSuperflex?: boolean
 ): boolean {
   if (p.pos !== 'QB' || isSuperflex) return false;
-  const valueSpots = p.adp - p.pick_number;
+  const valueSpots = p.pick_number - p.adp;
   if (p.round_number === 1 && p.adp > numTeams * 2.2) return true;
   if (p.round_number <= 2 && valueSpots < -numTeams * 0.85) return true;
   return false;
@@ -102,7 +111,10 @@ function isEarlyQbReach(
 
 export interface RosterQualityResult {
   score: number;
+  /** Elites on roster including keepers (narrative). */
   eliteTierCount: number;
+  /** Elites from non-keeper draft picks only (scoring floors/boosts). */
+  draftedEliteTierCount: number;
   backupSkillCount: number;
   sameTeamWrPenalty: number;
   consecutiveTeamWr: boolean;
@@ -148,8 +160,9 @@ export function analyzeRosterQuality(
 ): RosterQualityResult {
   const poolSize = numTeams * numRounds;
   const notes: string[] = [];
-  let score = 68;
+  let score = 72;
   let eliteTierCount = 0;
+  let draftedEliteTierCount = 0;
   let backupSkillCount = 0;
   let sameTeamWrPenalty = 0;
   let consecutiveTeamWr = false;
@@ -180,10 +193,24 @@ export function analyzeRosterQuality(
 
     if (isRound1Anchor(p, numTeams)) {
       eliteTierCount += 1;
+      if (!p.is_keeper) draftedEliteTierCount += 1;
+      if (p.name) anchorNames.push(p.name);
+    } else if (isEarlyEliteSkill(p, numTeams)) {
+      eliteTierCount += 1;
+      if (!p.is_keeper) draftedEliteTierCount += 1;
+      if (p.name) anchorNames.push(p.name);
+    } else if (
+      p.is_keeper &&
+      (p.pos === 'RB' || p.pos === 'WR') &&
+      p.adp <= numTeams * 2.5
+    ) {
+      // Late-round keepers can be studs on the roster, but never draftedElite.
+      eliteTierCount += 1;
       if (p.name) anchorNames.push(p.name);
     }
     if (isEliteQbTiming(p, numTeams)) {
       eliteTierCount += 1;
+      if (!p.is_keeper) draftedEliteTierCount += 1;
       if (p.name && !anchorNames.includes(p.name)) anchorNames.push(p.name);
     }
     if (p.pos === 'RB' && firstRbRound == null) firstRbRound = p.round_number;
@@ -339,11 +366,14 @@ export function analyzeRosterQuality(
     }
   }
 
-  if (eliteTierCount >= 3) {
+  // Score bonus only for elites you drafted — keepers don't buy a roster-quality letter bump.
+  if (draftedEliteTierCount >= 3) {
     score += 7;
     notes.push('elite anchors at multiple spots');
-  } else if (eliteTierCount >= 2) {
+  } else if (draftedEliteTierCount >= 2) {
     score += 3;
+  } else if (eliteTierCount >= 2 && draftedEliteTierCount === 0) {
+    notes.push('elite talent came mostly from keepers, not the draft');
   }
 
   if (backupSkillCount >= 4) {
@@ -364,6 +394,7 @@ export function analyzeRosterQuality(
   return {
     score: Math.max(0, Math.min(100, score)),
     eliteTierCount,
+    draftedEliteTierCount,
     backupSkillCount,
     sameTeamWrPenalty,
     consecutiveTeamWr,
