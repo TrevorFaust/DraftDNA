@@ -12,12 +12,24 @@ type Player2025StatsEntry = {
   totalFantasyPoints?: number;
 };
 
+export type RankingsPlayerCardMeta = {
+  communityPosRank: number | null;
+  myPosRank: number | null;
+  communityTrend: CommunityRankTrend | null;
+  tier?: number | null;
+  hasTierBreakAfter?: boolean;
+};
+
 type PlainRowProps = {
   player: RankedPlayer;
   displayAdp: number;
   communityPosRank?: number | null;
   myPosRank?: number | null;
   communityTrend?: CommunityRankTrend | null;
+  tier?: number | null;
+  canEditTierBreak?: boolean;
+  hasTierBreakAfter?: boolean;
+  onToggleTierBreak?: (playerId: string) => void;
   stats2025?: Player2025StatsEntry;
   onPlayerClick: (player: RankedPlayer) => void;
   onHandlePointerDown: (player: RankedPlayer, event: React.PointerEvent<HTMLButtonElement>) => void;
@@ -29,6 +41,10 @@ const PlainRow = memo(function PlainRow({
   communityPosRank,
   myPosRank,
   communityTrend,
+  tier,
+  canEditTierBreak = false,
+  hasTierBreakAfter = false,
+  onToggleTierBreak,
   stats2025,
   onPlayerClick,
   onHandlePointerDown,
@@ -41,6 +57,12 @@ const PlainRow = memo(function PlainRow({
       communityPosRank={communityPosRank}
       myPosRank={myPosRank}
       communityTrend={communityTrend}
+      tier={tier}
+      canEditTierBreak={canEditTierBreak}
+      hasTierBreakAfter={hasTierBreakAfter}
+      onToggleTierBreak={
+        onToggleTierBreak ? () => onToggleTierBreak(player.id) : undefined
+      }
       stats2025={stats2025}
       onPlayerClick={onPlayerClick}
       onHandlePointerDown={(event) => onHandlePointerDown(player, event)}
@@ -66,11 +88,9 @@ export type RankingsCompareScrollListProps = {
   players: RankedPlayer[];
   activeDragId: string | null;
   getDisplayAdp: (playerId: string, fallback: number) => number;
-  getPlayerRankCardMeta: (playerId: string) => {
-    communityPosRank: number | null;
-    myPosRank: number | null;
-    communityTrend: CommunityRankTrend | null;
-  };
+  getPlayerRankCardMeta: (playerId: string) => RankingsPlayerCardMeta;
+  canEditTierBreakForPlayer?: (playerId: string) => boolean;
+  onToggleTierBreak?: (playerId: string) => void;
   player2025Stats: Map<string, Player2025StatsEntry>;
   onPlayerClick: (player: RankedPlayer) => void;
   onHandlePointerDown: (player: RankedPlayer, event: React.PointerEvent<HTMLButtonElement>) => void;
@@ -82,6 +102,8 @@ export function RankingsCompareScrollList({
   activeDragId,
   getDisplayAdp,
   getPlayerRankCardMeta,
+  canEditTierBreakForPlayer,
+  onToggleTierBreak,
   player2025Stats,
   onPlayerClick,
   onHandlePointerDown,
@@ -94,12 +116,15 @@ export function RankingsCompareScrollList({
     if (activeDragId === player.id) {
       return <SourceSpacerRow key={player.id} playerId={player.id} />;
     }
+    const meta = getPlayerRankCardMeta(player.id);
     return (
       <PlainRow
         key={player.id}
         player={player}
         displayAdp={getDisplayAdp(player.id, player.adp)}
-        {...getPlayerRankCardMeta(player.id)}
+        {...meta}
+        canEditTierBreak={canEditTierBreakForPlayer?.(player.id) ?? false}
+        onToggleTierBreak={onToggleTierBreak}
         stats2025={player2025Stats.get(player.id)}
         onPlayerClick={onPlayerClick}
         onHandlePointerDown={onHandlePointerDown}

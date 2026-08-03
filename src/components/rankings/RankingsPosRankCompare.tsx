@@ -1,10 +1,9 @@
-import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   formatPositionalAdpRankLabel,
   showsPositionalListRank,
 } from '@/utils/positionAdpRank';
-import type { CommunityRankTrend } from '@/utils/communityRankTrend';
+import { getTierTone } from '@/utils/positionTiers';
 import { cn } from '@/lib/utils';
 
 function positionLabelClass(position: string): string {
@@ -71,29 +70,28 @@ export type RankingsPosRankCompareProps = {
   position: string;
   communityPosRank?: number | null;
   myPosRank?: number | null;
-  communityTrend?: CommunityRankTrend | null;
+  /** Personal position tier (1-based) derived from My RK cuts */
+  tier?: number | null;
   className?: string;
 };
 
-/** Side-by-side community vs personal positional rank, with optional community trend. */
+/** Side-by-side community vs personal positional rank, plus personal tier badge. */
 export function RankingsPosRankCompare({
   position,
   communityPosRank,
   myPosRank,
-  communityTrend,
+  tier,
   className,
 }: RankingsPosRankCompareProps) {
   if (!showsPositionalListRank(position)) return null;
   if (communityPosRank == null && myPosRank == null) return null;
 
-  const showTrend = communityTrend != null && communityTrend.delta !== 0;
-  const trendUp = showTrend && communityTrend.delta < 0;
-  const trendDown = showTrend && communityTrend.delta > 0;
+  const tone = tier != null && tier >= 1 ? getTierTone(tier) : null;
 
   return (
     <div
       className={cn(
-        'shrink-0 px-5 border-x border-border/50 flex flex-col items-center justify-center gap-1.5',
+        'shrink-0 px-5 border-x border-border/50 flex items-center justify-center gap-4',
         className
       )}
     >
@@ -110,29 +108,18 @@ export function RankingsPosRankCompare({
           <RankCell label="My RK" position={position} rank={myPosRank} tipPrefix="Your ranking" />
         )}
       </div>
-      {showTrend && (
+      {tone != null && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <div
-              className={cn(
-                'flex items-center gap-1 text-xs font-semibold tabular-nums leading-none cursor-default',
-                trendUp && 'text-green-500',
-                trendDown && 'text-red-400'
-              )}
+            <span
+              className="inline-flex items-center justify-center min-w-[2rem] h-7 px-2 rounded-md border border-border/60 text-xs font-display font-bold tracking-wide cursor-default"
+              style={{ color: tone.color, backgroundColor: tone.bgColor }}
             >
-              {trendUp ? (
-                <TrendingUp className="w-3.5 h-3.5 shrink-0" aria-hidden />
-              ) : (
-                <TrendingDown className="w-3.5 h-3.5 shrink-0" aria-hidden />
-              )}
-              <span>{Math.abs(communityTrend.delta)}</span>
-            </div>
+              {tone.label}
+            </span>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-xs text-xs">
-            Community overall rank moved from #{communityTrend.previousRank} to #
-            {communityTrend.previousRank + communityTrend.delta} over the past{' '}
-            {communityTrend.daysAgo} day{communityTrend.daysAgo === 1 ? '' : 's'}
-            {trendDown ? ' (stock dropping)' : ' (stock rising)'}
+            Your tier {tone.tier} at {position.trim().toUpperCase()}
           </TooltipContent>
         </Tooltip>
       )}

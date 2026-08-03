@@ -30,7 +30,11 @@ export type RankingsCompareDragPanelProps = {
     communityPosRank: number | null;
     myPosRank: number | null;
     communityTrend: CommunityRankTrend | null;
+    tier?: number | null;
+    hasTierBreakAfter?: boolean;
   };
+  canEditTierBreakForPlayer?: (playerId: string) => boolean;
+  onToggleTierBreak?: (playerId: string) => void;
   player2025Stats: Map<string, Player2025StatsEntry>;
   onPlayerClick: (player: RankedPlayer) => void;
   onCommitPreview: (preview: string[], baseline: string[], activeId: string) => void;
@@ -44,6 +48,8 @@ export function RankingsCompareDragPanel({
   players,
   getDisplayAdp,
   getPlayerRankCardMeta,
+  canEditTierBreakForPlayer,
+  onToggleTierBreak,
   player2025Stats,
   onPlayerClick,
   onCommitPreview,
@@ -295,6 +301,8 @@ export function RankingsCompareDragPanel({
             activeDragId={activeDragId}
             getDisplayAdp={getDisplayAdp}
             getPlayerRankCardMeta={getPlayerRankCardMeta}
+            canEditTierBreakForPlayer={canEditTierBreakForPlayer}
+            onToggleTierBreak={onToggleTierBreak}
             player2025Stats={player2025Stats}
             onPlayerClick={onPlayerClick}
             onHandlePointerDown={handleHandlePointerDown}

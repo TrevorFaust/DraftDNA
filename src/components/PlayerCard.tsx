@@ -9,7 +9,9 @@ import { resolveTeamAbbrForDisplay } from '@/utils/teamMapping';
 import { PlayerHeaderStatsLine } from '@/components/PlayerHeaderStatsLine';
 import { RankingsPosRankCompare } from '@/components/rankings/RankingsPosRankCompare';
 import { Rankings2025PpgCell } from '@/components/rankings/Rankings2025PpgCell';
+import { RankingsCommunityTrendBadge } from '@/components/rankings/RankingsCommunityTrendBadge';
 import type { CommunityRankTrend } from '@/utils/communityRankTrend';
+import { getTierTone } from '@/utils/positionTiers';
 
 interface PlayerCardProps {
   player: RankedPlayer;
@@ -28,6 +30,8 @@ interface PlayerCardProps {
   myPosRank?: number | null;
   /** Community overall rank trend vs prior snapshot */
   communityTrend?: CommunityRankTrend | null;
+  /** Personal position tier (1-based) */
+  tier?: number | null;
   /** One-line ADP + bye only (rankings lists). Default follows showGrabHandle. */
   compactStats?: boolean;
 }
@@ -64,29 +68,40 @@ export const PlayerCard = ({
   communityPosRank,
   myPosRank,
   communityTrend,
+  tier,
   compactStats,
 }: PlayerCardProps) => {
   const useCompactStats = compactStats ?? showGrabHandle;
   const { data: jerseyColorsByAbbr } = useNflTeamJerseyColors();
   const jerseyTeamAbbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
   const numberFill = lookupJerseyNumberFill(jerseyColorsByAbbr, jerseyTeamAbbr);
+  const tone = tier != null && tier >= 1 ? getTierTone(tier) : null;
 
   return (
     <div
       onClick={onClick}
       className={cn(
-        'glass-card p-4 flex items-center gap-4 transition-all duration-200 hover:bg-secondary/60',
+        'glass-card p-4 flex items-center gap-4 transition-all duration-200 hover:bg-secondary/60 border-l-4',
+        !tone && 'border-l-transparent',
         isDragging && 'dragging border-primary'
       )}
-      style={{ userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none' }}
+      style={{
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        MozUserSelect: 'none',
+        ...(tone ? { borderLeftColor: tone.color } : undefined),
+      }}
     >
-      <div className={cn(
-        'w-7 h-7 rounded-md flex items-center justify-center font-display text-sm',
-        positionColoredRank 
-          ? getPositionRankClass(player.position)
-          : 'bg-gradient-primary text-primary-foreground'
-      )}>
-        {rank}
+      <div className="flex flex-col items-center gap-1 shrink-0 w-7">
+        <div className={cn(
+          'w-7 h-7 rounded-md flex items-center justify-center font-display text-sm',
+          positionColoredRank 
+            ? getPositionRankClass(player.position)
+            : 'bg-gradient-primary text-primary-foreground'
+        )}>
+          {rank}
+        </div>
+        <RankingsCommunityTrendBadge communityTrend={communityTrend} />
       </div>
 
       <PlayerJerseyWithNumber
@@ -118,7 +133,7 @@ export const PlayerCard = ({
         position={player.position}
         communityPosRank={communityPosRank}
         myPosRank={myPosRank}
-        communityTrend={communityTrend}
+        tier={tier}
       />
 
       {useCompactStats && <Rankings2025PpgCell stats2025={stats2025} className="px-3 py-1" />}

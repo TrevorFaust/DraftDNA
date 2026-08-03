@@ -108,6 +108,19 @@ import {
   PLAYER_POOL_PRIOR_SEASON,
   PLAYER_POOL_CURRENT_SEASON,
 } from '@/constants/playerPoolSeason';
+import {
+  getCutsForPosition,
+  getTierNumber,
+  hasTierCutAfter,
+  setCutsForPosition,
+  toggleTierCut,
+  type PositionTierCuts,
+} from '@/utils/positionTiers';
+import {
+  getRankingTiersStorageKey,
+  rankingTiersLocalStorage,
+} from '@/utils/rankingTiersStorage';
+import { fetchUserRankingTiers, upsertUserRankingTiers } from '@/utils/rankingTiersDb';
 
 /** Disable dnd-kit built-in auto-scroll — rankings use custom fast edge scroll. */
 const autoScrollConfig = false;
@@ -567,6 +580,9 @@ const Rankings = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosition, setSelectedPosition] = useState<string>(FILTER_ALL);
   const [selectedTeam, setSelectedTeam] = useState<string>(FILTER_ALL);
+  /** Per-position cut-after ranks for personal tiers (RB: [5,15] → T1=1-5, T2=6-15, T3=16+). */
+  const [positionTierCuts, setPositionTierCuts] = useState<PositionTierCuts>({});
+  const positionTierPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<RankedPlayer | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [hasExistingRankings, setHasExistingRankings] = useState(
@@ -734,6 +750,17 @@ const Rankings = () => {
   const rankingsSessionDraftKey = useMemo(
     () =>
       getRankingsDraftSessionStorageKey({
+        userId: user?.id ?? null,
+        guestSessionId: user ? null : getOrCreateGuestSessionId(),
+        leagueId: user ? (selectedLeague?.id ?? null) : null,
+        bucketKey,
+      }),
+    [user?.id, user, selectedLeague?.id, bucketKey]
+  );
+
+  const rankingTiersStorageKey = useMemo(
+    () =>
+      getRankingTiersStorageKey({
         userId: user?.id ?? null,
         guestSessionId: user ? null : getOrCreateGuestSessionId(),
         leagueId: user ? (selectedLeague?.id ?? null) : null,
@@ -1184,6 +1211,146 @@ const Rankings = () => {
       getCommunityRankTrend(bucketKey, playerId, overallRank),
     [bucketKey]
   );
+
+  const maxMyPosRankByPosition = useMemo(() => {
+    const maxByPos = new Map<string, number>();
+    for (const p of players) {
+      const posRank = myPosRankMap.get(p.id);
+      if (posRank == null) continue;
+      const prev = maxByPos.get(p.position) ?? 0;
+      if (posRank > prev) maxByPos.set(p.position, posRank);
+    }
+    return maxByPos;
+  }, [players, myPosRankMap]);
+
+  const playersById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+
+  const getPlayerTier = useCallback(
+    (playerId: string): number | null => {
+      const player = playersById.get(playerId);
+      if (!player) return null;
+      const myPosRank = myPosRankMap.get(playerId);
+      if (myPosRank == null) return null;
+      const cuts = getCutsForPosition(positionTierCuts, player.position);
+      return getTierNumber(myPosRank, cuts);
+    },
+    [playersById, myPosRankMap, positionTierCuts]
+  );
+
+  const hasTierBreakAfterPlayer = useCallback(
+    (playerId: string): boolean => {
+      const player = playersById.get(playerId);
+      if (!player) return false;
+      const myPosRank = myPosRankMap.get(playerId);
+      if (myPosRank == null) return false;
+      return hasTierCutAfter(getCutsForPosition(positionTierCuts, player.position), myPosRank);
+    },
+    [playersById, myPosRankMap, positionTierCuts]
+  );
+
+  const canEditTierBreakForPlayer = useCallback(
+    (playerId: string): boolean => {
+      if (selectedPosition === FILTER_ALL) return false;
+      const player = playersById.get(playerId);
+      if (!player || player.position !== selectedPosition) return false;
+      const myPosRank = myPosRankMap.get(playerId);
+      if (myPosRank == null) return false;
+      const maxRank = maxMyPosRankByPosition.get(player.position) ?? 0;
+      return myPosRank < maxRank;
+    },
+    [selectedPosition, playersById, myPosRankMap, maxMyPosRankByPosition]
+  );
+
+  const persistPositionTierCuts = useCallback(
+    async (cuts: PositionTierCuts) => {
+      rankingTiersLocalStorage.save(rankingTiersStorageKey, cuts);
+      if (!user) return;
+      try {
+        await upsertUserRankingTiers({
+          userId: user.id,
+          leagueId: selectedLeague?.id ?? null,
+          bucket: userRankingBucketFromDisplayBucket(displayBucket),
+          cuts,
+        });
+      } catch (err) {
+        console.error('Failed to save ranking tiers:', err);
+      }
+    },
+    [rankingTiersStorageKey, user, displayBucket, selectedLeague?.id]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const local = rankingTiersLocalStorage.get(rankingTiersStorageKey);
+    setPositionTierCuts(local);
+
+    if (!user) return () => {
+      cancelled = true;
+    };
+
+    void (async () => {
+      try {
+        const remote = await fetchUserRankingTiers({
+          userId: user.id,
+          leagueId: selectedLeague?.id ?? null,
+          bucket: userRankingBucketFromDisplayBucket(displayBucket),
+        });
+        if (cancelled) return;
+        // Prefer remote when it has data; otherwise keep local (guest→sign-in carryover).
+        const next = Object.keys(remote).length > 0 ? remote : local;
+        setPositionTierCuts(next);
+        if (Object.keys(remote).length === 0 && Object.keys(local).length > 0) {
+          void upsertUserRankingTiers({
+            userId: user.id,
+            leagueId: selectedLeague?.id ?? null,
+            bucket: userRankingBucketFromDisplayBucket(displayBucket),
+            cuts: local,
+          });
+        } else if (Object.keys(remote).length > 0) {
+          rankingTiersLocalStorage.save(rankingTiersStorageKey, remote);
+        }
+      } catch (err) {
+        console.error('Failed to load ranking tiers:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rankingTiersStorageKey, user?.id, selectedLeague?.id, displayBucket.scoringFormat, displayBucket.leagueType, displayBucket.isSuperflex, displayBucket.rookiesOnly]);
+
+  const schedulePersistPositionTierCuts = useCallback(
+    (cuts: PositionTierCuts) => {
+      rankingTiersLocalStorage.save(rankingTiersStorageKey, cuts);
+      if (positionTierPersistTimerRef.current) {
+        clearTimeout(positionTierPersistTimerRef.current);
+      }
+      positionTierPersistTimerRef.current = setTimeout(() => {
+        void persistPositionTierCuts(cuts);
+      }, 400);
+    },
+    [rankingTiersStorageKey, persistPositionTierCuts]
+  );
+
+  const handleToggleTierBreak = useCallback(
+    (playerId: string) => {
+      const player = playersById.get(playerId);
+      if (!player) return;
+      const myPosRank = myPosRankMap.get(playerId);
+      if (myPosRank == null) return;
+      const maxRank = maxMyPosRankByPosition.get(player.position) ?? 0;
+      if (myPosRank >= maxRank) return;
+      setPositionTierCuts((prev) => {
+        const current = getCutsForPosition(prev, player.position);
+        const nextCuts = toggleTierCut(current, myPosRank);
+        const next = setCutsForPosition(prev, player.position, nextCuts);
+        schedulePersistPositionTierCuts(next);
+        return next;
+      });
+    },
+    [playersById, myPosRankMap, maxMyPosRankByPosition, schedulePersistPositionTierCuts]
+  );
+
   const getPlayerRankCardMeta = useCallback(
     (playerId: string) => {
       const overallRank = communityRankMap.get(playerId);
@@ -1192,9 +1359,18 @@ const Rankings = () => {
         myPosRank: getMyPosRank(playerId),
         communityTrend:
           overallRank != null ? getCommunityTrend(playerId, overallRank) ?? null : null,
+        tier: getPlayerTier(playerId),
+        hasTierBreakAfter: hasTierBreakAfterPlayer(playerId),
       };
     },
-    [communityRankMap, getCommunityPosRank, getMyPosRank, getCommunityTrend]
+    [
+      communityRankMap,
+      getCommunityPosRank,
+      getMyPosRank,
+      getCommunityTrend,
+      getPlayerTier,
+      hasTierBreakAfterPlayer,
+    ]
   );
 
   useEffect(() => {
@@ -2194,6 +2370,7 @@ const Rankings = () => {
       }
       tempRankingsStorage.save(players, bucketKey);
       rankingsDraftSessionStorage.clear(rankingsSessionDraftKey);
+      void persistPositionTierCuts(positionTierCuts);
       setHasExistingRankings(true);
       setIsEditMode(false);
       toast.success(
@@ -2208,6 +2385,7 @@ const Rankings = () => {
     setIsFinalizing(true);
     try {
       await saveRankings(players, selectedLeague.id, userRankingBucketFromDisplayBucket(displayBucket));
+      await persistPositionTierCuts(positionTierCuts);
       rankingsDraftSessionStorage.clear(rankingsSessionDraftKey);
       setHasExistingRankings(true);
       setIsEditMode(false);
@@ -2464,6 +2642,18 @@ const Rankings = () => {
           </div>
         </div>
 
+        {positionFilterActive ? (
+          <p className="text-sm text-muted-foreground mb-4">
+            Use the scissors on a player to start a new {selectedPosition} tier below them. Tier
+            colors show on every board with Comm RK and My RK.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground mb-4">
+            Filter by position to build tiers for that group. Your tier colors and badges show here
+            once you set them.
+          </p>
+        )}
+
         {((!user && !isEditMode) || (user && isAllLeagues && !isEditMode)) ? (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -2496,6 +2686,7 @@ const Rankings = () => {
                         communityPosRank={rankMeta.communityPosRank}
                         myPosRank={rankMeta.myPosRank}
                         communityTrend={rankMeta.communityTrend}
+                        tier={rankMeta.tier}
                       />
                       );
                     })}
@@ -2545,6 +2736,8 @@ const Rankings = () => {
                   players={dragSourcePlayers}
                   getDisplayAdp={getDisplayAdp}
                   getPlayerRankCardMeta={getPlayerRankCardMeta}
+                  canEditTierBreakForPlayer={canEditTierBreakForPlayer}
+                  onToggleTierBreak={handleToggleTierBreak}
                   player2025Stats={player2025Stats}
                   onPlayerClick={handlePlayerClick}
                   onCommitPreview={commitRankingsPreview}
@@ -2667,6 +2860,10 @@ const Rankings = () => {
                 getCommunityPosRank={getCommunityPosRank}
                 getMyPosRank={getMyPosRank}
                 getCommunityTrend={getCommunityTrend}
+                getTier={getPlayerTier}
+                canEditTierBreakForPlayer={canEditTierBreakForPlayer}
+                hasTierBreakAfterPlayer={hasTierBreakAfterPlayer}
+                onToggleTierBreak={handleToggleTierBreak}
                 player2025Stats={player2025Stats}
                 onPlayerClick={handlePlayerClick}
               />
@@ -2684,6 +2881,7 @@ const Rankings = () => {
                       dragOverlay.player.id,
                       dragOverlay.displayAdp
                     )}
+                    tier={getPlayerTier(dragOverlay.player.id)}
                     stats2025={player2025Stats.get(dragOverlay.player.id)}
                     isOverlay
                   />
@@ -2725,6 +2923,7 @@ const Rankings = () => {
                         communityPosRank={rankMeta.communityPosRank}
                         myPosRank={rankMeta.myPosRank}
                         communityTrend={rankMeta.communityTrend}
+                        tier={rankMeta.tier}
                       />
                       );
                     })}
@@ -2774,6 +2973,8 @@ const Rankings = () => {
                   players={dragSourcePlayers}
                   getDisplayAdp={getDisplayAdp}
                   getPlayerRankCardMeta={getPlayerRankCardMeta}
+                  canEditTierBreakForPlayer={canEditTierBreakForPlayer}
+                  onToggleTierBreak={handleToggleTierBreak}
                   player2025Stats={player2025Stats}
                   onPlayerClick={handlePlayerClick}
                   onCommitPreview={commitRankingsPreview}

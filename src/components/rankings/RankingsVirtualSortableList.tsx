@@ -26,6 +26,10 @@ type VirtualSortableRowProps = {
   communityPosRank?: number | null;
   myPosRank?: number | null;
   communityTrend?: CommunityRankTrend | null;
+  tier?: number | null;
+  canEditTierBreak?: boolean;
+  hasTierBreakAfter?: boolean;
+  onToggleTierBreak?: (playerId: string) => void;
   stats2025?: Player2025StatsEntry;
   onPlayerClick: (player: RankedPlayer) => void;
   dragMode: 'edit' | 'compare';
@@ -38,6 +42,10 @@ const VirtualSortableRow = memo(function VirtualSortableRow({
   communityPosRank,
   myPosRank,
   communityTrend,
+  tier,
+  canEditTierBreak = false,
+  hasTierBreakAfter = false,
+  onToggleTierBreak,
   stats2025,
   onPlayerClick,
   dragMode,
@@ -64,6 +72,12 @@ const VirtualSortableRow = memo(function VirtualSortableRow({
       communityPosRank={communityPosRank}
       myPosRank={myPosRank}
       communityTrend={communityTrend}
+      tier={tier}
+      canEditTierBreak={canEditTierBreak}
+      hasTierBreakAfter={hasTierBreakAfter}
+      onToggleTierBreak={
+        onToggleTierBreak ? () => onToggleTierBreak(player.id) : undefined
+      }
       stats2025={stats2025}
       onPlayerClick={onPlayerClick}
       isSourceHidden={dragMode === 'compare' && isDragging}
@@ -133,6 +147,7 @@ type PinnedActiveSortableProps = {
   communityPosRank?: number | null;
   myPosRank?: number | null;
   communityTrend?: CommunityRankTrend | null;
+  tier?: number | null;
   stats2025?: Player2025StatsEntry;
 };
 
@@ -144,6 +159,7 @@ const PinnedActiveSortable = memo(function PinnedActiveSortable({
   communityPosRank,
   myPosRank,
   communityTrend,
+  tier,
   stats2025,
 }: PinnedActiveSortableProps) {
   const { setNodeRef, setActivatorNodeRef, attributes, listeners } = useSortable({
@@ -172,6 +188,7 @@ const PinnedActiveSortable = memo(function PinnedActiveSortable({
           communityPosRank={communityPosRank}
           myPosRank={myPosRank}
           communityTrend={communityTrend}
+          tier={tier}
           stats2025={stats2025}
           dragHandleAttributes={attributes}
           dragHandleListeners={listeners}
@@ -197,6 +214,10 @@ export type RankingsVirtualSortableListProps = {
   getCommunityPosRank?: (playerId: string) => number | null | undefined;
   getMyPosRank?: (playerId: string) => number | null | undefined;
   getCommunityTrend?: (playerId: string, overallRank: number) => CommunityRankTrend | null | undefined;
+  getTier?: (playerId: string) => number | null | undefined;
+  canEditTierBreakForPlayer?: (playerId: string) => boolean;
+  hasTierBreakAfterPlayer?: (playerId: string) => boolean;
+  onToggleTierBreak?: (playerId: string) => void;
   player2025Stats: Map<string, Player2025StatsEntry>;
   onPlayerClick: (player: RankedPlayer) => void;
 };
@@ -212,6 +233,10 @@ export function RankingsVirtualSortableList({
   getCommunityPosRank,
   getMyPosRank,
   getCommunityTrend,
+  getTier,
+  canEditTierBreakForPlayer,
+  hasTierBreakAfterPlayer,
+  onToggleTierBreak,
   player2025Stats,
   onPlayerClick,
 }: RankingsVirtualSortableListProps) {
@@ -265,6 +290,7 @@ export function RankingsVirtualSortableList({
             pinnedActivePlayer.id,
             getDisplayAdp(pinnedActivePlayer.id, pinnedActivePlayer.adp)
           )}
+          tier={getTier?.(pinnedActivePlayer.id)}
           stats2025={player2025Stats.get(pinnedActivePlayer.id)}
         />
       ) : null}
@@ -284,6 +310,10 @@ export function RankingsVirtualSortableList({
             communityPosRank={getCommunityPosRank?.(item.player.id)}
             myPosRank={getMyPosRank?.(item.player.id)}
             communityTrend={getCommunityTrend?.(item.player.id, displayAdp)}
+            tier={getTier?.(item.player.id)}
+            canEditTierBreak={canEditTierBreakForPlayer?.(item.player.id) ?? false}
+            hasTierBreakAfter={hasTierBreakAfterPlayer?.(item.player.id) ?? false}
+            onToggleTierBreak={onToggleTierBreak}
             stats2025={player2025Stats.get(item.player.id)}
             onPlayerClick={onPlayerClick}
             dragMode={dragMode}
