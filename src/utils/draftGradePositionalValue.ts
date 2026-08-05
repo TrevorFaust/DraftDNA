@@ -71,14 +71,14 @@ export function analyzePositionalDraftValue(
     }
   }
 
+  // Early K/DEF costs capital; only soft-cap hard when RB/WR also lagged.
   if (kEarly > 0) {
-    penalty += 8 * kEarly;
-    // Soft cap only when the skill core is also missing — still allows mid-B if recovery is elite.
-    if (rbWrEarly < 3) maxNumericScore = Math.min(maxNumericScore ?? 100, 88);
+    penalty += kEarly === 1 && rbWrEarly >= 3 ? 5 : 8 * kEarly;
+    if (rbWrEarly < 3) maxNumericScore = Math.min(maxNumericScore ?? 100, 86);
   }
   if (defEarly > 0) {
-    penalty += 8 * defEarly;
-    if (rbWrEarly < 3) maxNumericScore = Math.min(maxNumericScore ?? 100, 88);
+    penalty += defEarly === 1 && rbWrEarly >= 3 ? 5 : 8 * defEarly;
+    if (rbWrEarly < 3) maxNumericScore = Math.min(maxNumericScore ?? 100, 86);
   }
 
   // Full utility meltdown: soft cap leaves A- possible only with an exceptional recovery.

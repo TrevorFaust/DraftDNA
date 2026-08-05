@@ -121,7 +121,7 @@ export const CHAOS_ARCHETYPES: ChaosArchetype[] = [
     name: 'The Panic Button',
     replace: false,
     flavorText:
-      'Five or more picks came off the board at least 2.5 rounds ahead of consensus expectations, which means the draft room exerted significant emotional pressure on this roster at multiple points. The Panic Button was pressed early and pressed often.',
+      'Five or more skill-position picks came off the board three or more rounds ahead of consensus expectations, which means the draft room exerted significant emotional pressure on this roster at multiple points. The Panic Button was pressed early and pressed often.',
   },
   {
     name: 'The Hometown Hero',

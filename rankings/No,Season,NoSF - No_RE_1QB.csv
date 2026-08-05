@@ -763,25 +763,25 @@ WR
 WR
 (SEA-null)
 192
-"Denver Broncos DST,"
+"Houston Texans DST,"
 DST
-(DEN-null)
+(HOU-null)
 193
 "D. Samuel,"
 WR
 (WAS-null)
 194
-"Houston Texans DST,"
+"Denver Broncos DST,"
 DST
-(HOU-null)
+(DEN-null)
 195
 "Seattle Seahawks DST,"
 DST
 (SEA-null)
 196
-"Philadelphia Eagles DST,"
+"Los Angeles Rams DST,"
 DST
-(PHI-null)
+(LAR-null)
 197
 "B. Aubrey,"
 K
@@ -799,21 +799,21 @@ K
 K
 (LAC-null)
 201
-"Jacksonville Jaguars DST,"
+"Philadelphia Eagles DST,"
 DST
-(JAX-null)
+(PHI-null)
 202
+"Minnesota Vikings DST,"
+DST
+(MIN-null)
+203
 "New England Patriots DST,"
 DST
 (NE-null)
-203
-"Green Bay Packers DST,"
-DST
-(GB-null)
 204
-"Los Angeles Rams DST,"
+"Jacksonville Jaguars DST,"
 DST
-(LAR-null)
+(JAC-null)
 205
 "C. Little,"
 K
@@ -839,13 +839,13 @@ K
 DST
 (PIT-null)
 211
-"Cleveland Browns DST,"
+"Los Angeles Chargers DST,"
 DST
-(CLE-null)
+(LAC-null)
 212
-"Minnesota Vikings DST,"
+"Baltimore Ravens DST,"
 DST
-(MIN-null)
+(BAL-null)
 213
 "H. Mevis,"
 K
@@ -859,9 +859,9 @@ K
 K
 (TB-null)
 216
-"Detroit Lions DST,"
+"Green Bay Packers DST,"
 DST
-(DET-null)
+(GB-null)
 217
 "T. Hockenson,"
 TE
@@ -927,9 +927,9 @@ TE
 DST
 (KC-null)
 233
-"Tampa Bay Buccaneers DST,"
+"Detroit Lions DST,"
 DST
-(TB-null)
+(DET-null)
 234
 "C. Ward,"
 QB
@@ -999,17 +999,17 @@ TE
 TE
 (LAR-null)
 251
-"Indianapolis Colts DST,"
+"Buffalo Bills DST,"
 DST
-(IND-null)
+(BUF-null)
 252
 "A. Rodgers,"
 QB
 (PIT-null)
 253
-"New Orleans Saints DST,"
+"Cleveland Browns DST,"
 DST
-(NO-null)
+(CLE-null)
 254
 "S. Sanders,"
 QB
@@ -1171,17 +1171,17 @@ DST
 TE
 (CHI-null)
 294
-"Los Angeles Chargers DST,"
+"Atlanta Falcons DST,"
 DST
-(LAC-null)
+(ATL-null)
 295
-"Buffalo Bills DST,"
+"New Orleans Saints DST,"
 DST
-(BUF-null)
+(NO-null)
 296
-"Carolina Panthers DST,"
+"Indianapolis Colts DST,"
 DST
-(CAR-null)
+(IND-null)
 297
 "C. Boswell,"
 K
@@ -1711,9 +1711,9 @@ RB
 QB
 (JAX-null)
 429
-"Dallas Cowboys DST,"
+"Carolina Panthers DST,"
 DST
-(DAL-null)
+(CAR-null)
 430
 "J. McNichols,"
 RB
@@ -1739,9 +1739,9 @@ RB
 TE
 (PIT-null)
 436
-"Baltimore Ravens DST,"
+"Dallas Cowboys DST,"
 DST
-(BAL-null)
+(DAL-null)
 437
 "J. Browning,"
 QB
@@ -1771,9 +1771,9 @@ RB
 WR
 (TB-null)
 444
-"Atlanta Falcons DST,"
+"Tampa Bay Buccaneers DST,"
 DST
-(ATL-null)
+(TB-null)
 445
 "Z. Gonzalez,"
 K
@@ -1823,9 +1823,9 @@ TE
 WR
 (BAL-null)
 457
-"Arizona Cardinals DST,"
+"Cincinnati Bengals DST,"
 DST
-(ARI-null)
+(CIN-null)
 458
 "T. Bridgewater,"
 QB
@@ -1979,9 +1979,9 @@ WR
 TE
 (NO-null)
 496
-"Cincinnati Bengals DST,"
+"Arizona Cardinals DST,"
 DST
-(CIN-null)
+(ARI-null)
 497
 "C. Williams,"
 WR

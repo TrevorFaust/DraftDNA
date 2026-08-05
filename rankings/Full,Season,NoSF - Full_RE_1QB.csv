@@ -767,21 +767,21 @@ RB
 WR
 (WAS-null)
 193
-"Denver Broncos DST,"
-DST
-(DEN-null)
-194
 "Houston Texans DST,"
 DST
 (HOU-null)
+194
+"Denver Broncos DST,"
+DST
+(DEN-null)
 195
 "Seattle Seahawks DST,"
 DST
 (SEA-null)
 196
-"Philadelphia Eagles DST,"
+"Los Angeles Rams DST,"
 DST
-(PHI-null)
+(LAR-null)
 197
 "B. Aubrey,"
 K
@@ -799,21 +799,21 @@ K
 K
 (LAC-null)
 201
-"Jacksonville Jaguars DST,"
+"Philadelphia Eagles DST,"
 DST
-(JAX-null)
+(PHI-null)
 202
+"Minnesota Vikings DST,"
+DST
+(MIN-null)
+203
 "New England Patriots DST,"
 DST
 (NE-null)
-203
-"Green Bay Packers DST,"
-DST
-(GB-null)
 204
-"Los Angeles Rams DST,"
+"Jacksonville Jaguars DST,"
 DST
-(LAR-null)
+(JAC-null)
 205
 "C. Little,"
 K
@@ -839,13 +839,13 @@ K
 DST
 (PIT-null)
 211
-"Cleveland Browns DST,"
+"Los Angeles Chargers DST,"
 DST
-(CLE-null)
+(LAC-null)
 212
-"Minnesota Vikings DST,"
+"Baltimore Ravens DST,"
 DST
-(MIN-null)
+(BAL-null)
 213
 "H. Mevis,"
 K
@@ -859,9 +859,9 @@ K
 K
 (TB-null)
 216
-"Detroit Lions DST,"
+"Green Bay Packers DST,"
 DST
-(DET-null)
+(GB-null)
 217
 "T. Hockenson,"
 TE
@@ -931,9 +931,9 @@ QB
 DST
 (KC-null)
 234
-"Tampa Bay Buccaneers DST,"
+"Detroit Lions DST,"
 DST
-(TB-null)
+(DET-null)
 235
 "A. Borregales,"
 K
@@ -1007,13 +1007,13 @@ QB
 QB
 (CLE-null)
 253
-"Indianapolis Colts DST,"
+"Buffalo Bills DST,"
 DST
-(IND-null)
+(BUF-null)
 254
-"New Orleans Saints DST,"
+"Cleveland Browns DST,"
 DST
-(NO-null)
+(CLE-null)
 255
 "H. Butker,"
 K
@@ -1171,17 +1171,17 @@ TE
 DST
 (SF-null)
 294
-"Los Angeles Chargers DST,"
+"Atlanta Falcons DST,"
 DST
-(LAC-null)
+(ATL-null)
 295
-"Buffalo Bills DST,"
+"New Orleans Saints DST,"
 DST
-(BUF-null)
+(NO-null)
 296
-"Carolina Panthers DST,"
+"Indianapolis Colts DST,"
 DST
-(CAR-null)
+(IND-null)
 297
 "C. Boswell,"
 K
@@ -1715,9 +1715,9 @@ RB
 WR
 (JAX-null)
 430
-"Dallas Cowboys DST,"
+"Carolina Panthers DST,"
 DST
-(DAL-null)
+(CAR-null)
 431
 "T. Smack,"
 K
@@ -1743,9 +1743,9 @@ QB
 WR
 (LV-null)
 437
-"Baltimore Ravens DST,"
+"Dallas Cowboys DST,"
 DST
-(BAL-null)
+(DAL-null)
 438
 "J. Moody,"
 K
@@ -1771,9 +1771,9 @@ WR
 QB
 (NE-null)
 444
-"Atlanta Falcons DST,"
+"Tampa Bay Buccaneers DST,"
 DST
-(ATL-null)
+(TB-null)
 445
 "Z. Gonzalez,"
 K
@@ -1831,9 +1831,9 @@ QB
 WR
 (HOU-null)
 459
-"Arizona Cardinals DST,"
+"Cincinnati Bengals DST,"
 DST
-(ARI-null)
+(CIN-null)
 460
 "J. Slye,"
 K
@@ -1979,9 +1979,9 @@ TE
 WR
 (JAX-null)
 496
-"Cincinnati Bengals DST,"
+"Arizona Cardinals DST,"
 DST
-(CIN-null)
+(ARI-null)
 497
 "E. Higgins,"
 TE

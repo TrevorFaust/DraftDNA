@@ -131,10 +131,12 @@ export const RankingsDragRow = memo(function RankingsDragRow({
           </div>
           <RankingsCommunityTrendBadge communityTrend={communityTrend} />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-semibold truncate">{player.name}</span>
-            <PositionBadge position={player.position} />
+        <div className="flex-1 min-w-0 pr-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-semibold truncate" title={player.name}>
+              {player.name}
+            </span>
+            <PositionBadge position={player.position} className="shrink-0" />
           </div>
           <p className="text-xs text-muted-foreground truncate mt-0.5">
             {displayTeamAbbrevOrFa(player.team, player.position, player.name)} · ADP {displayAdp}

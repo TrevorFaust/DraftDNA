@@ -1,10 +1,11 @@
 /**
- * Builder: human-like 12-team mocks. Aims for "good" or "bad" drafting —
- * does NOT know letter-grade thresholds or rewrite ADP to hit bands.
+ * Builder: human-like 12-team mocks aiming at letter grades.
+ * Strategies mirror how a person would try for that grade — no grade-engine gaming
+ * (no ADP rewrite, no threshold peeking).
  *
  * Usage:
  *   npx tsx scripts/grade-calibration/simulateMockDraftGrades.ts
- *   npx tsx scripts/grade-calibration/simulateMockDraftGrades.ts --trials=20 --seed=7
+ *   npx tsx scripts/grade-calibration/simulateMockDraftGrades.ts --trials=12 --seed=7 --attempt=1
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -32,36 +33,58 @@ const USER_GRADES: LetterGrade[] = [
   'A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F',
 ];
 
-/** Human intent only — no score-band knowledge. */
+/** Human mindset when trying for a letter — not score thresholds. */
 type HumanIntent = 'excellent' | 'solid' | 'sloppy' | 'terrible';
 
 type IntentConfig = {
   intent: HumanIntent;
-  /** Prefer best available ADP among skill. */
+  /** Target letter the human is trying to earn. */
+  aimGrade: LetterGrade | 'F-';
   bpa: number;
-  /** Prefer RB/WR early. */
   balance: number;
-  /** Willingness to take early TE. */
   earlyTe: number;
-  /** Willingness to take early K/DEF. */
   earlySpecial: number;
-  /** Willingness to take early QB. */
   earlyQb: number;
-  /** How far below BPA to randomly dig (reaches). */
   digDepth: number;
 };
 
+/**
+ * One human strategy per aim. Extreme aims are clearer; mid grades are "dial it
+ * down a notch" — exact hits will be rarer, which is honest.
+ */
 const INTENTS: IntentConfig[] = [
-  { intent: 'excellent', bpa: 1, balance: 1, earlyTe: 0.05, earlySpecial: 0, earlyQb: 0.1, digDepth: 0 },
-  { intent: 'solid', bpa: 0.9, balance: 0.95, earlyTe: 0.08, earlySpecial: 0, earlyQb: 0.12, digDepth: 0 },
-  // Sloppy = flawed human draft (one early TE lean, mild reaches) — C/D, not F.
-  { intent: 'sloppy', bpa: 0.6, balance: 0.75, earlyTe: 0.7, earlySpecial: 0, earlyQb: 0.15, digDepth: 5 },
-  // Terrible = early K/DEF/TE spam.
-  { intent: 'terrible', bpa: 0.1, balance: 0.1, earlyTe: 0.8, earlySpecial: 0.9, earlyQb: 0.55, digDepth: 18 },
+  // A+: hunt value + balanced starters
+  { aimGrade: 'A+', intent: 'excellent', bpa: 1, balance: 1, earlyTe: 0.04, earlySpecial: 0, earlyQb: 0.08, digDepth: 0 },
+  // A: same quality, slightly less aggressive on fallers
+  { aimGrade: 'A', intent: 'excellent', bpa: 0.95, balance: 1, earlyTe: 0.06, earlySpecial: 0, earlyQb: 0.1, digDepth: 0 },
+  // A-: clean BPA with a bit more early TE lean
+  { aimGrade: 'A-', intent: 'excellent', bpa: 0.92, balance: 0.95, earlyTe: 0.12, earlySpecial: 0, earlyQb: 0.14, digDepth: 1 },
+  // B+: solid human draft
+  { aimGrade: 'B+', intent: 'solid', bpa: 0.9, balance: 0.95, earlyTe: 0.1, earlySpecial: 0, earlyQb: 0.12, digDepth: 0 },
+  // B: chalk / slightly less disciplined
+  { aimGrade: 'B', intent: 'solid', bpa: 0.85, balance: 0.9, earlyTe: 0.15, earlySpecial: 0, earlyQb: 0.18, digDepth: 1 },
+  // B-: mostly fine with one soft mistake pattern
+  { aimGrade: 'B-', intent: 'solid', bpa: 0.8, balance: 0.85, earlyTe: 0.25, earlySpecial: 0, earlyQb: 0.22, digDepth: 2 },
+  // C+: early TE lean, still fill RB/WR
+  { aimGrade: 'C+', intent: 'sloppy', bpa: 0.7, balance: 0.8, earlyTe: 0.55, earlySpecial: 0, earlyQb: 0.2, digDepth: 3 },
+  // C: early TE + mild reaches
+  { aimGrade: 'C', intent: 'sloppy', bpa: 0.65, balance: 0.75, earlyTe: 0.7, earlySpecial: 0, earlyQb: 0.25, digDepth: 4 },
+  // C-: messier mid-bad
+  { aimGrade: 'C-', intent: 'sloppy', bpa: 0.55, balance: 0.7, earlyTe: 0.75, earlySpecial: 0, earlyQb: 0.3, digDepth: 6 },
+  // D+: a few blind-faith reaches, still build a roster
+  { aimGrade: 'D+', intent: 'sloppy', bpa: 0.35, balance: 0.75, earlyTe: 0.15, earlySpecial: 0, earlyQb: 0.12, digDepth: 7 },
+  // D: more pet-player reaches
+  { aimGrade: 'D', intent: 'sloppy', bpa: 0.25, balance: 0.7, earlyTe: 0.2, earlySpecial: 0, earlyQb: 0.15, digDepth: 11 },
+  // D-: heavy reaches + messy TE lean
+  { aimGrade: 'D-', intent: 'sloppy', bpa: 0.15, balance: 0.6, earlyTe: 0.55, earlySpecial: 0, earlyQb: 0.35, digDepth: 15 },
+  // F: one early K or DEF, still grab a couple skill pieces
+  { aimGrade: 'F', intent: 'terrible', bpa: 0.25, balance: 0.35, earlyTe: 0.3, earlySpecial: 0.65, earlyQb: 0.3, digDepth: 8 },
+  // F-: full meltdown
+  { aimGrade: 'F-', intent: 'terrible', bpa: 0.05, balance: 0.05, earlyTe: 0.85, earlySpecial: 0.98, earlyQb: 0.7, digDepth: 24 },
 ];
 
 function parseArgs() {
-  const trials = Number(process.argv.find((a) => a.startsWith('--trials='))?.split('=')[1] ?? 16);
+  const trials = Number(process.argv.find((a) => a.startsWith('--trials='))?.split('=')[1] ?? 10);
   const slotArg = process.argv.find((a) => a.startsWith('--slot='))?.split('=')[1];
   const slots = slotArg
     ? slotArg.split(',').map(Number)
@@ -186,13 +209,6 @@ function mulberry32(seed: number) {
   };
 }
 
-/**
- * Per-draft sloppy flavor (human mistakes, not grade targets):
- * - early_te: one early TE, then mostly normal
- * - reachy: mild ADP reaches, thin early TE
- * - late_rb2: delay second RB
- * - double_te: two early TEs but still fill some RB/WR (D territory, not F)
- */
 type SloppyFlavor = 'early_te' | 'reachy' | 'late_rb2' | 'double_te';
 
 /** Draft like a person with a quality mindset — no grade thresholds. */
@@ -203,7 +219,9 @@ function selectHumanPick(
   round: number,
   cfg: IntentConfig,
   rng: () => number,
-  sloppyFlavor: SloppyFlavor = 'early_te'
+  sloppyFlavor: SloppyFlavor = 'early_te',
+  /** Known keepers still on the roster (future rounds) — draft around them. */
+  pendingKeepers: RankedPlayer[] = []
 ): RankedPlayer {
   const byAdp = [...available].sort((a, b) => a.adp - b.adp);
   const rb = countPos(team, 'RB');
@@ -217,31 +235,38 @@ function selectHumanPick(
     const pos = posKey(p);
     let score = 0;
 
-    // BPA pressure
     score += (90 - idx) * cfg.bpa;
 
-    // Prefer fallers when being excellent (human "that's value")
     const valueSpots = pickNumber - p.adp;
     if (cfg.intent === 'excellent' || cfg.intent === 'solid') {
       if (valueSpots >= 6) score += valueSpots * 2.5 * cfg.bpa;
     } else if (cfg.intent === 'sloppy') {
-      // Mild dig — not a full tank
       if (sloppyFlavor === 'reachy') {
         score += Math.max(0, p.adp - pickNumber) * 0.8;
         if (idx >= 3 && idx <= 3 + cfg.digDepth) score += 12;
       } else {
         score += (90 - idx) * 0.35;
-        if (valueSpots < -6) score += 8; // occasional reach
+        if (valueSpots < -6) score += 8;
       }
     } else {
-      // Terrible: dig for worse ADP
       score += Math.max(0, p.adp - pickNumber) * (1 - cfg.bpa) * 1.2;
       if (idx < cfg.digDepth) score -= (cfg.digDepth - idx) * 2;
       else score += Math.min(40, idx);
     }
 
+    const pendingWrKeeper = pendingKeepers.some((k) => posKey(k) === 'WR' && k.adp <= NUM_TEAMS * 5);
+    const pendingRbKeeper = pendingKeepers.some((k) => posKey(k) === 'RB' && k.adp <= NUM_TEAMS * 5);
+
     if (round <= 6) {
-      // Always prefer some RB/WR for sloppy so we don't trip utility≥4 F-cap
+      // Plan around discounted elite keepers (e.g. Puka in R10 → lean RB early).
+      if (pendingWrKeeper) {
+        if (pos === 'RB' && rb < 3) score += 45;
+        if (pos === 'WR' && wr >= 1 && round <= 4) score -= 25;
+      }
+      if (pendingRbKeeper) {
+        if (pos === 'WR' && wr < 3) score += 45;
+        if (pos === 'RB' && rb >= 1 && round <= 4) score -= 25;
+      }
       if (cfg.intent === 'sloppy') {
         if (pos === 'RB' && rb < 2) score += 70;
         if (pos === 'WR' && wr < 2) score += 70;
@@ -257,7 +282,7 @@ function selectHumanPick(
           if (pos === 'TE') score += 85;
         }
         if (sloppyFlavor === 'late_rb2' && pos === 'RB' && rb >= 1 && round <= 6) {
-          score -= 55; // defer RB2
+          score -= 55;
         }
         if (sloppyFlavor === 'late_rb2' && pos === 'WR' && wr < 3) score += 25;
       } else {
@@ -276,7 +301,7 @@ function selectHumanPick(
       if (pos === 'WR' && wr < 2) score += 60 * Math.max(cfg.balance, 0.3);
       if ((pos === 'K' || pos === 'DEF') && round < 12 && cfg.earlySpecial < 0.5) score -= 80;
       if (cfg.intent === 'sloppy' && sloppyFlavor === 'late_rb2' && pos === 'RB' && rb < 2) {
-        score += 80; // finally take RB2 mid-late
+        score += 80;
       }
     } else {
       if (pos === 'K' && k === 0) score += 35;
@@ -285,10 +310,27 @@ function selectHumanPick(
       if (pos === 'TE' && te === 0) score += 25;
     }
 
-    // Terrible: force early utility
     if (cfg.intent === 'terrible' && round <= 5) {
-      if (pos === 'K' || pos === 'DEF' || pos === 'TE' || pos === 'QB') score += 80 + rng() * 40;
-      if (pos === 'RB' || pos === 'WR') score -= 70 + rng() * 30;
+      if (cfg.aimGrade === 'F') {
+        // Early K/DEF plus a thin skill core — F needs the bad rest, not auto from the K alone.
+        if ((pos === 'K' || pos === 'DEF') && k + def === 0) score += 150;
+        if (pos === 'TE' || pos === 'QB') score += 60;
+        if (pos === 'RB' || pos === 'WR') score -= 40;
+      } else {
+        if (pos === 'K' || pos === 'DEF' || pos === 'TE' || pos === 'QB') score += 80 + rng() * 40;
+        if (pos === 'RB' || pos === 'WR') score -= 70 + rng() * 30;
+      }
+    }
+
+    // F-: keep burning early capital on K/DEF and avoiding skill.
+    if (cfg.aimGrade === 'F-' && round <= 7) {
+      if (pos === 'K' || pos === 'DEF') score += 160;
+      if (pos === 'RB' || pos === 'WR') score -= 55;
+    }
+    // D- : early TE+QB without necessarily taking K yet
+    if (cfg.aimGrade === 'D-' && round <= 5) {
+      if (pos === 'TE' || pos === 'QB') score += 70;
+      if (pos === 'K' || pos === 'DEF') score += 25;
     }
 
     score += (rng() - 0.5) * (8 + cfg.digDepth * 0.3);
@@ -306,7 +348,6 @@ function selectHumanPick(
     if (faller && rng() < 0.55) return faller.p;
   }
 
-  // Sloppy: force the signature mistake early, then recover with RB/WR
   if (cfg.intent === 'sloppy' && round <= 3) {
     if (
       (sloppyFlavor === 'early_te' || sloppyFlavor === 'double_te') &&
@@ -321,7 +362,33 @@ function selectHumanPick(
     }
   }
 
+  // F / F-: force early K/DEF from the full board (specials sit outside top-ADP window).
+  if (
+    (cfg.aimGrade === 'F' || cfg.aimGrade === 'F-') &&
+    round <= (cfg.aimGrade === 'F-' ? 6 : 4) &&
+    k === 0 &&
+    def === 0
+  ) {
+    const kdPool = byAdp.filter((p) => {
+      const pos = posKey(p);
+      return pos === 'K' || pos === 'DEF';
+    });
+    if (kdPool.length && rng() < (cfg.aimGrade === 'F-' ? 0.95 : 0.9)) {
+      return kdPool[Math.floor(rng() * Math.min(4, kdPool.length))];
+    }
+  }
+
   if (cfg.earlySpecial >= 0.7 && round <= 6) {
+    const preferKd = cfg.aimGrade === 'F' || cfg.aimGrade === 'F-';
+    if (preferKd && k === 0 && def === 0) {
+      const kdPool = byAdp.filter((p) => {
+        const pos = posKey(p);
+        return pos === 'K' || pos === 'DEF';
+      });
+      if (kdPool.length && rng() < cfg.earlySpecial) {
+        return kdPool[Math.floor(rng() * Math.min(3, kdPool.length))];
+      }
+    }
     const special = scored.find((s) => s.pos === 'K' || s.pos === 'DEF' || s.pos === 'TE');
     if (special && rng() < cfg.earlySpecial) return special.p;
   }
@@ -332,7 +399,18 @@ function selectHumanPick(
   return top[Math.floor(rng() * top.length)]?.p ?? byAdp[0];
 }
 
+type RosterPick = {
+  round: number;
+  pick: number;
+  name: string;
+  pos: string;
+  team: string | null;
+  adp: number;
+  is_keeper: boolean;
+};
+
 type TrialResult = {
+  aimGrade: LetterGrade | 'F-';
   intent: HumanIntent;
   slot: number;
   grade: LetterGrade;
@@ -342,6 +420,8 @@ type TrialResult = {
   reaches: number;
   elite: number;
   withKeepers?: boolean;
+  tagline?: string;
+  roster: RosterPick[];
 };
 
 function runDraft(
@@ -359,23 +439,31 @@ function runDraft(
   const archetypes = assignRandomNamedArchetypesForDraft(NUM_TEAMS, userSlot);
   for (let i = 0; i < (seed % 5) + 1; i++) rng();
 
-  // Per-draft human variance (not grade-aware).
+  const dBand = cfg.aimGrade === 'D+' || cfg.aimGrade === 'D' || cfg.aimGrade === 'D-';
+  const fBand = cfg.aimGrade === 'F' || cfg.aimGrade === 'F-';
   const liveCfg: IntentConfig = {
     ...cfg,
-    digDepth:
-      cfg.intent === 'terrible'
-        ? Math.floor(10 + rng() * 20)
+    digDepth: fBand
+      ? cfg.aimGrade === 'F-'
+        ? Math.floor(16 + rng() * 12)
+        : Math.floor(6 + rng() * 6)
+      : dBand
+        ? cfg.digDepth + Math.floor(rng() * 2)
         : cfg.intent === 'sloppy'
           ? Math.floor(3 + rng() * 6)
           : cfg.digDepth,
-    earlySpecial:
-      cfg.intent === 'terrible' ? 0.7 + rng() * 0.3 : cfg.earlySpecial,
+    earlySpecial: fBand
+      ? Math.max(cfg.earlySpecial, cfg.aimGrade === 'F-' ? 0.95 : 0.8)
+      : cfg.earlySpecial,
   };
   const sloppyFlavors: SloppyFlavor[] = ['early_te', 'reachy', 'late_rb2', 'double_te'];
-  const sloppyFlavor =
-    cfg.intent === 'sloppy'
-      ? sloppyFlavors[Math.floor(rng() * sloppyFlavors.length)]
-      : 'early_te';
+  // D-band = blind-faith reaches; C-band keeps mixed human mistakes.
+  const sloppyFlavor: SloppyFlavor =
+    cfg.aimGrade === 'D+' || cfg.aimGrade === 'D' || cfg.aimGrade === 'D-'
+      ? 'reachy'
+      : cfg.intent === 'sloppy'
+        ? sloppyFlavors[Math.floor(rng() * sloppyFlavors.length)]
+        : 'early_te';
 
   const keeperByRound = new Map<number, RankedPlayer>();
   if (keeperPlan) {
@@ -383,7 +471,6 @@ function runDraft(
       const pl = pool.find((p) => p.id === keeperPlan.playerIds[i]);
       if (pl) keeperByRound.set(keeperPlan.rounds[i], pl);
     }
-    // Remove keepers from board for other teams
     for (const pl of keeperByRound.values()) {
       const idx = board.findIndex((p) => p.id === pl.id);
       if (idx >= 0) board.splice(idx, 1);
@@ -409,7 +496,19 @@ function runDraft(
       chosen = keeperByRound.get(round)!;
       isKeeper = true;
     } else if (team === userSlot) {
-      chosen = selectHumanPick(board, drafted, pickNumber, round, liveCfg, rng, sloppyFlavor);
+      const pendingKeepers = [...keeperByRound.entries()]
+        .filter(([r]) => r > round)
+        .map(([, p]) => p);
+      chosen = selectHumanPick(
+        board,
+        drafted,
+        pickNumber,
+        round,
+        liveCfg,
+        rng,
+        sloppyFlavor,
+        pendingKeepers
+      );
     } else {
       chosen = selectCpuPick(board, archetypes[team], {
         roundNumber: round,
@@ -469,6 +568,7 @@ function runDraft(
   );
 
   return {
+    aimGrade: cfg.aimGrade,
     intent: cfg.intent,
     slot: userSlot,
     grade: gradeResult?.grade ?? 'F-',
@@ -478,13 +578,22 @@ function runDraft(
     reaches: gradeResult?.breakdown.reachCount ?? 0,
     elite: gradeResult?.breakdown.eliteTierCount ?? 0,
     withKeepers: Boolean(keeperPlan),
+    tagline: gradeResult?.tagline ?? '',
+    roster: userPickRows.map((r) => ({
+      round: r.round_number,
+      pick: r.pick_number,
+      name: r.player.name,
+      pos: posKey(r.player),
+      team: r.player.team,
+      adp: r.player.adp,
+      is_keeper: r.is_keeper,
+    })),
   };
 }
 
-/** Elite keepers in late rounds + terrible drafting should NOT yield A. */
 function runKeeperAbuseTests(pool: RankedPlayer[], seed: number) {
   const elites = pool.filter((p) => ['RB', 'WR'].includes(p.position)).slice(0, 3);
-  const terrible = INTENTS.find((i) => i.intent === 'terrible')!;
+  const terrible = INTENTS.find((i) => i.aimGrade === 'F-')!;
   const results: TrialResult[] = [];
   for (let i = 0; i < 24; i++) {
     const slot = (i % 12) + 1;
@@ -509,18 +618,136 @@ function runKeeperAbuseTests(pool: RankedPlayer[], seed: number) {
       m[r.grade] = (m[r.grade] ?? 0) + 1;
       return m;
     }, {} as Record<string, number>),
-    /** Pass if keepers + terrible draft rarely get B or better. */
     pass: bOrBetter / results.length <= 0.15 && aOrBetter === 0,
   };
+}
+
+/**
+ * Realistic discount keepers (R1–5 talent, kept R6–10) + human good drafts.
+ * Writeups must say "kept", never "found … in round N" for the keeper.
+ */
+function runKeeperStrategyTests(pool: RankedPlayer[], seed: number) {
+  const wrs = pool.filter((p) => p.position === 'WR');
+  const rbs = pool.filter((p) => p.position === 'RB');
+  const pukaLike = wrs.find((p) => p.adp <= 12) ?? wrs[0];
+  const olaveLike = wrs.find((p) => p.adp >= 24 && p.adp <= 48) ?? wrs[8];
+  const chaseBrownLike = rbs.find((p) => p.adp >= 30 && p.adp <= 55) ?? rbs[10];
+  const achaneLike = rbs.find((p) => p.adp >= 14 && p.adp <= 36) ?? rbs[5];
+  const hypoWr = wrs.find((p) => p.adp >= 13 && p.adp <= 24 && p.id !== pukaLike.id) ?? wrs[3];
+  const hypoRb = rbs.find((p) => p.adp >= 8 && p.adp <= 20 && p.id !== achaneLike.id) ?? rbs[2];
+
+  const excellent = INTENTS.find((i) => i.aimGrade === 'A+')!;
+  const solid = INTENTS.find((i) => i.aimGrade === 'B')!;
+
+  type Scenario = {
+    id: string;
+    player: RankedPlayer;
+    round: number;
+    cfg: IntentConfig;
+  };
+  const scenarios: Scenario[] = [
+    { id: 'puka_r10', player: pukaLike, round: 10, cfg: excellent },
+    { id: 'olave_r7', player: olaveLike, round: 7, cfg: solid },
+    { id: 'chase_brown_r6', player: chaseBrownLike, round: 6, cfg: solid },
+    { id: 'achane_r9', player: achaneLike, round: 9, cfg: excellent },
+    { id: 'hypo_wr_r8', player: hypoWr, round: 8, cfg: solid },
+    { id: 'hypo_rb_r10', player: hypoRb, round: 10, cfg: excellent },
+  ];
+
+  const rows: {
+    id: string;
+    keeper: string;
+    round: number;
+    grade: string;
+    score: number;
+    tagline: string;
+    mentionsKept: boolean;
+    falseFind: boolean;
+  }[] = [];
+
+  let n = 0;
+  for (const sc of scenarios) {
+    for (let t = 0; t < 8; t++) {
+      n += 1;
+      const slot = (t % 12) + 1;
+      const r = runDraft(pool, slot, sc.cfg, seed + 9000 + n * 17, {
+        playerIds: [sc.player.id],
+        rounds: [sc.round],
+      });
+      const tag = r.tagline ?? '';
+      const name = sc.player.name;
+      const mentionsKept =
+        /kept|keeper/i.test(tag) &&
+        (tag.includes(name) || tag.toLowerCase().includes('keeper'));
+      // "found NAME … in round N" or "landing him in round N" for the keeper is wrong.
+      const falseFind = new RegExp(
+        `(found|landing|got)\\s[^.]{0,40}${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^.]{0,40}round\\s*${sc.round}`,
+        'i'
+      ).test(tag) || new RegExp(
+        `${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^.]{0,60}in round ${sc.round}[^.]{0,40}(value|found|steal)`,
+        'i'
+      ).test(tag);
+
+      rows.push({
+        id: sc.id,
+        keeper: name,
+        round: sc.round,
+        grade: r.grade,
+        score: r.score,
+        tagline: tag,
+        mentionsKept,
+        falseFind,
+      });
+    }
+  }
+
+  const bOrBetter = rows.filter((r) =>
+    ['A+', 'A', 'A-', 'B+', 'B', 'B-'].includes(r.grade)
+  ).length;
+  const falseFinds = rows.filter((r) => r.falseFind).length;
+  const keptMentions = rows.filter((r) => r.mentionsKept).length;
+
+  return {
+    trials: rows.length,
+    bOrBetter,
+    bOrBetterRate: rows.length ? bOrBetter / rows.length : 0,
+    keptMentions,
+    keptMentionRate: rows.length ? keptMentions / rows.length : 0,
+    falseFinds,
+    samples: rows.slice(0, 8).map((r) => ({
+      id: r.id,
+      keeper: r.keeper,
+      grade: r.grade,
+      tagline: r.tagline.slice(0, 220),
+      mentionsKept: r.mentionsKept,
+      falseFind: r.falseFind,
+    })),
+    /** Good drafts with discount keepers stay A–C; writeups name keepers, not fake finds. */
+    pass:
+      bOrBetter / rows.length >= 0.7 &&
+      falseFinds === 0 &&
+      keptMentions / rows.length >= 0.5,
+  };
+}
+
+function gradesNear(aim: string, got: string): boolean {
+  const scale = [
+    'A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F+', 'F', 'F-',
+  ];
+  const ai = scale.indexOf(aim);
+  const gi = scale.indexOf(got);
+  if (ai < 0 || gi < 0) return aim === got;
+  return Math.abs(ai - gi) <= 1;
 }
 
 function main() {
   const { trials, slots, seed, attempt } = parseArgs();
   const pool = buildSimPool(loadPlayers());
   console.log(
-    `Builder attempt ${attempt} | ${pool.length} players | ${NUM_TEAMS}x${NUM_ROUNDS} | trials/intent=${trials}`
+    `Builder attempt ${attempt} | ${pool.length} players | ${NUM_TEAMS}x${NUM_ROUNDS} | trials/aim=${trials}`
   );
 
+  const byAim: Record<string, TrialResult[]> = {};
   const byIntent: Record<string, TrialResult[]> = {};
   const allResults: TrialResult[] = [];
 
@@ -530,12 +757,20 @@ function main() {
     for (let i = 0; i < trials; i++) {
       for (const slot of slots) {
         n += 1;
-        const r = runDraft(pool, slot, cfg, seed + n * 7919 + cfg.intent.length * 17);
+        const r = runDraft(
+          pool,
+          slot,
+          cfg,
+          seed + n * 7919 + cfg.aimGrade.length * 17 + INTENTS.indexOf(cfg) * 101
+        );
         results.push(r);
         allResults.push(r);
+        (byIntent[cfg.intent] ??= []).push(r);
       }
     }
-    byIntent[cfg.intent] = results;
+    byAim[cfg.aimGrade] = results;
+    const hits = results.filter((r) => r.grade === cfg.aimGrade).length;
+    const near = results.filter((r) => gradesNear(cfg.aimGrade, r.grade)).length;
     const grades: Record<string, number> = {};
     let scoreSum = 0;
     for (const r of results) {
@@ -543,8 +778,9 @@ function main() {
       scoreSum += r.score;
     }
     console.log(
-      `[${cfg.intent.padEnd(9)}] n=${results.length} avg=${(scoreSum / results.length).toFixed(1)} ` +
-        `grades=${JSON.stringify(grades)}`
+      `[aim ${cfg.aimGrade.padEnd(2)}] n=${results.length} hit=${((hits / results.length) * 100).toFixed(1)}% ` +
+        `near±1=${((near / results.length) * 100).toFixed(1)}% avg=${(scoreSum / results.length).toFixed(1)} ` +
+        `got=${JSON.stringify(grades)}`
     );
   }
 
@@ -552,7 +788,6 @@ function main() {
   const solid = byIntent.solid ?? [];
   const goodAim = [...excellent, ...solid];
   const terrible = byIntent.terrible ?? [];
-  const sloppy = byIntent.sloppy ?? [];
 
   const gradeCount = (rows: TrialResult[], g: LetterGrade) =>
     rows.filter((r) => r.grade === g).length;
@@ -574,16 +809,109 @@ function main() {
     ['D+', 'D', 'D-', 'F+', 'F', 'F-'].includes(r.grade)
   );
 
-  // Coverage: every letter appears somewhere across intents (human variance).
   const coverage: Record<string, number> = {};
   for (const r of allResults) coverage[r.grade] = (coverage[r.grade] ?? 0) + 1;
   const missingGrades = USER_GRADES.filter((g) => (coverage[g] ?? 0) < 3);
+
+  const aimHitRates: Record<
+    string,
+    { n: number; exactHits: number; exactRate: number; nearHits: number; nearRate: number; grades: Record<string, number> }
+  > = {};
+  for (const [aim, rows] of Object.entries(byAim)) {
+    const exactHits = rows.filter((r) => r.grade === aim).length;
+    const nearHits = rows.filter((r) => gradesNear(aim, r.grade)).length;
+    const grades: Record<string, number> = {};
+    for (const r of rows) grades[r.grade] = (grades[r.grade] ?? 0) + 1;
+    aimHitRates[aim] = {
+      n: rows.length,
+      exactHits,
+      exactRate: rows.length ? exactHits / rows.length : 0,
+      nearHits,
+      nearRate: rows.length ? nearHits / rows.length : 0,
+      grades,
+    };
+  }
+
+  // Sample rosters for review: all A+ hits and all F- hits (cap for file size).
+  const aPlusRosters = (byAim['A+'] ?? [])
+    .filter((r) => r.grade === 'A+')
+    .slice(0, 12)
+    .map((r) => ({
+      slot: r.slot,
+      score: r.score,
+      grade: r.grade,
+      aimGrade: r.aimGrade,
+      roster: r.roster,
+    }));
+  const fMinusRosters = (byAim['F-'] ?? [])
+    .filter((r) => r.grade === 'F-')
+    .slice(0, 12)
+    .map((r) => ({
+      slot: r.slot,
+      score: r.score,
+      grade: r.grade,
+      aimGrade: r.aimGrade,
+      roster: r.roster,
+    }));
+
+  // If no exact A+ hits, still show best A+ aims for review
+  const aPlusAimSamples =
+    aPlusRosters.length > 0
+      ? aPlusRosters
+      : (byAim['A+'] ?? [])
+          .slice()
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 6)
+          .map((r) => ({
+            slot: r.slot,
+            score: r.score,
+            grade: r.grade,
+            aimGrade: r.aimGrade,
+            roster: r.roster,
+            note: 'best A+ aims (no exact A+ hit in sample)',
+          }));
+
+  const fMinusAimSamples =
+    fMinusRosters.length > 0
+      ? fMinusRosters
+      : (byAim['F-'] ?? [])
+          .slice()
+          .sort((a, b) => a.score - b.score)
+          .slice(0, 6)
+          .map((r) => ({
+            slot: r.slot,
+            score: r.score,
+            grade: r.grade,
+            aimGrade: r.aimGrade,
+            roster: r.roster,
+            note: 'worst F- aims (no exact F- hit in sample)',
+          }));
 
   const keeperTest = runKeeperAbuseTests(pool, seed);
   console.log(
     `\nKeeper abuse (terrible + 3 late elite keepers): ${JSON.stringify(keeperTest.grades)} ` +
       `pass=${keeperTest.pass}`
   );
+
+  const keeperStrategyTest = runKeeperStrategyTests(pool, seed);
+  console.log(
+    `\nKeeper strategy (discount elites R6–10 + good drafts): B+=${(keeperStrategyTest.bOrBetterRate * 100).toFixed(0)}% ` +
+      `keptMentions=${(keeperStrategyTest.keptMentionRate * 100).toFixed(0)}% falseFinds=${keeperStrategyTest.falseFinds} ` +
+      `pass=${keeperStrategyTest.pass}`
+  );
+  for (const s of keeperStrategyTest.samples.slice(0, 4)) {
+    console.log(`  [${s.id}] ${s.keeper} → ${s.grade} kept=${s.mentionsKept} fakeFind=${s.falseFind}`);
+    console.log(`    ${s.tagline}`);
+  }
+
+  console.log('\n=== Aim hit rates (exact) ===');
+  for (const aim of [...USER_GRADES, 'F-'] as const) {
+    const h = aimHitRates[aim];
+    if (!h) continue;
+    console.log(
+      `  ${aim.padEnd(2)} → ${(h.exactRate * 100).toFixed(1)}% exact | ${(h.nearRate * 100).toFixed(1)}% ±1 grade`
+    );
+  }
 
   const report = {
     generatedAt: new Date().toISOString(),
@@ -602,6 +930,24 @@ function main() {
         },
       ])
     ),
+    byAim: Object.fromEntries(
+      Object.entries(byAim).map(([k, rows]) => [
+        k,
+        {
+          n: rows.length,
+          avgScore: rows.reduce((s, r) => s + r.score, 0) / rows.length,
+          grades: rows.reduce((m, r) => {
+            m[r.grade] = (m[r.grade] ?? 0) + 1;
+            return m;
+          }, {} as Record<string, number>),
+        },
+      ])
+    ),
+    aimHitRates,
+    sampleRosters: {
+      aPlusHits: aPlusAimSamples,
+      fMinusHits: fMinusAimSamples,
+    },
     metrics: {
       goodAimDfRate: goodDfRate,
       goodAimBOrBetterRate: goodBPlusOrBetter,
@@ -613,19 +959,57 @@ function main() {
       terribleLowBandRate: terribleFBand,
       coverage,
       missingGrades,
+      aPlusAimExactRate: aimHitRates['A+']?.exactRate ?? 0,
+      fMinusAimExactRate: aimHitRates['F-']?.exactRate ?? 0,
+      fBandAimExactRate:
+        ((aimHitRates['F']?.exactHits ?? 0) + (aimHitRates['F-']?.exactHits ?? 0)) /
+        Math.max(1, (aimHitRates['F']?.n ?? 0) + (aimHitRates['F-']?.n ?? 0)),
     },
     keeperTest,
+    keeperStrategyTest,
     builderNotes: [
-      'Intents are human mindsets (excellent/solid/sloppy/terrible), not letter targets.',
-      'No ADP rewriting to hit grade bands.',
-      'Natural board value only (CPU reaches create falls).',
+      'Aims use human drafting mindsets for that letter — not grade-engine thresholds.',
+      'No ADP rewriting to hit bands.',
+      'WR2 on an NFL team is treated as startable; early WR3+ is the depth problem.',
+      'Discount keepers (R1–5 talent kept R6–10) reshape early RB/WR strategy and writeups.',
     ],
   };
 
   mkdirSync(OUT_DIR, { recursive: true });
   const outPath = join(OUT_DIR, `builder-run-${attempt}.json`);
   writeFileSync(outPath, JSON.stringify(report, null, 2));
+
+  // Human-readable roster dump
+  const rosterMd: string[] = [
+    `# Sample rosters — attempt ${attempt}`,
+    '',
+    '## A+ (exact hits, or best aims if none)',
+    '',
+  ];
+  for (const s of aPlusAimSamples) {
+    rosterMd.push(`### Slot ${s.slot} — graded ${s.grade} (score ${s.score.toFixed(1)}, aimed ${s.aimGrade})`);
+    for (const p of s.roster) {
+      rosterMd.push(
+        `- R${p.round} (P${p.pick}): ${p.name} ${p.pos}${p.team ? ` ${p.team}` : ''} ADP ${p.adp}${p.is_keeper ? ' [K]' : ''}`
+      );
+    }
+    rosterMd.push('');
+  }
+  rosterMd.push('## F− (exact hits, or worst aims if none)', '');
+  for (const s of fMinusAimSamples) {
+    rosterMd.push(`### Slot ${s.slot} — graded ${s.grade} (score ${s.score.toFixed(1)}, aimed ${s.aimGrade})`);
+    for (const p of s.roster) {
+      rosterMd.push(
+        `- R${p.round} (P${p.pick}): ${p.name} ${p.pos}${p.team ? ` ${p.team}` : ''} ADP ${p.adp}${p.is_keeper ? ' [K]' : ''}`
+      );
+    }
+    rosterMd.push('');
+  }
+  const rosterPath = join(OUT_DIR, `rosters-attempt-${attempt}.md`);
+  writeFileSync(rosterPath, rosterMd.join('\n'));
+
   console.log(`\nWrote ${outPath}`);
+  console.log(`Wrote ${rosterPath}`);
   console.log(
     `goodAim D/F rate=${(goodDfRate * 100).toFixed(1)}% | goodAim B-or-better=${(goodBPlusOrBetter * 100).toFixed(1)}%`
   );

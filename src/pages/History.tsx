@@ -8,7 +8,7 @@ import { PositionBadge } from '@/components/PositionBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Calendar, Users, Layers, ChevronRight, ChevronLeft, Trash2, Folder, List, Grid, Star, Search, Filter } from 'lucide-react';
+import { Calendar, Users, Layers, ChevronRight, ChevronLeft, Trash2, Folder, List, Grid, Star, Search, Filter, Pencil, Check } from 'lucide-react';
 import type { MockDraft, DraftPick, Player, RankedPlayer } from '@/types/database';
 import { useLeagues } from '@/hooks/useLeagues';
 import { BrandedLoader } from '@/components/BrandedLoader';
@@ -37,13 +37,29 @@ import { ArchetypeBadge } from '@/components/ArchetypeBadge';
 import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
 import { getArchetypeByName } from '@/constants/archetypeMappings.generated';
 import { DraftGradeBanner, DraftGradeDisplay } from '@/components/DraftGradeDisplay';
-import { computeDraftGrade, toDraftGradePicks } from '@/utils/draftGrade';
+import { computeDraftGrade, parseStoredDraftGrade, toDraftGradePicks } from '@/utils/draftGrade';
 import { buildPriorSeasonRankByPlayerId } from '@/utils/draftGradePriorSeason';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
+import {
+  buildDraftRankingsFromCommunity,
+  fetchCommunityRankingsForDraft,
+} from '@/utils/communityRankingsMerge';
+import { fetchMyCompletedMpHistory } from '@/utils/multiplayerDraftApi';
 
 interface DraftWithPicks extends MockDraft {
   picks: (DraftPick & { player: Player })[];
+  /** True when this row came from multiplayer_drafts (not solo mock_drafts). */
+  isMultiplayer?: boolean;
 }
+
+type LeagueGradeMeta = {
+  isSuperflex: boolean;
+  scoringFormat: string;
+  leagueType: string;
+  rookiesOnly: boolean;
+};
+
+type KeeperRow = { team_number: number; player_id: string; round_number: number };
 
 const History = () => {
   const { user, loading: authLoading } = useAuth();
@@ -69,6 +85,12 @@ const History = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [cpuArchetypePreviewName, setCpuArchetypePreviewName] = useState<string | null>(null);
+  const [keepersByLeagueId, setKeepersByLeagueId] = useState<Record<string, KeeperRow[]>>({});
+  const [leagueMetaById, setLeagueMetaById] = useState<Record<string, LeagueGradeMeta>>({});
+  /** Board ADP (community rank) by player id — matches DraftRoom grading inputs. */
+  const [boardAdpByPlayerId, setBoardAdpByPlayerId] = useState<Record<string, number>>({});
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const [editingDraftName, setEditingDraftName] = useState('');
 
   const unlockedArchetypeNames = useMemo(() => {
     const unlocked = new Set<string>();
@@ -194,7 +216,7 @@ const History = () => {
     }
 
     try {
-      // Fetch drafts
+      // Fetch solo drafts
       const { data: draftsData, error: draftsError } = await supabase
         .from('mock_drafts')
         .select('*')
@@ -204,60 +226,68 @@ const History = () => {
       if (draftsError) throw draftsError;
 
       const draftIds = (draftsData || []).map((d) => d.id);
-      if (draftIds.length === 0) {
-        setDrafts([]);
-        setPlayers([]);
-        setLoading(false);
-        return;
-      }
-
-      // Single batched picks query (with join) instead of one query per draft
       const picksByDraftId = new Map<string, (DraftPick & { player: Player })[]>();
       const playersMap = new Map<string, Player>();
       const DRAFT_ID_BATCH = 80;
       const PICKS_PAGE_SIZE = 1000;
 
-      for (let b = 0; b < draftIds.length; b += DRAFT_ID_BATCH) {
-        const batchIds = draftIds.slice(b, b + DRAFT_ID_BATCH);
-        let offset = 0;
-        let hasMore = true;
-        while (hasMore) {
-          const { data: page, error: picksError } = await supabase
-            .from('draft_picks')
-            .select(`*, players (*)`)
-            .in('mock_draft_id', batchIds)
-            .order('pick_number', { ascending: true })
-            .range(offset, offset + PICKS_PAGE_SIZE - 1);
+      if (draftIds.length > 0) {
+        for (let b = 0; b < draftIds.length; b += DRAFT_ID_BATCH) {
+          const batchIds = draftIds.slice(b, b + DRAFT_ID_BATCH);
+          let offset = 0;
+          let hasMore = true;
+          while (hasMore) {
+            const { data: page, error: picksError } = await supabase
+              .from('draft_picks')
+              .select(`*, players (*)`)
+              .in('mock_draft_id', batchIds)
+              .order('pick_number', { ascending: true })
+              .range(offset, offset + PICKS_PAGE_SIZE - 1);
 
-          if (picksError) {
-            console.error('Error fetching picks with join:', picksError);
-            break;
+            if (picksError) {
+              console.error('Error fetching picks with join:', picksError);
+              break;
+            }
+            const rows = page || [];
+            for (const pick of rows) {
+              const player = (pick as any).players ?? playersMap.get(pick.player_id) ?? null;
+              if (player && player.id) playersMap.set(player.id, player);
+              const entry: DraftPick & { player: Player | null } = {
+                id: pick.id,
+                mock_draft_id: pick.mock_draft_id,
+                player_id: pick.player_id,
+                team_number: pick.team_number,
+                round_number: pick.round_number,
+                pick_number: pick.pick_number,
+                created_at: pick.created_at,
+                is_autodraft: (pick as { is_autodraft?: boolean }).is_autodraft,
+                player: player as Player,
+              };
+              const list = picksByDraftId.get(pick.mock_draft_id) || [];
+              list.push(entry as DraftPick & { player: Player });
+              picksByDraftId.set(pick.mock_draft_id, list);
+            }
+            hasMore = rows.length === PICKS_PAGE_SIZE;
+            offset += PICKS_PAGE_SIZE;
           }
-          const rows = page || [];
-          for (const pick of rows) {
-            const player = (pick as any).players ?? playersMap.get(pick.player_id) ?? null;
-            if (player && player.id) playersMap.set(player.id, player);
-            const entry: DraftPick & { player: Player | null } = {
-              id: pick.id,
-              mock_draft_id: pick.mock_draft_id,
-              player_id: pick.player_id,
-              team_number: pick.team_number,
-              round_number: pick.round_number,
-              pick_number: pick.pick_number,
-              created_at: pick.created_at,
-              player: player as Player,
-            };
-            const list = picksByDraftId.get(pick.mock_draft_id) || [];
-            list.push(entry as DraftPick & { player: Player });
-            picksByDraftId.set(pick.mock_draft_id, list);
-          }
-          hasMore = rows.length === PICKS_PAGE_SIZE;
-          offset += PICKS_PAGE_SIZE;
         }
       }
 
-      // Fetch any players missing from join (e.g. deleted or join failed)
-      const missingIds = new Set<string>();
+      // Completed multiplayer mocks this user played
+      let mpHistory: Awaited<ReturnType<typeof fetchMyCompletedMpHistory>> = [];
+      try {
+        mpHistory = await fetchMyCompletedMpHistory(user.id);
+      } catch (mpErr) {
+        console.warn('Failed to load multiplayer draft history:', mpErr);
+      }
+
+      const mpPlayerIds = new Set<string>();
+      for (const row of mpHistory) {
+        for (const pick of row.picks) {
+          if (pick.player_id) mpPlayerIds.add(pick.player_id);
+        }
+      }
+      const missingIds = new Set<string>(mpPlayerIds);
       picksByDraftId.forEach((picks) => {
         picks.forEach((p) => {
           if (p.player_id && !playersMap.has(p.player_id)) missingIds.add(p.player_id);
@@ -271,7 +301,6 @@ const History = () => {
           const { data } = await supabase.from('players').select('*').in('id', batch);
           (data || []).forEach((p) => playersMap.set(p.id, p));
         }
-        // Re-attach player to picks that had missing player
         picksByDraftId.forEach((picks) => {
           picks.forEach((p) => {
             if (!p.player && p.player_id) (p as any).player = playersMap.get(p.player_id) ?? null;
@@ -279,15 +308,68 @@ const History = () => {
         });
       }
 
-      const draftsWithPicks: DraftWithPicks[] = (draftsData || []).map((draft) => ({
-        ...draft,
+      const soloDrafts: DraftWithPicks[] = (draftsData || []).map((draft) => ({
+        ...(draft as MockDraft),
+        isMultiplayer: false,
         picks: (picksByDraftId.get(draft.id) || [])
           .filter((p): p is DraftPick & { player: Player } => p.player != null)
           .sort((a, b) => a.pick_number - b.pick_number),
       }));
 
+      const mpDrafts: DraftWithPicks[] = mpHistory.map((row) => {
+        const result = row.result;
+        const picks = row.picks
+          .map((pick) => {
+            const player = playersMap.get(pick.player_id);
+            if (!player) return null;
+            return {
+              id: pick.id,
+              mock_draft_id: pick.draft_id,
+              player_id: pick.player_id,
+              team_number: pick.team_number,
+              round_number: pick.round_number,
+              pick_number: pick.pick_number,
+              created_at: pick.created_at,
+              is_autodraft: pick.is_autodraft,
+              player,
+            } as DraftPick & { player: Player };
+          })
+          .filter((p): p is DraftPick & { player: Player } => p != null)
+          .sort((a, b) => a.pick_number - b.pick_number);
+
+        return {
+          id: row.draft.id,
+          user_id: user.id,
+          name: row.draft.name,
+          num_teams: row.draft.num_teams,
+          num_rounds: row.draft.num_rounds,
+          user_pick_position: row.team_number,
+          draft_order: row.draft.draft_order,
+          status: 'completed',
+          created_at: row.draft.created_at,
+          completed_at: row.draft.completed_at,
+          league_id: row.draft.source_league_id,
+          pick_timer: row.draft.pick_timer,
+          cpu_speed: row.draft.cpu_speed as MockDraft['cpu_speed'],
+          grade_letter: result?.grade_letter ?? null,
+          grade_score: result?.grade_score != null ? Number(result.grade_score) : null,
+          grade_payload: result?.grade_payload ?? null,
+          user_detected_archetype: result?.detected_archetype ?? null,
+          user_detected_archetype_index: result?.detected_archetype_index ?? null,
+          user_detected_chaos_archetype: result?.detected_chaos_archetype ?? null,
+          isMultiplayer: true,
+          picks,
+        };
+      });
+
+      const merged = [...soloDrafts, ...mpDrafts].sort((a, b) => {
+        const dateA = new Date(a.completed_at || a.created_at).getTime();
+        const dateB = new Date(b.completed_at || b.created_at).getTime();
+        return dateB - dateA;
+      });
+
       setPlayers(Array.from(playersMap.values()));
-      setDrafts(draftsWithPicks);
+      setDrafts(merged);
     } catch (error) {
       console.error('Error fetching drafts:', error);
       toast.error('Failed to load drafts');
@@ -299,6 +381,120 @@ const History = () => {
   useEffect(() => {
       fetchData();
   }, [fetchData]);
+
+  // Load keepers + league settings + community board ADP so History grades match DraftRoom.
+  useEffect(() => {
+    if (drafts.length === 0) {
+      setKeepersByLeagueId({});
+      setLeagueMetaById({});
+      setBoardAdpByPlayerId({});
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const leagueIds = [
+        ...new Set(drafts.map((d) => d.league_id).filter((id): id is string => !!id)),
+      ];
+
+      const metaById: Record<string, LeagueGradeMeta> = {};
+      const keepersMap: Record<string, KeeperRow[]> = {};
+
+      if (leagueIds.length > 0) {
+        const { data: leaguesData } = await supabase
+          .from('leagues')
+          .select('id, is_superflex, scoring_format, league_type, rookies_only')
+          .in('id', leagueIds);
+        for (const row of leaguesData || []) {
+          metaById[row.id] = {
+            isSuperflex: Boolean(row.is_superflex),
+            scoringFormat: (row.scoring_format as string) || 'ppr',
+            leagueType: (row.league_type as string) || 'season',
+            rookiesOnly: Boolean(row.rookies_only),
+          };
+        }
+
+        const { data: keepersData } = await (supabase as any)
+          .from('league_keepers')
+          .select('league_id, team_number, player_id, round_number')
+          .in('league_id', leagueIds);
+        for (const row of (keepersData || []) as Array<{
+          league_id: string;
+          team_number: number;
+          player_id: string;
+          round_number: number;
+        }>) {
+          const list = keepersMap[row.league_id] || [];
+          list.push({
+            team_number: row.team_number,
+            player_id: row.player_id,
+            round_number: row.round_number,
+          });
+          keepersMap[row.league_id] = list;
+        }
+      }
+
+      if (cancelled) return;
+      setLeagueMetaById(metaById);
+      setKeepersByLeagueId(keepersMap);
+
+      // Build community board ADP for drafts missing a stored grade.
+      const needsRecompute = drafts.some(
+        (d) => d.status === 'completed' && !parseStoredDraftGrade(d.grade_payload)
+      );
+      if (!needsRecompute || players.length === 0) {
+        setBoardAdpByPlayerId({});
+        return;
+      }
+
+      const bucketKey = (m: LeagueGradeMeta) =>
+        `${m.scoringFormat}|${m.leagueType}|${m.isSuperflex ? 'sf' : '1qb'}|${m.rookiesOnly ? 'rook' : 'all'}`;
+
+      const buckets = new Map<string, LeagueGradeMeta>();
+      for (const draft of drafts) {
+        if (draft.status !== 'completed' || parseStoredDraftGrade(draft.grade_payload)) continue;
+        const meta = draft.league_id
+          ? metaById[draft.league_id]
+          : {
+              isSuperflex: false,
+              scoringFormat: (draft as { scoring_format?: string }).scoring_format || 'ppr',
+              leagueType: 'season',
+              rookiesOnly: false,
+            };
+        if (!meta) continue;
+        buckets.set(bucketKey(meta), meta);
+      }
+
+      const adpMerged: Record<string, number> = {};
+      for (const meta of buckets.values()) {
+        const community = await fetchCommunityRankingsForDraft(
+          supabase,
+          {
+            scoringFormat: meta.scoringFormat,
+            leagueType: meta.leagueType,
+            isSuperflex: meta.isSuperflex,
+            rookiesOnly: meta.rookiesOnly,
+          },
+          { excludeUserId: user?.id ?? null, excludeGuestSessionId: null }
+        );
+        const ranked = await buildDraftRankingsFromCommunity(
+          supabase,
+          players as unknown as Array<
+            Record<string, unknown> & { id: string; adp?: number | null; espn_id?: string | null }
+          >,
+          community
+        );
+        for (const p of ranked) {
+          if (adpMerged[p.id] == null) adpMerged[p.id] = p.adp;
+        }
+      }
+      if (!cancelled) setBoardAdpByPlayerId(adpMerged);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [drafts, players, user?.id]);
 
   const deleteDraft = async (draftId: string) => {
     try {
@@ -361,6 +557,9 @@ const History = () => {
 
   const computeGradeForDraft = (draft: DraftWithPicks) => {
     if (draft.status !== 'completed') return null;
+    const stored = parseStoredDraftGrade(draft.grade_payload);
+    if (stored) return stored;
+
     const userPicks = dedupePicksBySlot(getUserTeamPicks(draft).filter((p) => p.player));
     if (userPicks.length === 0) return null;
     const chaos =
@@ -368,36 +567,54 @@ const History = () => {
       null;
     const archetypeName =
       (draft as { user_detected_archetype?: string | null }).user_detected_archetype?.trim() || null;
+    const replaceChaos = !!(chaos && isChaosReplace(chaos));
+    const leagueMeta = draft.league_id ? leagueMetaById[draft.league_id] : undefined;
+    const isSuperflex =
+      leagueMeta?.isSuperflex ??
+      (draft.id === selectedDraft?.id ? draftLeagueSettings?.isSuperflex : undefined) ??
+      false;
+    const keepers = draft.league_id ? keepersByLeagueId[draft.league_id] || [] : [];
+    const poolForGrade = players.map((p) => ({
+      position: p.position,
+      team: p.team,
+      adp: boardAdpByPlayerId[p.id] ?? p.adp,
+    }));
+
     return computeDraftGrade(
       toDraftGradePicks(
-        userPicks.map((p) => ({
-          pick_number: p.pick_number,
-          round_number: p.round_number,
-          is_autodraft: p.is_autodraft,
-          player: p.player
-            ? {
-                id: p.player.id,
-                name: p.player.name,
-                adp: p.player.adp,
-                position: p.player.position,
-                team: p.player.team,
-                bye_week: p.player.bye_week,
-              }
-            : null,
-        }))
+        userPicks.map((p) => {
+          const isKeeper = keepers.some(
+            (k) =>
+              k.player_id === p.player_id &&
+              k.round_number === p.round_number &&
+              k.team_number === p.team_number
+          );
+          return {
+            pick_number: p.pick_number,
+            round_number: p.round_number,
+            is_autodraft: p.is_autodraft,
+            is_keeper: isKeeper,
+            player: p.player
+              ? {
+                  id: p.player.id,
+                  name: p.player.name,
+                  adp: boardAdpByPlayerId[p.player.id] ?? p.player.adp,
+                  position: p.player.position,
+                  team: p.player.team,
+                  bye_week: p.player.bye_week,
+                }
+              : null,
+          };
+        })
       ),
       {
         numTeams: draft.num_teams,
         numRounds: draft.num_rounds,
         chaosArchetype: chaos,
-        isSuperflex: draft.id === selectedDraft?.id ? draftLeagueSettings?.isSuperflex : undefined,
-        playerPool: players.map((p) => ({
-          position: p.position,
-          team: p.team,
-          adp: p.adp,
-        })),
+        isSuperflex,
+        playerPool: poolForGrade,
         priorSeasonRankByPlayerId,
-        archetypeName: archetypeName || undefined,
+        archetypeName: replaceChaos ? chaos : archetypeName || undefined,
       }
     );
   };
@@ -495,6 +712,7 @@ const History = () => {
   }, [selectedDraft, selectedCpuTeam]);
 
   const toggleFavorite = async (draftId: string, currentFavorite: boolean) => {
+    if (drafts.find((d) => d.id === draftId)?.isMultiplayer) return;
     try {
       await supabase
         .from('mock_drafts')
@@ -507,6 +725,35 @@ const History = () => {
       toast.success(!currentFavorite ? 'Draft favorited' : 'Draft unfavorited');
     } catch (error) {
       toast.error('Failed to update favorite status');
+    }
+  };
+
+  const saveDraftName = async (draftId: string) => {
+    const nextName = editingDraftName.trim();
+    if (!nextName) {
+      toast.error('Enter a draft name');
+      return;
+    }
+    try {
+      if (!user || draftId.startsWith('temp_')) {
+        const temp = tempDraftStorage.getDraft(draftId);
+        if (temp) {
+          tempDraftStorage.saveDraft({ ...temp.draft, name: nextName }, temp.picks);
+        }
+      } else {
+        const { error } = await supabase
+          .from('mock_drafts')
+          .update({ name: nextName })
+          .eq('id', draftId);
+        if (error) throw error;
+      }
+      setDrafts((prev) => prev.map((d) => (d.id === draftId ? { ...d, name: nextName } : d)));
+      setSelectedDraft((prev) => (prev?.id === draftId ? { ...prev, name: nextName } : prev));
+      setEditingDraftId(null);
+      toast.success('Draft renamed');
+    } catch (error) {
+      console.error('Failed to rename draft:', error);
+      toast.error('Failed to rename draft');
     }
   };
 
@@ -882,25 +1129,72 @@ const History = () => {
         ) : (
           <div className="space-y-4">
             {filteredDrafts.map((draft) => (
-              <div key={draft.id} className="glass-card p-4 animate-slide-up">
+              <div
+                key={draft.isMultiplayer ? `mp-${draft.id}` : draft.id}
+                className="glass-card p-4 animate-slide-up"
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <button
-                        onClick={() => toggleFavorite(draft.id, draft.is_favorite || false)}
-                        className="p-1 hover:bg-secondary/50 rounded transition-colors"
-                        aria-label={draft.is_favorite ? 'Unfavorite' : 'Favorite'}
-                      >
-                        <Star
-                          className={cn(
-                            'w-4 h-4 transition-colors',
-                            draft.is_favorite
-                              ? 'fill-yellow-400 text-yellow-400'
-                              : 'text-muted-foreground hover:text-yellow-400'
+                      {!draft.isMultiplayer ? (
+                        <button
+                          onClick={() => toggleFavorite(draft.id, draft.is_favorite || false)}
+                          className="p-1 hover:bg-secondary/50 rounded transition-colors"
+                          aria-label={draft.is_favorite ? 'Unfavorite' : 'Favorite'}
+                        >
+                          <Star
+                            className={cn(
+                              'w-4 h-4 transition-colors',
+                              draft.is_favorite
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-muted-foreground hover:text-yellow-400'
+                            )}
+                          />
+                        </button>
+                      ) : (
+                        <Users className="w-4 h-4 text-primary shrink-0" aria-hidden />
+                      )}
+                      {editingDraftId === draft.id ? (
+                        <form
+                          className="flex items-center gap-2"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            void saveDraftName(draft.id);
+                          }}
+                        >
+                          <Input
+                            value={editingDraftName}
+                            onChange={(e) => setEditingDraftName(e.target.value)}
+                            className="h-8 w-48 bg-secondary/50"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') setEditingDraftId(null);
+                            }}
+                          />
+                          <Button type="submit" size="icon" variant="ghost" className="h-8 w-8" aria-label="Save name">
+                            <Check className="w-4 h-4" />
+                          </Button>
+                        </form>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <h3 className="font-display text-xl">{draft.name}</h3>
+                          {!draft.isMultiplayer && (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-muted-foreground"
+                              aria-label="Rename draft"
+                              onClick={() => {
+                                setEditingDraftId(draft.id);
+                                setEditingDraftName(draft.name);
+                              }}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
                           )}
-                        />
-                      </button>
-                      <h3 className="font-display text-xl">{draft.name}</h3>
+                        </div>
+                      )}
                       <span
                         className={cn(
                           'px-2 py-0.5 rounded text-xs font-medium',
@@ -911,6 +1205,11 @@ const History = () => {
                       >
                         {draft.status === 'completed' ? 'Completed' : 'In Progress'}
                       </span>
+                      {draft.isMultiplayer && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/15 text-primary border border-primary/25">
+                          Multiplayer
+                        </span>
+                      )}
                       {draft.status === 'completed' && (() => {
                         const listGrade = computeGradeForDraft(draft);
                         const chaosNm =
@@ -1008,28 +1307,35 @@ const History = () => {
                       );
                     })()}
 
-                    {/* Move to league dropdown */}
-                    <div className="mt-3 flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Move to:</span>
-                      <select
-                        value={draft.league_id || ''}
-                        onChange={(e) =>
-                          assignDraftToLeague(draft.id, e.target.value || null)
-                        }
-                        className="text-xs bg-secondary/50 border border-border/50 rounded px-2 py-1 text-foreground"
-                      >
-                        <option value="">Uncategorized</option>
-                        {leagues.map((league) => (
-                          <option key={league.id} value={league.id}>
-                            {league.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Move to league dropdown (solo mocks only) */}
+                    {!draft.isMultiplayer && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Move to:</span>
+                        <select
+                          value={draft.league_id || ''}
+                          onChange={(e) =>
+                            assignDraftToLeague(draft.id, e.target.value || null)
+                          }
+                          className="text-xs bg-secondary/50 border border-border/50 rounded px-2 py-1 text-foreground"
+                        >
+                          <option value="">Uncategorized</option>
+                          {leagues.map((league) => (
+                            <option key={league.id} value={league.id}>
+                              {league.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {draft.isMultiplayer && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Drafted with other players (multiplayer mock).
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {draft.status === 'in_progress' ? (
+                    {draft.status === 'in_progress' && !draft.isMultiplayer ? (
                       <Button
                         variant="default"
                         size="sm"
@@ -1047,27 +1353,29 @@ const History = () => {
                       View <ChevronRight className="w-4 h-4" />
                     </Button>
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete "{draft.name}" and all its picks.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteDraft(draft.id)}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    {!draft.isMultiplayer && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete "{draft.name}" and all its picks.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteDraft(draft.id)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1088,9 +1396,19 @@ const History = () => {
       >
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">
-              {selectedDraft?.name}
+            <DialogTitle className="font-display text-2xl flex items-center gap-2 flex-wrap">
+              <span>{selectedDraft?.name}</span>
+              {selectedDraft?.isMultiplayer && (
+                <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/15 text-primary border border-primary/25 font-sans tracking-normal">
+                  Multiplayer
+                </span>
+              )}
             </DialogTitle>
+            {selectedDraft?.isMultiplayer && (
+              <p className="text-sm text-muted-foreground">
+                This mock was run with other players.
+              </p>
+            )}
           </DialogHeader>
 
             {selectedDraft && (

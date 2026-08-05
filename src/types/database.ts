@@ -46,6 +46,12 @@ export interface MockDraft {
   user_detected_archetype_index?: number | null;
   /** Chaos archetype name when a chaos trigger fired; replace-type replaces main for display. */
   user_detected_chaos_archetype?: string | null;
+  /** Letter grade locked in at completion (matches History). */
+  grade_letter?: string | null;
+  /** Numeric score locked in at completion. */
+  grade_score?: number | null;
+  /** Full grade result JSON from completion for History display. */
+  grade_payload?: Record<string, unknown> | null;
 }
 
 export interface DraftPick {

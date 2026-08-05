@@ -132,3 +132,60 @@ export function positionTierCutsEqual(a: PositionTierCuts, b: PositionTierCuts):
   }
   return true;
 }
+
+/**
+ * Build consensus cut points from many users' tier submissions.
+ * Votes are smoothed ±1 rank, local peaks kept when they clear a share of submitters,
+ * and near-duplicate peaks within 1 rank are collapsed to the stronger vote.
+ */
+export function aggregateCommunityTierCuts(
+  submissions: PositionTierCuts[],
+  minShare = 0.2
+): PositionTierCuts {
+  const histByPos = new Map<string, Map<number, number>>();
+  const submittersByPos = new Map<string, number>();
+
+  for (const sub of submissions) {
+    for (const [rawPos, rawCuts] of Object.entries(sub)) {
+      const pos = normalizeTierPosition(rawPos);
+      const cuts = normalizeCuts(rawCuts);
+      if (cuts.length === 0) continue;
+      submittersByPos.set(pos, (submittersByPos.get(pos) ?? 0) + 1);
+      const hist = histByPos.get(pos) ?? new Map<number, number>();
+      for (const cut of cuts) {
+        hist.set(cut, (hist.get(cut) ?? 0) + 1);
+      }
+      histByPos.set(pos, hist);
+    }
+  }
+
+  const out: PositionTierCuts = {};
+  for (const [pos, hist] of histByPos) {
+    const submitters = submittersByPos.get(pos) ?? 0;
+    if (submitters === 0 || hist.size === 0) continue;
+    const minVotes = Math.max(1, Math.ceil(submitters * minShare));
+    const maxRank = Math.max(...hist.keys());
+    const raw = (rank: number) => hist.get(rank) ?? 0;
+    const smooth = (rank: number) => raw(rank) + 0.5 * raw(rank - 1) + 0.5 * raw(rank + 1);
+
+    const peaks: { rank: number; score: number }[] = [];
+    for (let rank = 1; rank <= maxRank; rank++) {
+      if (raw(rank) < 1) continue;
+      const score = smooth(rank);
+      if (score + 1e-9 < minVotes) continue;
+      if (score + 1e-9 < smooth(rank - 1)) continue;
+      if (score + 1e-9 < smooth(rank + 1)) continue;
+      peaks.push({ rank, score });
+    }
+
+    peaks.sort((a, b) => b.score - a.score || a.rank - b.rank);
+    const chosen: number[] = [];
+    for (const peak of peaks) {
+      if (chosen.some((existing) => Math.abs(existing - peak.rank) <= 1)) continue;
+      chosen.push(peak.rank);
+    }
+    chosen.sort((a, b) => a - b);
+    if (chosen.length > 0) out[pos] = chosen;
+  }
+  return out;
+}

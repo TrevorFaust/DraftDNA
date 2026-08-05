@@ -1,7 +1,8 @@
 import type { RankedPlayer } from '@/types/database';
 
-/** Merge my current rankings into community (excluding me) for live update when dragging. */
-/** ADP = position in merged list so ADP always matches community rank (updates as user drags). */
+/** Merge my current rankings into community (excluding me) for live update when dragging.
+ *  Sets list `rank` / temporary `adp` to the live merged order; UI ADP labels should use
+ *  the frozen consensus map instead so drag does not rewrite displayed ADP. */
 export function mergeLiveCommunity(
   allPlayersData: any[],
   communityRaw: { player_id: string; avg_rank: number; sample_count: number }[],

@@ -139,16 +139,30 @@ function checkTrigger(chaosName: string, picks: ChaosPick[], config: ChaosDetect
         const first = sorted.find((p) => pos(p) === posKey);
         return first != null && first.round_number >= 13;
       });
-    case 'The Panic Button':
-      return sorted.filter((p) => (expectedRound(p.adp, numTeams) - p.round_number) >= 2.5).length >= 5;
+    case 'The Panic Button': {
+      // 5+ skill-position reaches of 3+ rounds vs ADP. K/DST are excluded: they sit
+      // late on the board, so normal roster-filling looks like a "reach" and was
+      // firing this badge on ordinary drafts.
+      const panicReaches = sorted.filter((p) => {
+        if (isK(p) || isDst(p)) return false;
+        const adp = Number(p.adp);
+        if (!Number.isFinite(adp) || adp <= 0 || adp >= 9000) return false;
+        return expectedRound(adp, numTeams) - p.round_number >= 3;
+      });
+      return panicReaches.length >= 5;
+    }
     case 'The Alphabetical': {
-      const names = sorted.map((p) => lastName(p.name));
-      if (names.length <= 1) return true;
-      let inOrder = 0;
+      // Very Rare: draft order is essentially A→Z by last name.
+      // Ignore blank names; require almost the full roster and at most one inversion
+      // (name-parsing edge cases). The old 80%-of-pairs rule fired on normal drafts.
+      const names = sorted.map((p) => lastName(p.name)).filter((n) => n.length > 0);
+      if (names.length < 8) return false;
+      if (names.length < sorted.length - 1) return false;
+      let inversions = 0;
       for (let i = 1; i < names.length; i++) {
-        if (names[i] >= names[i - 1]) inOrder++;
+        if (names[i] < names[i - 1]) inversions++;
       }
-      return inOrder / (names.length - 1) >= 0.8;
+      return inversions <= 1;
     }
     case 'The Old Boys Club': {
       const withAge = sorted.filter((p) => typeof p.age === 'number' && p.age >= 0);

@@ -12,6 +12,7 @@ export interface PosRank1Finisher {
   name: string;
   pos: string;
   round: number;
+  isKeeper?: boolean;
 }
 
 export interface RbWrFinisher {
@@ -19,6 +20,7 @@ export interface RbWrFinisher {
   pos: string;
   rank: number;
   draftRound: number;
+  isKeeper?: boolean;
 }
 
 export interface RankedDefFinisher {
@@ -102,6 +104,7 @@ export interface PriorSeasonPickInput {
   pick_number: number;
   playerId?: string | null;
   adp?: number;
+  is_keeper?: boolean;
 }
 
 const EARLY_ROSTER_MAX_ROUND = 12;
@@ -194,6 +197,7 @@ export function analyzePriorSeasonRanks(
             name: p.name,
             pos: p.pos,
             round: p.round_number,
+            isKeeper: Boolean(p.is_keeper),
           });
         }
         if (rank <= 5) {
@@ -231,6 +235,7 @@ export function analyzePriorSeasonRanks(
         name: p.name,
         pos: p.pos,
         round: p.round_number,
+        isKeeper: Boolean(p.is_keeper),
       });
     }
 
@@ -267,6 +272,7 @@ export function analyzePriorSeasonRanks(
             pos: p.pos,
             rank,
             draftRound: p.round_number,
+            isKeeper: Boolean(p.is_keeper),
           });
         }
       }
@@ -512,15 +518,26 @@ function describeRbWrFinisher(f: RbWrFinisher, y: number): string {
   return `${f.name} as the ${y} ${posRankTag(f.pos, f.rank)}`;
 }
 
+function describeLateFinisher(f: RbWrFinisher): string {
+  if (f.isKeeper) {
+    return `${f.name} (${posRankTag(f.pos, f.rank)}, kept in round ${f.draftRound})`;
+  }
+  return `${f.name} (${posRankTag(f.pos, f.rank)} in round ${f.draftRound})`;
+}
+
 function rbWrProductionFromRanks(profile: PriorSeasonDraftProfile, y: number): string | null {
   const finishers = [...profile.rbWrFinishers].sort((a, b) => a.draftRound - b.draftRound);
   if (finishers.length === 0) return null;
 
-  const core = finishers.filter((f) => f.draftRound < LATE_TOP5_QB_ROUND);
-  const late = finishers.filter((f) => f.draftRound >= LATE_TOP5_QB_ROUND);
+  // Keepers are rostered talent, not late-round finds — treat them as core.
+  const core = finishers.filter((f) => f.isKeeper || f.draftRound < LATE_TOP5_QB_ROUND);
+  const late = finishers.filter((f) => !f.isKeeper && f.draftRound >= LATE_TOP5_QB_ROUND);
 
   if (core.length === 1 && late.length === 0) {
     const f = core[0];
+    if (f.isKeeper) {
+      return `You have ${describeRbWrFinisher(f, y)} as a round-${f.draftRound} keeper.`;
+    }
     return `You have ${describeRbWrFinisher(f, y)}.`;
   }
 
@@ -535,18 +552,14 @@ function rbWrProductionFromRanks(profile: PriorSeasonDraftProfile, y: number): s
         ? `You have ${coreParts[0]}.`
         : `You have ${coreParts.slice(0, -1).join(', ')} and ${coreParts[coreParts.length - 1]}.`;
     if (late.length > 0) {
-      const lateDesc = late
-        .map((f) => `${f.name} (${posRankTag(f.pos, f.rank)} in round ${f.draftRound})`)
-        .join(' and ');
+      const lateDesc = late.map(describeLateFinisher).join(' and ');
       line += ` You also added ${lateDesc} later.`;
     }
     return line;
   }
 
   if (late.length > 0) {
-    const lateDesc = late
-      .map((f) => `${f.name} (${posRankTag(f.pos, f.rank)} in round ${f.draftRound})`)
-      .join(' and ');
+    const lateDesc = late.map(describeLateFinisher).join(' and ');
     return `You found ${lateDesc} in the back half of the draft.`;
   }
 
@@ -690,9 +703,15 @@ function posRank1SkillBeats(
     if (isObviousFirstRoundElite(f, narrativeCtx)) continue;
 
     const label = positionLabel(f.pos);
-    beats.push(
-      `${f.name} finished first among ${label}s in ${y}, and landing him in round ${f.round} was strong value.`
-    );
+    if (f.isKeeper) {
+      beats.push(
+        `${f.name} finished first among ${label}s in ${y}, and keeping him in round ${f.round} locked that production onto your roster.`
+      );
+    } else {
+      beats.push(
+        `${f.name} finished first among ${label}s in ${y}, and landing him in round ${f.round} was strong value.`
+      );
+    }
   }
   return beats;
 }

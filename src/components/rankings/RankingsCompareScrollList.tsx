@@ -213,16 +213,14 @@ export function gapTopForDropSlot(
   return (prevBottom + nextTop) / 2 - half;
 }
 
+/** Reorder for optimistic drag preview only — keep each player's global `rank` / `adp`. */
 export function orderPlayersByPreviewIds(
   players: RankedPlayer[],
   previewIds: readonly string[]
 ): RankedPlayer[] {
   const byId = new Map(players.map((p) => [p.id, p]));
   return previewIds
-    .map((id, index) => {
-      const player = byId.get(id);
-      return player ? { ...player, rank: index + 1 } : null;
-    })
+    .map((id) => byId.get(id) ?? null)
     .filter((p): p is RankedPlayer => p != null);
 }
 

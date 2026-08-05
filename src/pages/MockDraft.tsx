@@ -22,19 +22,58 @@ import { BrandedLoader } from '@/components/BrandedLoader';
 import type { MockDraft } from '@/types/database';
 import { assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
 import { fetchRookiesRankings } from '@/utils/rookiesFilter';
+import { fetchMergedPlayerPool } from '@/utils/playerPoolFetch';
+import {
+  buildDraftRankingsFromCommunity,
+  fetchCommunityRankingsForDraft,
+} from '@/utils/communityRankingsMerge';
+import {
+  fetchGuestActiveMpDrafts,
+  fetchMyActiveMpDrafts,
+  mpCreateDraft,
+} from '@/utils/multiplayerDraftApi';
+import { getOrCreateGuestSessionId, resetGuestSessionId } from '@/utils/temporaryStorage';
 
 const MockDraft = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedLeague } = useLeagues();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [draftMode, setDraftMode] = useState<'solo' | 'multiplayer'>('solo');
   const [draftName, setDraftName] = useState('');
   const [numTeams, setNumTeams] = useState('12');
   const [userPickPosition, setUserPickPosition] = useState('1');
   const [pickTimer, setPickTimer] = useState('30');
   const [cpuSpeed, setCpuSpeed] = useState<'slow' | 'normal' | 'fast' | 'rapid'>('rapid');
   const [playerPool, setPlayerPool] = useState('all');
-  
+  const [activeMpDrafts, setActiveMpDrafts] = useState<
+    Array<{
+      draft_id: string;
+      invite_code: string;
+      name: string;
+      status: string;
+      team_number: number | null;
+    }>
+  >([]);
+  const [rejoinInviteCode, setRejoinInviteCode] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = user
+          ? await fetchMyActiveMpDrafts(user.id)
+          : await fetchGuestActiveMpDrafts(getOrCreateGuestSessionId());
+        if (!cancelled) setActiveMpDrafts(rows);
+      } catch {
+        if (!cancelled) setActiveMpDrafts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   // For guests: derive dynasty + rookies from tempSettings
   const tempSettings = !user ? tempSettingsStorage.get() : null;
   const isDynasty = (selectedLeague as any)?.league_type === 'dynasty' || tempSettings?.leagueType === 'dynasty';
@@ -121,15 +160,44 @@ const MockDraft = () => {
   
   // Don't redirect - allow viewing the page without auth
 
+  const resolveDraftName = async (): Promise<string> => {
+    const trimmed = draftName.trim();
+    if (trimmed) return trimmed;
+
+    let priorCount = 0;
+    if (user && selectedLeague?.id) {
+      const { count, error } = await supabase
+        .from('mock_drafts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('league_id', selectedLeague.id);
+      if (error) console.error('Failed to count league drafts for default name:', error);
+      priorCount = count ?? 0;
+    } else if (user) {
+      const { count, error } = await supabase
+        .from('mock_drafts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      if (error) console.error('Failed to count drafts for default name:', error);
+      priorCount = count ?? 0;
+    } else {
+      priorCount = tempDraftStorage.getDraftList().length;
+    }
+
+    return `Mock Draft #${priorCount + 1}`;
+  };
+
   const startDraft = async () => {
-    if (!draftName.trim()) {
-      toast.error('Please enter a draft name');
+    if (draftMode === 'multiplayer' && !user) {
+      toast.error('Sign in to host a multiplayer mock draft');
       return;
     }
 
     setLoading(true);
 
     try {
+      const resolvedName = await resolveDraftName();
+
       // Validate and clamp numTeams between 4 and 32
       let validatedNumTeams = parseInt(numTeams) || 12;
       if (validatedNumTeams < 4) {
@@ -234,6 +302,140 @@ const MockDraft = () => {
         numRounds = Math.min(rosterRounds, maxRoundsByPool);
       }
       
+      // Multiplayer: create lobby with frozen board, then wait for invitees
+      if (draftMode === 'multiplayer' && user) {
+        const rookiesOnly = isDynasty && effectivePlayerPool === 'rookies';
+        let boardPlayers: Array<{ id: string; position: string }> = [];
+        if (rookiesOnly) {
+          const rookieRows = await fetchRookiesRankings({
+            scoringFormat,
+            leagueType,
+            isSuperflex,
+          });
+          boardPlayers = rookieRows.map((r: any) => ({
+            id: r.player_id,
+            position: r.position || 'FLEX',
+          }));
+        } else {
+          const pool = await fetchMergedPlayerPool();
+          const community = await fetchCommunityRankingsForDraft(
+            supabase,
+            {
+              scoringFormat,
+              leagueType,
+              isSuperflex,
+              rookiesOnly: false,
+            },
+            { excludeUserId: user.id, excludeGuestSessionId: null }
+          );
+          const ranked = await buildDraftRankingsFromCommunity(
+            supabase,
+            pool as any,
+            community
+          );
+          boardPlayers = ranked.map((p) => ({ id: p.id, position: p.position }));
+          // Guarantee every team can draft a DEF and K (community board can bury them)
+          const have = new Set(boardPlayers.map((p) => p.id));
+          const needDef = validatedNumTeams;
+          const needK = validatedNumTeams;
+          let defCount = boardPlayers.filter((p) =>
+            ['DEF', 'D/ST', 'DST'].includes((p.position || '').toUpperCase())
+          ).length;
+          let kCount = boardPlayers.filter((p) => (p.position || '').toUpperCase() === 'K').length;
+          for (const p of pool as Array<{ id: string; position?: string }>) {
+            if (defCount >= needDef && kCount >= needK) break;
+            if (have.has(p.id)) continue;
+            const pos = (p.position || '').toUpperCase();
+            if (defCount < needDef && (pos === 'DEF' || pos === 'D/ST' || pos === 'DST')) {
+              boardPlayers.push({ id: p.id, position: p.position || 'DEF' });
+              have.add(p.id);
+              defCount += 1;
+            } else if (kCount < needK && pos === 'K') {
+              boardPlayers.push({ id: p.id, position: 'K' });
+              have.add(p.id);
+              kCount += 1;
+            }
+          }
+        }
+
+        if (boardPlayers.length < validatedNumTeams * numRounds) {
+          toast.error('Not enough players in the board for this league size');
+          setLoading(false);
+          return;
+        }
+
+        let keepers: Array<{ team_number: number; player_id: string; round_number: number }> = [];
+        let teamNames: Record<string, string> = {};
+        if (selectedLeague?.id) {
+          const [{ data: leagueKeepers }, { data: leagueTeams }] = await Promise.all([
+            (supabase as any)
+              .from('league_keepers')
+              .select('team_number, player_id, round_number')
+              .eq('league_id', selectedLeague.id),
+            (supabase as any)
+              .from('league_teams')
+              .select('team_number, team_name')
+              .eq('league_id', selectedLeague.id),
+          ]);
+          keepers = (leagueKeepers || []).map((k: any) => ({
+            team_number: k.team_number,
+            player_id: k.player_id,
+            round_number: k.round_number,
+          }));
+          for (const row of leagueTeams || []) {
+            if (row?.team_number != null && row?.team_name) {
+              teamNames[String(row.team_number)] = String(row.team_name);
+            }
+          }
+        }
+
+        const mpPositionLimits = positionLimits || {
+          QB: 4,
+          RB: 8,
+          WR: 8,
+          TE: 3,
+          DEF: 1,
+          K: 1,
+          FLEX: isSuperflex ? 2 : 1,
+          BENCH: 6,
+        };
+
+        const created = await mpCreateDraft({
+          name: resolvedName,
+          numTeams: validatedNumTeams,
+          numRounds,
+          hostTeamNumber: validatedPickPosition,
+          draftOrder,
+          pickTimer: pickTimer === '0' ? 0 : parseInt(pickTimer),
+          cpuSpeed,
+          scoringFormat,
+          leagueType,
+          isSuperflex,
+          positionLimits: mpPositionLimits,
+          playerPool: isDynasty ? effectivePlayerPool : 'all',
+          teamNames,
+          sourceLeagueId: selectedLeague?.id || null,
+          boardPlayerIds: boardPlayers.map((p) => p.id),
+          boardPlayerPositions: boardPlayers.map((p) => p.position),
+          keepers,
+          displayName: (
+            await supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', user.id)
+              .maybeSingle()
+          ).data?.username?.trim() || user.email?.split('@')[0] || 'Host',
+        });
+        const keeperN = created.keeper_count ?? keepers.length;
+        toast.success(
+          keeperN > 0
+            ? `Lobby created — ${keeperN} keeper${keeperN === 1 ? '' : 's'} locked in. Share the invite link.`
+            : 'Lobby created — share the invite link'
+        );
+        navigate(`/lobby/${created.invite_code}`);
+        return;
+      }
+
       // Save settings to localStorage for non-logged-in users
       if (!user) {
         tempSettingsStorage.save({
@@ -257,7 +459,7 @@ const MockDraft = () => {
         const tempDraft: MockDraft = {
           id: tempDraftId,
           user_id: 'temp_user',
-          name: draftName.trim(),
+          name: resolvedName,
           num_teams: validatedNumTeams,
           num_rounds: numRounds,
           user_pick_position: validatedPickPosition,
@@ -287,7 +489,7 @@ const MockDraft = () => {
         .from('mock_drafts')
         .insert({
           user_id: user.id,
-          name: draftName.trim(),
+          name: resolvedName,
           num_teams: validatedNumTeams,
           num_rounds: numRounds,
           user_pick_position: validatedPickPosition,
@@ -333,7 +535,7 @@ const MockDraft = () => {
               .from('mock_drafts')
               .insert({
                 user_id: user.id,
-                name: draftName.trim(),
+                name: resolvedName,
                 num_teams: validatedNumTeams,
                 num_rounds: numRounds,
                 user_pick_position: validatedPickPosition,
@@ -360,7 +562,7 @@ const MockDraft = () => {
             .from('mock_drafts')
             .insert({
               user_id: user.id,
-              name: draftName.trim(),
+              name: resolvedName,
               num_teams: validatedNumTeams,
               num_rounds: numRounds,
               user_pick_position: validatedPickPosition,
@@ -424,13 +626,108 @@ const MockDraft = () => {
               </p>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label>Draft mode</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={draftMode === 'solo' ? 'default' : 'secondary'}
+                onClick={() => setDraftMode('solo')}
+              >
+                Solo vs CPU
+              </Button>
+              <Button
+                type="button"
+                variant={draftMode === 'multiplayer' ? 'default' : 'secondary'}
+                onClick={() => setDraftMode('multiplayer')}
+              >
+                Multiplayer
+              </Button>
+            </div>
+            {draftMode === 'multiplayer' && (
+              <p className="text-xs text-muted-foreground">
+                Host creates a lobby, invites up to {Math.max(0, (parseInt(numTeams) || 12) - 1)} friends,
+                then starts when everyone is ready. Empty seats stay CPU.
+                {!user ? ' Sign in required to host.' : ''}
+              </p>
+            )}
+            {draftMode === 'multiplayer' && (
+              <div className="rounded-lg border border-border/50 bg-secondary/30 p-3 space-y-2">
+                <p className="text-sm font-medium">Rejoin a draft</p>
+                {!user && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      resetGuestSessionId();
+                      toast.success('New guest session — join a lobby to enter as a different user');
+                    }}
+                  >
+                    New guest session
+                  </Button>
+                )}
+                {activeMpDrafts.map((d) => (
+                  <div
+                    key={d.draft_id}
+                    className="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{d.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {d.status === 'lobby' ? 'Lobby' : 'In progress'} · {d.invite_code}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        navigate(
+                          d.status === 'lobby'
+                            ? `/lobby/${d.invite_code}`
+                            : `/multiplayer-draft/${d.draft_id}`
+                        )
+                      }
+                    >
+                      Rejoin
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex gap-2 pt-1">
+                  <Input
+                    value={rejoinInviteCode}
+                    onChange={(e) => setRejoinInviteCode(e.target.value.toUpperCase())}
+                    placeholder="Invite code"
+                    className="bg-background/50"
+                    autoComplete="off"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={!rejoinInviteCode.trim()}
+                    onClick={() => {
+                      // Always land on the lobby so guests can enter a display name
+                      // (and signed-in users join with their profile username there).
+                      const code = rejoinInviteCode.trim().toUpperCase();
+                      navigate(`/lobby/${code}`);
+                    }}
+                  >
+                    Go
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
           
           <div className="space-y-2">
-            <Label htmlFor="draftName">Draft Name</Label>
+            <Label htmlFor="draftName">Draft Name <span className="text-muted-foreground font-normal">(optional)</span></Label>
             <Input
               id="draftName"
               name="draftName"
-              placeholder="e.g., Mock Draft #1"
+              placeholder="Leave blank for Mock Draft #…"
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
               className="bg-secondary/50 border-border/50"
@@ -636,11 +933,11 @@ const MockDraft = () => {
               ) : (
                 <>
                   <ClipboardList className="w-5 h-5" />
-                  Start Draft
+                  {draftMode === 'multiplayer' ? 'Create lobby' : 'Start Draft'}
                 </>
               )}
             </Button>
-            {!user && (
+            {!user && draftMode === 'solo' && (
               <p className="text-xs text-muted-foreground mt-2 text-center">
                 Note: Drafts created without signing in will not be saved when you leave the page.
               </p>
@@ -653,7 +950,8 @@ const MockDraft = () => {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li>• <strong className="text-foreground">Snake Draft:</strong> Order reverses each round</li>
             <li>• <strong className="text-foreground">Linear Draft:</strong> Same order every round</li>
-            <li>• Players are sorted by your rankings (or ADP if no rankings)</li>
+            <li>• <strong className="text-foreground">Multiplayer:</strong> Invite link, claim seats, ready up, host starts</li>
+            <li>• Players are sorted by community consensus for multiplayer boards</li>
           </ul>
         </div>
       </main>

@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { getAgeFromBirthDate } from "@/utils/playerAge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { NFL_DEFENSE_TEAM_NAMES } from "@/constants/nflDefenses";
+import { NFL_DEFENSE_FANTASY_RANK_ORDER } from "@/constants/nflDefenses";
 import {
   PLAYER_POOL_PRIOR_SEASON,
   PLAYER_POOL_CURRENT_SEASON,
@@ -492,13 +492,13 @@ export default function PlayersSpreadsheet() {
         );
         const syntheticDefenses = rookiesOnly
           ? []
-          : NFL_DEFENSE_TEAM_NAMES.filter((teamName) => !existingDefenseNames.has(teamName)).map((teamName, index) => ({
+          : NFL_DEFENSE_FANTASY_RANK_ORDER.filter((teamName) => !existingDefenseNames.has(teamName)).map((teamName, index) => ({
               id: `defense-${teamName.replace(/\s/g, "-").toLowerCase()}`,
               name: teamName,
               position: "D/ST",
               team: defenseTeamAbbrByName.get(teamName) ?? null,
               season: PLAYER_POOL_PRIOR_SEASON,
-              adp: 160 + index,
+              adp: 150 + Math.floor((index / Math.max(NFL_DEFENSE_FANTASY_RANK_ORDER.length, 1)) * 50),
               bye_week: null,
               jersey_number: null,
               created_at: new Date().toISOString(),

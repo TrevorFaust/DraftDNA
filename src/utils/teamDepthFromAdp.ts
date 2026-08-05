@@ -101,7 +101,7 @@ export function getDepthRole(
   return analysis.byPlayerKey.get(playerKey(nflTeam, pos, adp)) ?? null;
 }
 
-/** Problematic: back-to-back picks that are both depth/dart pass-catchers on same team. */
+/** Problematic: back-to-back WR3+/RB depth — not WR2 ("competing"), which is startable. */
 export function isShallowSameTeamStack(
   a: { pos: string; adp: number; nflTeam: string | null },
   b: { pos: string; adp: number; nflTeam: string | null },
@@ -112,7 +112,7 @@ export function isShallowSameTeamStack(
   const roleA = getDepthRole(analysis, a.nflTeam, a.pos, a.adp);
   const roleB = getDepthRole(analysis, b.nflTeam, b.pos, b.adp);
   if (!roleA || !roleB) return false;
-  const shallow = new Set<DepthRole>(['depth', 'dart', 'competing']);
+  const shallow = new Set<DepthRole>(['depth', 'dart']);
   return shallow.has(roleA) && shallow.has(roleB);
 }
 

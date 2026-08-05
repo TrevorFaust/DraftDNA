@@ -2,7 +2,8 @@
  * Draft letter grade (A+ … F-).
  *
  * v5: value = pick − ADP (positive = faller/steal). Keepers are value-neutral
- * (no fake steals from late-round keepers). Curve centered ~B for solid drafts;
+ * (no fake steals). Discount elites (R1–5 talent kept R6–10) reshape strategy
+ * scoring and writeups. Curve centered ~B for solid drafts;
  * clean process + elites unlock As; tanks land D/F.
  */
 
@@ -18,6 +19,7 @@ import {
   analyzeEarlyDraftStructure,
   isFalseEarlySteal,
 } from '@/utils/draftGradeEarlySlot';
+import { analyzeKeeperDraftContext } from '@/utils/draftGradeKeepers';
 import {
   analyzeRosterQuality,
   buildInsightTagline,
@@ -100,26 +102,49 @@ export interface DraftGradeResult {
   summary: string;
 }
 
+/** Read a grade result saved on mock_drafts.grade_payload (or temp draft storage). */
+export function parseStoredDraftGrade(payload: unknown): DraftGradeResult | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const p = payload as Partial<DraftGradeResult>;
+  if (typeof p.grade !== 'string' || typeof p.numericScore !== 'number' || !p.breakdown) {
+    return null;
+  }
+  return {
+    grade: p.grade as LetterGrade,
+    numericScore: p.numericScore,
+    breakdown: p.breakdown,
+    tagline: typeof p.tagline === 'string' ? p.tagline : '',
+    summary: typeof p.summary === 'string' ? p.summary : '',
+  };
+}
+
 /**
- * Centered ~B (75): chalk ADP drafts land B-/B, steals+elites unlock As,
- * structural mistakes land C/D, and extreme tanks land F+/F/F- without
- * collapsing every bad draft to zero.
+ * Letter-first grading: pick A/B/C/D/F from overall quality, then + / plain / -
+ * as slightly better / on par / slightly worse within that letter.
+ *
+ * Good-faith human drafts mostly land A–C. D is heavy reaches / blind faith.
+ * F is structural meltdown (early K/DEF spam, no skill core).
  */
 const GRADE_SCALE: { min: number; grade: LetterGrade }[] = [
+  // A family (80–100)
   { min: 93, grade: 'A+' },
-  { min: 88, grade: 'A' },
-  { min: 85, grade: 'A-' },
-  { min: 81, grade: 'B+' },
-  { min: 75, grade: 'B' },
-  { min: 71, grade: 'B-' },
-  { min: 67, grade: 'C+' },
-  { min: 62, grade: 'C' },
-  { min: 58, grade: 'C-' },
-  { min: 54, grade: 'D+' },
-  { min: 49, grade: 'D' },
-  { min: 44, grade: 'D-' },
-  { min: 40, grade: 'F+' },
-  { min: 35, grade: 'F' },
+  { min: 86, grade: 'A' },
+  { min: 80, grade: 'A-' },
+  // B family (66–79)
+  { min: 75, grade: 'B+' },
+  { min: 70, grade: 'B' },
+  { min: 66, grade: 'B-' },
+  // C family (52–65)
+  { min: 61, grade: 'C+' },
+  { min: 56, grade: 'C' },
+  { min: 52, grade: 'C-' },
+  // D family (36–51)
+  { min: 46, grade: 'D+' },
+  { min: 41, grade: 'D' },
+  { min: 36, grade: 'D-' },
+  // F family (0–35)
+  { min: 27, grade: 'F+' },
+  { min: 16, grade: 'F' },
   { min: 0, grade: 'F-' },
 ];
 
@@ -203,12 +228,12 @@ function isReachHeavyBoard(opts: {
   premiumSlotMiss: boolean;
   earlyTeamWr2Count: number;
 }): boolean {
+  // A few projection reaches (Love / Waddle-type bets) are normal — not board-breaking.
   return (
-    opts.reachCount >= 4 ||
-    opts.avgValueSpots < -6 ||
-    opts.negativeValuePickCount >= 5 ||
-    opts.premiumSlotMiss ||
-    // Only extreme WR2 stacking counts as board-break — 2 depth WRs is common chalk.
+    opts.reachCount >= 6 ||
+    opts.avgValueSpots < -10 ||
+    opts.negativeValuePickCount >= 7 ||
+    (opts.premiumSlotMiss && opts.reachCount >= 3) ||
     opts.earlyTeamWr2Count >= 4
   );
 }
@@ -224,6 +249,8 @@ function computeSynergyScore(
     avgValueSpots: number;
     consensusPickRate: number;
     rosterPenalty: number;
+    hasEliteWrKeeper?: boolean;
+    hasEliteRbKeeper?: boolean;
   }
 ): { score: number; modifier: number; rb2Round: number | null; wr2Round: number | null } {
   const { numTeams, numRounds, chaosArchetype, realStealCount, reachCount, avgValueSpots, consensusPickRate, rosterPenalty } =
@@ -232,27 +259,45 @@ function computeSynergyScore(
   let score = 74;
   const chaos = isChaosDraft(chaosArchetype);
 
-  const rb1Round = firstPositionRound(picks, 'RB');
-  const rb2Round = nthPositionRound(picks, 'RB', 2);
-  const wr1Round = firstPositionRound(picks, 'WR');
-  const wr2Round = nthPositionRound(picks, 'WR', 2);
+  // Drafted-only rounds for "when did you pick X"; keepers fill the hole for balance.
+  const drafted = picks.filter((p) => !p.is_keeper);
+  const rb1Drafted = firstPositionRound(drafted, 'RB');
+  const rb2Drafted = nthPositionRound(drafted, 'RB', 2);
+  const wr1Drafted = firstPositionRound(drafted, 'WR');
+  const wr2Drafted = nthPositionRound(drafted, 'WR', 2);
+
+  const rb1Round = opts.hasEliteRbKeeper ? 1 : rb1Drafted;
+  const wr1Round = opts.hasEliteWrKeeper ? 1 : wr1Drafted;
+  // Second starter: keeper counts as one, so first drafted at pos is effectively RB2/WR2.
+  const rb2Round = opts.hasEliteRbKeeper
+    ? rb1Drafted ?? rb2Drafted
+    : rb2Drafted;
+  const wr2Round = opts.hasEliteWrKeeper
+    ? wr1Drafted ?? wr2Drafted
+    : wr2Drafted;
 
   const rb2LateThreshold = Math.max(9, Math.ceil(numRounds * 0.52));
   const wr2LateThreshold = Math.max(10, Math.ceil(numRounds * 0.58));
 
-  if (rb2Round != null && rb2Round > rb2LateThreshold) score -= 11;
-  if (wr2Round != null && wr2Round > wr2LateThreshold) score -= 11;
-  if (wr1Round != null && wr1Round > 8) score -= 5;
-  if (rb1Round != null && rb1Round > 9) score -= 5;
+  if (rb2Round != null && rb2Round > rb2LateThreshold) score -= 6;
+  if (wr2Round != null && wr2Round > wr2LateThreshold) score -= 6;
+  if (wr1Round != null && wr1Round > 8) score -= 4;
+  if (rb1Round != null && rb1Round > 9) score -= 4;
 
   if (rb1Round != null && rb1Round <= 5 && wr1Round != null && wr1Round <= 6) score += 3;
   if (rb2Round != null && rb2Round <= 8 && wr2Round != null && wr2Round <= 9) score += 4;
 
   const zeroRb = rb1Round == null || rb1Round >= 6;
   const heroRb = rb1Round != null && rb1Round <= 2 && (rb2Round == null || rb2Round >= 6);
-  const wrHeavyEarly = picks.filter((p) => p.pos === 'WR' && p.round_number <= 5).length >= 3;
+  const earlyDraftedWr = drafted.filter((p) => p.pos === 'WR' && p.round_number <= 5).length;
+  const earlyDraftedRb = drafted.filter((p) => p.pos === 'RB' && p.round_number <= 5).length;
+  const wrHeavyEarly = earlyDraftedWr >= 3;
   if (zeroRb && wrHeavyEarly) score += 3;
   if (heroRb && wr1Round != null && wr1Round <= 5) score += 2;
+
+  // Known elite WR keeper → RB-heavy early is the plan, not a WR hole.
+  if (opts.hasEliteWrKeeper && earlyDraftedRb >= 2 && earlyDraftedWr <= 1) score += 4;
+  if (opts.hasEliteRbKeeper && earlyDraftedWr >= 2 && earlyDraftedRb <= 1) score += 4;
 
   // Pure chalk is fine — slight ding only when almost every skill pick is dead-on ADP
   // with no steals. (Ultra-consensus still hard-caps the final score later.)
@@ -267,7 +312,8 @@ function computeSynergyScore(
   if (realStealCount >= 2 && (heroRb || zeroRb || wrHeavyEarly)) score += 2;
   if (chaos && realStealCount + reachCount >= 3) score += 1;
 
-  score -= Math.min(15, rosterPenalty);
+  // Same-team WR notes shouldn't erase an otherwise logical draft.
+  score -= Math.min(8, rosterPenalty);
 
   score = Math.max(0, Math.min(100, score));
   const modifier = Math.round((score - 70) / 3);
@@ -310,6 +356,8 @@ export function computeDraftGrade(
     };
   });
 
+  const keeperCtx = analyzeKeeperDraftContext(parsed, numTeams);
+
   let priorSeasonProfile: PriorSeasonDraftProfile | null = null;
   if (options.priorSeasonRankByPlayerId) {
     priorSeasonProfile = analyzePriorSeasonRanks(
@@ -320,6 +368,7 @@ export function computeDraftGrade(
         pick_number: p.pick_number,
         playerId: p.playerId,
         adp: p.adp,
+        is_keeper: p.is_keeper,
       })),
       options.priorSeasonRankByPlayerId,
       numTeams
@@ -477,6 +526,8 @@ export function computeDraftGrade(
     avgValueSpots,
     consensusPickRate,
     rosterPenalty: rosterQuality.sameTeamWrPenalty + (rosterQuality.consecutiveTeamWr ? 4 : 0),
+    hasEliteWrKeeper: keeperCtx.hasEliteWrKeeper,
+    hasEliteRbKeeper: keeperCtx.hasEliteRbKeeper,
   });
 
   let numericScore = Math.round(
@@ -588,7 +639,7 @@ export function computeDraftGrade(
     !boardReachHeavy &&
     reachCount <= 1;
 
-  // Human-good boards: drafted elites + clean process unlock As without gamed ADP.
+  // Human-good boards enter a letter family; natural score keeps + / plain / - room.
   if (
     cleanProcess &&
     draftedElite >= 2 &&
@@ -596,43 +647,45 @@ export function computeDraftGrade(
     reachCount === 0 &&
     (realStealCount >= 1 || avgValueSpots >= 3)
   ) {
-    numericScore = Math.min(95, Math.max(numericScore, 93)); // A+
+    // Strong A board — A+ only if value is already elite.
+    numericScore = Math.max(numericScore, 90);
+    if (realStealCount >= 2 && avgValueSpots >= 3) {
+      numericScore = Math.max(numericScore, 93);
+    }
   } else if (
     cleanProcess &&
     draftedElite >= 2 &&
     avgValueSpots >= 1 &&
-    reachCount <= 1 &&
-    numericScore < 90
+    reachCount <= 1
   ) {
-    numericScore = Math.min(91, Math.max(numericScore, 88)); // A
+    numericScore = Math.max(numericScore, 86); // A
   } else if (
     cleanProcess &&
     draftedElite >= 2 &&
     avgValueSpots >= -0.5 &&
-    reachCount <= 2 &&
-    numericScore < 87
+    reachCount <= 2
   ) {
-    numericScore = Math.min(87, Math.max(numericScore, 85)); // A-
+    numericScore = Math.max(numericScore, 80); // A-
   } else if (
     cleanProcess &&
     draftedElite >= 2 &&
     avgValueSpots >= -1.5 &&
     reachCount <= 1 &&
-    numericScore >= 72 &&
-    numericScore < 81
+    numericScore >= 66 &&
+    numericScore < 80
   ) {
-    numericScore = Math.min(83, Math.max(numericScore, 81)); // B+
+    numericScore = Math.max(numericScore, 75); // B+
   } else if (
     cleanProcess &&
     draftedElite >= 1 &&
     avgValueSpots >= -3 &&
     reachCount <= 2 &&
     earlySpecialTeams === 0 &&
-    numericScore >= 62 &&
-    numericScore < 71
+    numericScore >= 56 &&
+    numericScore < 70
   ) {
-    // Solid chalk with one real anchor — keep out of C+ when process was clean.
-    numericScore = Math.min(74, Math.max(numericScore, 71)); // B-
+    // Solid chalk with one real anchor — B family, not C.
+    numericScore = Math.max(numericScore, 68); // B- / B
   } else if (
     !earlyStructure.premiumSlotMiss &&
     !boardReachHeavy &&
@@ -641,7 +694,8 @@ export function computeDraftGrade(
     avgValueSpots >= 5 &&
     reachCount <= 1
   ) {
-    numericScore = Math.min(95, Math.max(numericScore, 93)); // A+ (steal-heavy)
+    numericScore = Math.max(numericScore, 90);
+    if (avgValueSpots >= 6) numericScore = Math.max(numericScore, 93);
   }
 
   if (avgValueSpots < -4) {
@@ -678,11 +732,11 @@ export function computeDraftGrade(
   if (priorSeasonProfile && !reachHeavy) {
     const elitePrior = priorSeasonEliteRosterScore(priorSeasonProfile);
     if (elitePrior >= 16 && reachCount <= 2) {
-      numericScore = Math.min(95, Math.max(numericScore, 90));
+      numericScore = Math.max(numericScore, 90);
     } else if (elitePrior >= 13 && reachCount <= 3) {
-      numericScore = Math.min(93, Math.max(numericScore, 86));
+      numericScore = Math.max(numericScore, 86);
     } else if (elitePrior >= 10 && reachCount <= 2) {
-      numericScore = Math.min(90, Math.max(numericScore, 82));
+      numericScore = Math.max(numericScore, 80);
     }
   }
 
@@ -690,7 +744,7 @@ export function computeDraftGrade(
     numericScore = Math.min(84, numericScore + 4);
   }
 
-  // After late penalties, solid chalk can get nudged out of C+ — re-apply here.
+  // After late penalties, solid chalk stays in B family.
   if (
     earlySpecialTeams === 0 &&
     !earlyStructure.premiumSlotMiss &&
@@ -698,10 +752,87 @@ export function computeDraftGrade(
     draftedElite >= 1 &&
     avgValueSpots >= -3 &&
     reachCount <= 3 &&
-    numericScore >= 62 &&
-    numericScore < 71
+    numericScore >= 56 &&
+    numericScore < 70
   ) {
-    numericScore = Math.min(74, Math.max(numericScore, 71));
+    numericScore = Math.max(numericScore, 68);
+  }
+
+  // Trying-their-best: filled starters → A–C (early K/DEF alone is a cost, not an auto-F).
+  // F when early K/DEF pairs with a thin/bad skill draft. D for extreme pet-player boards.
+  const rbCount = parsed.filter((p) => p.pos === 'RB').length;
+  const wrCount = parsed.filter((p) => p.pos === 'WR').length;
+  const qbCount = parsed.filter((p) => p.pos === 'QB').length;
+  const teCount = parsed.filter((p) => p.pos === 'TE').length;
+  const skillEarly = parsed.filter(
+    (p) => (p.pos === 'RB' || p.pos === 'WR') && p.round_number <= 6
+  ).length;
+  // Real lineup shape: 2RB/2WR/1QB is enough; flex TE is fine. Early K/DEF allowed.
+  const filledStarters =
+    rbCount >= 2 &&
+    wrCount >= 2 &&
+    qbCount >= 1 &&
+    (teCount >= 1 || wrCount + rbCount >= 5);
+  const notStructuralMeltdown =
+    positionalValue.maxNumericScore == null || positionalValue.maxNumericScore >= 84;
+  // Ordinary mocks with a few projection reaches stay in C. D needs a real pet-player board.
+  const blindFaithReaches =
+    severeReachCount >= 3 ||
+    (reachCount >= 7 && avgValueSpots < -9) ||
+    (reachCount >= 8 && avgValueSpots < -8);
+  // Early K/DEF + weak skill core / rotten board → F. Early K/DEF + real starters → just a ding.
+  const earlySpecialMeltdown =
+    earlySpecialTeams >= 1 &&
+    (skillEarly <= 1 ||
+      rbCount < 2 ||
+      wrCount < 2 ||
+      qbCount < 1 ||
+      (earlySpecialTeams >= 2 && skillEarly <= 2) ||
+      (skillEarly <= 2 && reachCount >= 5 && avgValueSpots < -8));
+
+  if (earlySpecialMeltdown) {
+    // Spread F+/F/F- — one early K with zero early skill is F, not always F-.
+    if (earlySpecialTeams >= 3 || (earlySpecialTeams >= 2 && skillEarly === 0)) {
+      numericScore = 8; // F-
+    } else if (skillEarly === 0) {
+      numericScore = 20; // F
+    } else if (skillEarly === 1 || earlySpecialTeams >= 2) {
+      numericScore = 18; // F
+    } else {
+      numericScore = 30; // F+
+    }
+  } else if (filledStarters && notStructuralMeltdown && blindFaithReaches) {
+    // D family spread: D+ / D / D- by how far past ADP — still a real roster.
+    const reachSeverity =
+      (reachCount >= 10 ? 2 : reachCount >= 8 ? 1 : 0) +
+      (severeReachCount >= 5 ? 2 : severeReachCount >= 3 ? 1 : 0) +
+      (avgValueSpots < -14 ? 2 : avgValueSpots < -10 ? 1 : 0);
+    if (reachSeverity >= 3) numericScore = 36; // D-
+    else if (reachSeverity >= 1) numericScore = 43; // D
+    else numericScore = 48; // D+
+  } else if (filledStarters && notStructuralMeltdown) {
+    // One early K/DEF with a real roster: paid a price (process/positional), not a meltdown.
+    // Soft ceiling — hard to be A-band when you burned early capital on ST.
+    if (earlySpecialTeams >= 1 && skillEarly >= 3) {
+      numericScore = Math.min(numericScore, 78); // B ceiling
+    }
+    // Viable starters: floor in C family. Mild reaches / projection bets → C, not D.
+    if (
+      positionalValue.penalty <= 10 &&
+      reachCount <= 4 &&
+      severeReachCount <= 2 &&
+      avgValueSpots >= -6
+    ) {
+      numericScore = Math.max(numericScore, earlySpecialTeams >= 1 ? 56 : 61); // C / C+
+    } else if (
+      positionalValue.penalty <= 14 &&
+      reachCount <= 6 &&
+      avgValueSpots >= -10
+    ) {
+      numericScore = Math.max(numericScore, 56); // C
+    } else {
+      numericScore = Math.max(numericScore, 52); // C-
+    }
   }
 
   numericScore = Math.max(0, Math.min(100, numericScore));
@@ -771,6 +902,10 @@ export function computeDraftGrade(
       premiumSlotMiss: earlyStructure.premiumSlotMiss,
       earlyTeamWr2Count: earlyStructure.earlyTeamWr2Count,
       teamSynergyNote: rosterQuality.teamSynergyNote,
+      keeperRosterNote: keeperCtx.rosterNote,
+      keeperStrategyNote: keeperCtx.strategyNote,
+      hasEliteWrKeeper: keeperCtx.hasEliteWrKeeper,
+      hasEliteRbKeeper: keeperCtx.hasEliteRbKeeper,
     });
 
   return {

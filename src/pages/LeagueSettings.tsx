@@ -773,11 +773,17 @@ export default function LeagueSettings() {
     return 8 + flexCount + bench;
   };
 
-  /** Max keepers per team from league position limits (Position Limits tab). */
+  /** Max keepers per team from live Position Limits form (falls back to saved league). */
   const getKeeperLimit = (): number => {
-    const lim = selectedLeague?.position_limits ? (selectedLeague.position_limits as { KEEPERS?: number }).KEEPERS : undefined;
-    const n = typeof lim === 'number' ? lim : 1;
-    const maxRounds = calculateNumRounds();
+    const fromForm =
+      typeof positionLimits.KEEPERS === 'number'
+        ? positionLimits.KEEPERS
+        : parseInt(String(positionLimits.KEEPERS), 10);
+    const fromLeague = selectedLeague?.position_limits
+      ? (selectedLeague.position_limits as { KEEPERS?: number }).KEEPERS
+      : undefined;
+    const n = Number.isFinite(fromForm) ? fromForm : typeof fromLeague === 'number' ? fromLeague : 1;
+    const maxRounds = getMaxKeepers();
     return Math.min(Math.max(0, n), maxRounds);
   };
 
@@ -790,11 +796,21 @@ export default function LeagueSettings() {
   };
 
   const addKeeperSlot = (teamNumber: number) => {
-    const limit = getKeeperLimit();
+    const maxSlots = getMaxKeepers();
     setKeepersByTeam((prev) => {
       const arr = [...(prev[teamNumber] || [])];
-      if (arr.length >= limit) return prev;
+      if (arr.length >= maxSlots) return prev;
+      const nextLen = arr.length + 1;
       arr.push({ player: null, round: 1 });
+      // Bump Keepers limit so Add keeper works without a trip to Position Limits first.
+      setPositionLimits((limits) => {
+        const current =
+          typeof limits.KEEPERS === 'number'
+            ? limits.KEEPERS
+            : parseInt(String(limits.KEEPERS), 10) || 0;
+        if (current >= nextLen) return limits;
+        return { ...limits, KEEPERS: Math.min(maxSlots, nextLen) };
+      });
       return { ...prev, [teamNumber]: arr };
     });
   };
@@ -915,6 +931,30 @@ export default function LeagueSettings() {
     }
 
     setSaving(true);
+
+    // Keep Position Limits.KEEPERS in sync with the most slots any team is using.
+    const maxSlotsUsed = Math.max(
+      0,
+      ...Array.from({ length: teamCount }, (_, i) => (keepersByTeam[i + 1] || []).length)
+    );
+    const nextKeeperLimit = Math.min(getMaxKeepers(), Math.max(getKeeperLimit(), maxSlotsUsed));
+    const existingLimits = (selectedLeague.position_limits || {}) as Record<string, number>;
+    if ((existingLimits.KEEPERS ?? 1) < nextKeeperLimit || positionLimits.KEEPERS !== nextKeeperLimit) {
+      const updatedLimits = { ...existingLimits, KEEPERS: nextKeeperLimit };
+      const { error: limitsError } = await supabase
+        .from('leagues')
+        .update({ position_limits: updatedLimits })
+        .eq('id', selectedLeague.id);
+      if (limitsError) {
+        toast.error('Failed to update keepers limit');
+        console.error(limitsError);
+        setSaving(false);
+        return;
+      }
+      setPositionLimits((prev) => ({ ...prev, KEEPERS: nextKeeperLimit }));
+      setSelectedLeague({ ...selectedLeague, position_limits: updatedLimits } as typeof selectedLeague);
+    }
+
     await supabase.from('league_keepers').delete().eq('league_id', selectedLeague.id);
 
     const toInsert: { league_id: string; team_number: number; player_id: string; round_number: number }[] = [];
@@ -1606,7 +1646,7 @@ export default function LeagueSettings() {
                     </Popover>
                   </div>
                   <CardDescription>
-                    Assign keepers per team (limit set in Position Limits). Each keeper is drafted in a specific round.
+                    Assign keepers per team. Use Add keeper for more slots (up to roster rounds); saving updates the Keepers limit.
                   </CardDescription>
                 </div>
                 {user && selectedLeague && (
@@ -1639,6 +1679,7 @@ export default function LeagueSettings() {
                       Object.values(keepersByTeam || {}).flat().forEach((s) => s.player?.id && allKeeperPlayerIds.add(s.player.id));
 
                       const keeperLimit = getKeeperLimit();
+                      const maxKeeperSlots = getMaxKeepers();
                       return Array.from({ length: teamCount }, (_, i) => i + 1).map((teamNum) => {
                         const slots = keepersByTeam[teamNum] ?? (keeperLimit >= 1 ? [{ player: null, round: 1 }] : []);
                         const teamName = teamNames.find((t) => t.team_number === teamNum)?.team_name || `Team ${teamNum}`;
@@ -1652,8 +1693,8 @@ export default function LeagueSettings() {
                                 <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">You</span>
                               )}
                             </div>
-                            {keeperLimit === 0 && (
-                              <p className="text-sm text-muted-foreground">No keeper slots. Set &quot;Keepers&quot; in Position Limits to allow keepers.</p>
+                            {maxKeeperSlots === 0 && (
+                              <p className="text-sm text-muted-foreground">No keeper slots available for this roster size.</p>
                             )}
                             <div className="space-y-2">
                               {slots.map((slot, idx) => (
@@ -1690,7 +1731,7 @@ export default function LeagueSettings() {
                                   </Button>
                                 </div>
                               ))}
-                              {keeperLimit > 0 && slots.length < keeperLimit && (
+                              {slots.length < maxKeeperSlots && (
                                 <Button
                                   variant="outline"
                                   size="sm"

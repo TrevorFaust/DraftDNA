@@ -22,7 +22,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { NFL_DEFENSE_TEAM_NAMES } from '../src/constants/nflDefenses'
+import { compareDefensesByFantasyRank, NFL_DEFENSE_TEAM_NAMES } from '../src/constants/nflDefenses'
 import {
   PLAYER_POOL_CURRENT_SEASON,
   PLAYER_POOL_PRIOR_SEASON,
@@ -770,13 +770,10 @@ function buildRankingsPlayerPool(rows: PoolPlayer[]): PoolPlayer[] {
     if (!uniqueDefenseMap.has(defense.name)) uniqueDefenseMap.set(defense.name, defense)
   }
   let defensePlayers = Array.from(uniqueDefenseMap.values())
-  defensePlayers = defensePlayers.sort((a, b) => a.name.localeCompare(b.name))
+  defensePlayers = defensePlayers.sort((a, b) => compareDefensesByFantasyRank(a.name, b.name))
   defensePlayers = defensePlayers.map((defense, index) => {
     const adp = 150 + Math.floor((index / Math.max(defensePlayers.length, 1)) * 50)
-    if (Number(defense.adp) >= 200 || Number(defense.adp) < 150) {
-      return { ...defense, adp }
-    }
-    return defense
+    return { ...defense, adp }
   })
 
   const merged = [...nonDefensePlayers, ...defensePlayers].sort((a, b) => {

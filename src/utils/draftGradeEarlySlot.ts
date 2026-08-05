@@ -55,7 +55,8 @@ function isWr1OnTeam(depthCtx: TeamDepthAnalysis, pick: EarlySlotPick): boolean 
 function isShallowWrOnTeam(depthCtx: TeamDepthAnalysis, pick: EarlySlotPick): boolean {
   if (!pick.nflTeam) return false;
   const role = getDepthRole(depthCtx, pick.nflTeam, 'WR', pick.adp);
-  return role === 'competing' || role === 'depth' || role === 'dart';
+  // WR2 ("competing") is startable; only WR3+ is shallow for early-slot judgment.
+  return role === 'depth' || role === 'dart';
 }
 
 function hasProblematicSameTeamEarlyWrs(
@@ -156,9 +157,9 @@ function lateQbWithEarlyWrPenalty(
 
   const reasons: string[] = [];
   if (shallowCount >= 2) {
-    reasons.push('several early wideouts were WR2-or-lower on their teams');
+    reasons.push('several early wideouts were WR3-or-lower on their teams');
   } else if (shallowCount >= 1) {
-    reasons.push('at least one early wideout was a secondary option on his team');
+    reasons.push('at least one early wideout was a WR3-or-lower option on his team');
   }
   if (sameTeamIssue) {
     reasons.push('you doubled up on the same passing game early');
@@ -243,7 +244,6 @@ export function analyzeEarlyDraftStructure(
   let narrativeNote: string | null = null;
   let premiumSlotMiss = false;
   let earlyTeamWr2Count = 0;
-  const eliteWr2AdpCap = numTeams * 6;
 
   const first = sorted[0];
   if (first && isPremiumSlotReach(first, numTeams, poolSize)) {
@@ -277,37 +277,30 @@ export function analyzeEarlyDraftStructure(
   }
   const depthCtx = analyzeTeamDepthFromAdp(forDepth);
 
-  let lateWr2Count = 0;
+  // NFL WR2 ("competing") is a normal fantasy starter in 12/14-team leagues.
+  // Only early WR3+ (depth/dart) ahead of the WR2 market is a real problem.
+  let earlyWr3Count = 0;
+  let wr3DepthPenalty = 0;
 
   for (const p of picks) {
     if (p.pos !== 'WR' || !p.nflTeam) continue;
     const role = getDepthRole(depthCtx, p.nflTeam, 'WR', p.adp);
-    if (role !== 'competing' && role !== 'depth' && role !== 'dart') continue;
+    if (role !== 'depth' && role !== 'dart') continue;
 
-    const eliteCompeting = role === 'competing' && p.adp <= eliteWr2AdpCap && p.round_number <= 6;
-    if (eliteCompeting) continue;
-
-    if (p.round_number <= 8) {
-      earlyTeamWr2Count += 1;
-      penalty += p.round_number <= 5 ? 2 : 1;
-    } else if (p.round_number >= 9 && p.round_number <= 12) {
-      // Bench WR depth in R13+ is normal — only mid-late secondary WRs ding.
-      lateWr2Count += 1;
-      penalty += 1;
+    if (p.round_number <= 6) {
+      earlyWr3Count += 1;
+      earlyTeamWr2Count += 1; // retained field name for callers; means early shallow WR count
+      wr3DepthPenalty += p.round_number <= 4 ? 2 : 1;
     }
   }
 
-  if (lateWr2Count >= 3) {
-    earlyTeamWr2Count += lateWr2Count;
-    // Penalty only — bench WR depth must not hard-block A+.
-    penalty += 2;
-    const lateNote =
-      'You added multiple secondary wideouts in the back half of the draft when clearer starters were still available.';
-    narrativeNote = narrativeNote ? `${narrativeNote} ${lateNote}` : lateNote;
-  } else if (earlyTeamWr2Count >= 3) {
-    penalty += 2;
-  } else if (earlyTeamWr2Count >= 2) {
+  penalty += Math.min(6, wr3DepthPenalty);
+
+  if (earlyWr3Count >= 2) {
     penalty += 1;
+    const note =
+      'You took NFL WR3-or-lower options early while clearer WR2s were still on the board.';
+    narrativeNote = narrativeNote ? `${narrativeNote} ${note}` : note;
   }
 
   const firstQb = sorted.find((p) => p.pos === 'QB');

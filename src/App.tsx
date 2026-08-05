@@ -16,6 +16,8 @@ import { Rankings } from "./pages/Rankings";
 import PlayersSpreadsheet from "./pages/PlayersSpreadsheet";
 import MockDraft from "./pages/MockDraft";
 import DraftRoom from "./pages/DraftRoom";
+import MultiplayerLobby from "./pages/MultiplayerLobby";
+import MultiplayerDraftRoom from "./pages/MultiplayerDraftRoom";
 import PredictionChallenge from "./pages/PredictionChallenge";
 import Settings from "./pages/Settings";
 import LeagueSettings from "./pages/LeagueSettings";
@@ -79,6 +81,8 @@ const App = () => (
                     <Route path="/players" element={<PlayersSpreadsheet />} />
                     <Route path="/statistics" element={<Suspense fallback={<PageFallback />}><Statistics /></Suspense>} />
                     <Route path="/mock-draft" element={<MockDraft />} />
+                    <Route path="/lobby/:inviteCode" element={<MultiplayerLobby />} />
+                    <Route path="/multiplayer-draft/:draftId" element={<MultiplayerDraftRoom />} />
                     <Route path="/draft/:draftId" element={<DraftRoom />} />
                     <Route path="/history" element={<Suspense fallback={<PageFallback />}><History /></Suspense>} />
                     <Route path="/badges" element={<Suspense fallback={<PageFallback />}><Badges /></Suspense>} />

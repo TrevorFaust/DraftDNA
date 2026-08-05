@@ -27,7 +27,7 @@ export function Rankings2025PpgCell({ stats2025, className }: Rankings2025PpgCel
   return (
     <div
       className={cn(
-        'shrink-0 min-w-[3.25rem] px-2 border-l border-border/50 text-center',
+        'shrink-0 min-w-[2.75rem] px-1.5 border-l border-border/50 text-center',
         className
       )}
     >

@@ -6,6 +6,11 @@ import { Navbar } from '@/components/Navbar';
 import { PositionBadge } from '@/components/PositionBadge';
 import { MyRoster } from '@/components/MyRoster';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
+import {
+  DraftMobilePanelTabs,
+  draftMobilePanelClass,
+  type DraftMobilePanel,
+} from '@/components/DraftMobilePanelTabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -21,7 +26,7 @@ import {
 import type { Player, MockDraft, DraftPick, RankedPlayer } from '@/types/database';
 import { fetchRookiesRankings } from '@/utils/rookiesFilter';
 import { useNflTeams } from '@/hooks/useNflTeams';
-import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
+import { compareDefensesByFantasyRank, NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import {
   PLAYER_POOL_PRIOR_SEASON,
@@ -48,7 +53,7 @@ import { getArchetypeByNameOrImproviser, FULL_ARCHETYPE_LIST } from '@/constants
 import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
 import { ArchetypeBadge } from '@/components/ArchetypeBadge';
 import { DraftGradeBanner } from '@/components/DraftGradeDisplay';
-import { computeDraftGrade, toDraftGradePicks } from '@/utils/draftGrade';
+import { computeDraftGrade, parseStoredDraftGrade, toDraftGradePicks, type DraftGradeResult } from '@/utils/draftGrade';
 import { buildPriorSeasonRankByPlayerId } from '@/utils/draftGradePriorSeason';
 import {
   countLeagueTop12Te,
@@ -118,6 +123,7 @@ const DraftRoom = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState<string>('ALL');
+  const [mobilePanel, setMobilePanel] = useState<DraftMobilePanel>('players');
   const [isDraftPaused, setIsDraftPaused] = useState(false);
   const [currentPick, setCurrentPick] = useState(1);
   const [isDrafting, setIsDrafting] = useState(false);
@@ -151,6 +157,8 @@ const DraftRoom = () => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const cpuDraftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const draftBoardRef = useRef<HTMLDivElement | null>(null);
+  const stickDraftBoardToBottomRef = useRef(true);
+  const draftBoardScrollRafRef = useRef<number | null>(null);
   const lastPickRef = useRef<number>(0);
   const lastRapidCpuPickAtRef = useRef(0);
   const isDraftPausedRef = useRef<boolean>(false);
@@ -468,20 +476,18 @@ const DraftRoom = () => {
       let defensePlayers = Array.from(uniqueDefenseMap.values());
       
       // Update ADPs for defenses to be between 150-200 (distribute evenly)
-      // Sort by name to ensure consistent ordering
-      defensePlayers = defensePlayers.sort((a, b) => a.name.localeCompare(b.name));
+      // Sort by fantasy D/ST rank order (HOU first … ARI last), not alphabetical
+      defensePlayers = defensePlayers.sort((a, b) => compareDefensesByFantasyRank(a.name, b.name));
       const defensesToUpdate: { id: string; adp: number }[] = [];
       defensePlayers = defensePlayers.map((defense, index) => {
         const adp = 150 + Math.floor((index / defensePlayers.length) * 50);
         const normalizedTeam = defense.team && defense.team !== 'FA'
           ? defense.team
           : (defenseTeamAbbrByName.get(defense.name) ?? defense.team);
-        // Only update if ADP is outside the desired range (e.g., still 999 or old range)
-        if (Number(defense.adp) >= 200 || Number(defense.adp) < 150) {
+        if (Number(defense.adp) !== adp) {
           defensesToUpdate.push({ id: defense.id, adp });
-          return { ...defense, adp, team: normalizedTeam };
         }
-        return { ...defense, team: normalizedTeam };
+        return { ...defense, adp, team: normalizedTeam };
       });
       
       // Update defenses in database if needed
@@ -1016,6 +1022,10 @@ const DraftRoom = () => {
         clearTimeout(cpuDraftTimeoutRef.current);
         cpuDraftTimeoutRef.current = null;
       }
+      // Pause can interrupt mid-pick; clear drafting lock so resume can continue
+      if (isDrafting) {
+        setIsDrafting(false);
+      }
       return; // Don't run if draft is paused
     }
     console.log('▶️ CPU useEffect: Draft is NOT paused, continuing...');
@@ -1276,16 +1286,6 @@ const DraftRoom = () => {
         const data = await draftPlayer(cpuPick, pickNumber, currentTeam, roundNumber);
         if (data) {
           applyPick(data);
-          setTimeout(() => {
-            if (draftBoardRef.current) {
-              const container = draftBoardRef.current;
-              const isNearBottom =
-                container.scrollHeight - container.scrollTop - container.clientHeight < 50;
-              if (isNearBottom) {
-                container.scrollTop = container.scrollHeight;
-              }
-            }
-          }, 100);
         }
 
         setIsDrafting(false);
@@ -1680,43 +1680,42 @@ const DraftRoom = () => {
   
   const isRosterComplete = filledSlots.every(filled => filled);
 
-  // Auto-scroll draft board to bottom when picks change (only if user is already at bottom)
+  // Stick draft board to bottom on new picks only while the user is already pinned there.
   useEffect(() => {
-    if (draftBoardRef.current && picks.length > 0) {
-      // Small delay to ensure DOM has updated
-      setTimeout(() => {
-        if (draftBoardRef.current) {
-          const container = draftBoardRef.current;
-          const scrollHeight = container.scrollHeight;
-          const scrollTop = container.scrollTop;
-          const clientHeight = container.clientHeight;
-          
-          // Check if user is at or near the bottom (within 50px threshold)
-          const isNearBottom = scrollHeight - scrollTop - clientHeight < 50;
-          
-          // Only auto-scroll if user is already at the bottom
-          if (isNearBottom) {
-            container.scrollTop = scrollHeight;
-          }
-        }
-      }, 50);
+    if (!draftBoardRef.current || picks.length === 0) return;
+    if (!stickDraftBoardToBottomRef.current) return;
+
+    if (draftBoardScrollRafRef.current != null) {
+      cancelAnimationFrame(draftBoardScrollRafRef.current);
     }
+
+    draftBoardScrollRafRef.current = requestAnimationFrame(() => {
+      draftBoardScrollRafRef.current = requestAnimationFrame(() => {
+        const container = draftBoardRef.current;
+        if (!container || !stickDraftBoardToBottomRef.current) return;
+        container.scrollTop = container.scrollHeight;
+        setDraftBoardScrolledUp(false);
+        draftBoardScrollRafRef.current = null;
+      });
+    });
+
+    return () => {
+      if (draftBoardScrollRafRef.current != null) {
+        cancelAnimationFrame(draftBoardScrollRafRef.current);
+        draftBoardScrollRafRef.current = null;
+      }
+    };
   }, [picks.length]);
 
-  // Track if draft board is scrolled up (for scrollbar visibility)
+  // Pin/unpin stick-to-bottom from user scroll; also drives scrollbar visibility.
   const handleDraftBoardScroll = useCallback(() => {
     const container = draftBoardRef.current;
     if (!container) return;
-    const { scrollHeight, scrollTop, clientHeight } = container;
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 30;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isNearBottom = distanceFromBottom < 40;
+    stickDraftBoardToBottomRef.current = isNearBottom;
     setDraftBoardScrolledUp(!isNearBottom);
   }, []);
-
-  // Sync scroll state when picks change (e.g. after auto-scroll to bottom)
-  useEffect(() => {
-    const t = setTimeout(handleDraftBoardScroll, 60);
-    return () => clearTimeout(t);
-  }, [picks.length, handleDraftBoardScroll]);
 
   // Bucket-based archetype assignment: prefer unearned badges in the same strategy bucket, then rotate when the bucket is fully earned.
   const resolveArchetypeForCompletion = useCallback(
@@ -1840,6 +1839,59 @@ const DraftRoom = () => {
     [user?.id]
   );
 
+  const buildCompletionGrade = useCallback(
+    (
+      draftVal: MockDraft,
+      picksVal: DraftPick[],
+      playersVal: RankedPlayer[],
+      chaosArchetype: string | null | undefined,
+      archetypeName: string | null | undefined
+    ): DraftGradeResult | null => {
+      const userPicks = picksVal.filter((p) => p.team_number === draftVal.user_pick_position);
+      if (userPicks.length === 0) return null;
+      return computeDraftGrade(
+        toDraftGradePicks(
+          userPicks
+            .map((pick) => {
+              const pl = playersVal.find((p) => p.id === pick.player_id);
+              if (!pl) return null;
+              const isKeeper = keepers.some(
+                (k) =>
+                  k.player_id === pick.player_id &&
+                  k.round_number === pick.round_number &&
+                  k.team_number === pick.team_number
+              );
+              return {
+                pick_number: pick.pick_number,
+                round_number: pick.round_number,
+                is_autodraft: pick.is_autodraft,
+                is_keeper: isKeeper,
+                player: {
+                  id: pl.id,
+                  name: pl.name,
+                  adp: pl.adp,
+                  position: pl.position,
+                  team: pl.team,
+                  bye_week: pl.bye_week,
+                },
+              };
+            })
+            .filter((p): p is NonNullable<typeof p> => p != null)
+        ),
+        {
+          numTeams: draftVal.num_teams,
+          numRounds: draftVal.num_rounds,
+          chaosArchetype: chaosArchetype ?? null,
+          isSuperflex,
+          playerPool: playersVal,
+          priorSeasonRankByPlayerId,
+          archetypeName: archetypeName || null,
+        }
+      );
+    },
+    [keepers, isSuperflex, priorSeasonRankByPlayerId]
+  );
+
   // Handle showing completion screen when draft was already completed
   useEffect(() => {
     if (!draft || picks.length < totalPicks || totalPicks <= 0 || draft.status === 'completed') return;
@@ -1850,6 +1902,22 @@ const DraftRoom = () => {
     (async () => {
       const { userDetectedArchetype, userDetectedArchetypeIndex, userDetectedChaosArchetype } = await resolveArchetypeForCompletion(draft, picks, players, config, isSuperflex);
       if (cancelled) return;
+      const replaceChaos =
+        !!userDetectedChaosArchetype && isChaosReplace(userDetectedChaosArchetype);
+      const grade = buildCompletionGrade(
+        draft,
+        picks,
+        players,
+        userDetectedChaosArchetype,
+        replaceChaos ? userDetectedChaosArchetype : userDetectedArchetype
+      );
+      const gradeFields = grade
+        ? {
+            grade_letter: grade.grade,
+            grade_score: grade.numericScore,
+            grade_payload: grade as unknown as Record<string, unknown>,
+          }
+        : {};
       if (isTempDraft) {
         const updatedDraft = {
           ...draft,
@@ -1858,6 +1926,7 @@ const DraftRoom = () => {
           user_detected_archetype: userDetectedArchetype,
           user_detected_archetype_index: userDetectedArchetypeIndex,
           user_detected_chaos_archetype: userDetectedChaosArchetype ?? undefined,
+          ...gradeFields,
         };
         tempDraftStorage.saveDraft(updatedDraft, picks);
         setDraft(updatedDraft);
@@ -1870,6 +1939,7 @@ const DraftRoom = () => {
             user_detected_archetype: userDetectedArchetype,
             user_detected_archetype_index: userDetectedArchetypeIndex,
             user_detected_chaos_archetype: userDetectedChaosArchetype,
+            ...gradeFields,
           })
           .eq('id', draftId);
         setDraft((prev) =>
@@ -1880,13 +1950,14 @@ const DraftRoom = () => {
                 user_detected_archetype: userDetectedArchetype,
                 user_detected_archetype_index: userDetectedArchetypeIndex,
                 user_detected_chaos_archetype: userDetectedChaosArchetype ?? undefined,
+                ...gradeFields,
               }
             : prev
         );
       }
     })();
     return () => { cancelled = true; };
-  }, [draft, picks.length, totalPicks, draftId, picks, isTempDraft, players, positionLimits, isSuperflex, resolveArchetypeForCompletion]);
+  }, [draft, picks.length, totalPicks, draftId, picks, isTempDraft, players, positionLimits, isSuperflex, resolveArchetypeForCompletion, buildCompletionGrade]);
 
   // Trigger confetti when draft completes
   useEffect(() => {
@@ -2033,44 +2104,13 @@ const DraftRoom = () => {
 
     const completionGrade =
       !isFinalizingBadge && draft?.status === 'completed' && userPicks.length > 0
-        ? computeDraftGrade(
-            toDraftGradePicks(
-              userPicks
-                .map((pick) => {
-                  const pl = players.find((p) => p.id === pick.player_id);
-                  if (!pl) return null;
-                  const isKeeper = keepers.some(
-                    (k) =>
-                      k.player_id === pick.player_id &&
-                      k.round_number === pick.round_number &&
-                      k.team_number === pick.team_number
-                  );
-                  return {
-                    pick_number: pick.pick_number,
-                    round_number: pick.round_number,
-                    is_autodraft: pick.is_autodraft,
-                    is_keeper: isKeeper,
-                    player: {
-                      id: pl.id,
-                      name: pl.name,
-                      adp: pl.adp,
-                      position: pl.position,
-                      team: pl.team,
-                      bye_week: pl.bye_week,
-                    },
-                  };
-                })
-                .filter((p): p is NonNullable<typeof p> => p != null)
-            ),
-            {
-              numTeams: draft.num_teams,
-              numRounds: draft.num_rounds,
-              chaosArchetype: draft.user_detected_chaos_archetype ?? chaosName,
-              isSuperflex,
-              playerPool: players,
-              priorSeasonRankByPlayerId,
-              archetypeName: isReplaceChaos ? chaosName : detectedArchetype || null,
-            }
+        ? parseStoredDraftGrade(draft.grade_payload) ??
+          buildCompletionGrade(
+            draft,
+            picks,
+            players,
+            draft.user_detected_chaos_archetype ?? chaosName,
+            isReplaceChaos ? chaosName : detectedArchetype || null
           )
         : null;
 
@@ -2464,6 +2504,22 @@ const DraftRoom = () => {
                     .filter((p): p is NonNullable<typeof p> => !!p)
                     .sort((a, b) => a.pick_number - b.pick_number);
                   const { userDetectedArchetype, userDetectedArchetypeIndex, userDetectedChaosArchetype } = await resolveArchetypeForCompletion(draft, picks, players, config, isSuperflex);
+                  const replaceChaos =
+                    !!userDetectedChaosArchetype && isChaosReplace(userDetectedChaosArchetype);
+                  const grade = buildCompletionGrade(
+                    draft,
+                    picks,
+                    players,
+                    userDetectedChaosArchetype,
+                    replaceChaos ? userDetectedChaosArchetype : userDetectedArchetype
+                  );
+                  const gradeFields = grade
+                    ? {
+                        grade_letter: grade.grade,
+                        grade_score: grade.numericScore,
+                        grade_payload: grade as unknown as Record<string, unknown>,
+                      }
+                    : {};
                   if (isTempDraft) {
                     const updatedDraft = {
                       ...draft,
@@ -2472,6 +2528,7 @@ const DraftRoom = () => {
                       user_detected_archetype: userDetectedArchetype,
                       user_detected_archetype_index: userDetectedArchetypeIndex,
                       user_detected_chaos_archetype: userDetectedChaosArchetype ?? undefined,
+                      ...gradeFields,
                     };
                     tempDraftStorage.saveDraft(updatedDraft, picks);
                     setDraft(updatedDraft);
@@ -2485,6 +2542,7 @@ const DraftRoom = () => {
                         user_detected_archetype: userDetectedArchetype,
                         user_detected_archetype_index: userDetectedArchetypeIndex,
                         user_detected_chaos_archetype: userDetectedChaosArchetype,
+                        ...gradeFields,
                       })
                       .eq('id', draftId);
                     setDraft((prev) =>
@@ -2495,6 +2553,7 @@ const DraftRoom = () => {
                             user_detected_archetype: userDetectedArchetype,
                             user_detected_archetype_index: userDetectedArchetypeIndex,
                             user_detected_chaos_archetype: userDetectedChaosArchetype ?? undefined,
+                            ...gradeFields,
                           }
                         : prev
                     );
@@ -2515,9 +2574,16 @@ const DraftRoom = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1 min-h-0 overflow-hidden">
+        <DraftMobilePanelTabs value={mobilePanel} onChange={setMobilePanel} className="mb-3" />
+
+        <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 flex-1 min-h-0 overflow-hidden">
           {/* My Roster: align to top of row; scroll inside cell if roster is taller than the players column */}
-          <div className="lg:col-span-1 min-h-0 flex flex-col justify-start overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
+          <div
+            className={cn(
+              'lg:col-span-1 flex-col justify-start overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin',
+              draftMobilePanelClass(mobilePanel, 'roster')
+            )}
+          >
             <MyRoster 
               picks={picks} 
               players={players} 
@@ -2531,12 +2597,17 @@ const DraftRoom = () => {
           </div>
 
           {/* Available Players */}
-          <div className="lg:col-span-2 min-h-0 glass-card p-4 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+          <div
+            className={cn(
+              'lg:col-span-2 glass-card p-4 flex-col overflow-hidden',
+              draftMobilePanelClass(mobilePanel, 'players')
+            )}
+          >
+            <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-2 flex-wrap">
               <h2 className="font-display text-xl">AVAILABLE PLAYERS</h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0 justify-end flex-wrap sm:flex-nowrap">
                 <Select value={positionFilter} onValueChange={setPositionFilter}>
-                  <SelectTrigger className="w-32 bg-secondary/50 border-border/50 h-9">
+                  <SelectTrigger className="w-32 bg-secondary/50 border-border/50 h-9 shrink-0">
                     <SelectValue placeholder="Position" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2551,7 +2622,7 @@ const DraftRoom = () => {
                     )}
                   </SelectContent>
                 </Select>
-                <div className="relative w-64">
+                <div className="relative w-full sm:w-64 min-w-0 max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     placeholder="Search..."
@@ -2664,7 +2735,12 @@ const DraftRoom = () => {
           </div>
 
           {/* Draft Board */}
-          <div className="min-h-0 glass-card p-4 flex flex-col overflow-hidden">
+          <div
+            className={cn(
+              'glass-card p-4 flex-col overflow-hidden',
+              draftMobilePanelClass(mobilePanel, 'board')
+            )}
+          >
             <h2 className="font-display text-xl mb-4 flex-shrink-0">DRAFT BOARD</h2>
             <div 
               ref={draftBoardRef}

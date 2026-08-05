@@ -103,7 +103,7 @@ import { RankingsExportButtons } from '@/components/rankings/RankingsExportButto
 import { RankingsColumnExportMenu } from '@/components/rankings/RankingsColumnExportMenu';
 import type { FinalizedImportSummary } from '@/utils/rankingsSpreadsheet/matchPlayers';
 import { useNflTeams } from '@/hooks/useNflTeams';
-import { NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
+import { compareDefensesByFantasyRank, NFL_DEFENSE_TEAM_NAMES } from '@/constants/nflDefenses';
 import {
   PLAYER_POOL_PRIOR_SEASON,
   PLAYER_POOL_CURRENT_SEASON,
@@ -120,7 +120,7 @@ import {
   getRankingTiersStorageKey,
   rankingTiersLocalStorage,
 } from '@/utils/rankingTiersStorage';
-import { fetchUserRankingTiers, upsertUserRankingTiers } from '@/utils/rankingTiersDb';
+import { fetchUserRankingTiers, upsertUserRankingTiers, fetchCommunityRankingTiers } from '@/utils/rankingTiersDb';
 
 /** Disable dnd-kit built-in auto-scroll — rankings use custom fast edge scroll. */
 const autoScrollConfig = false;
@@ -582,6 +582,8 @@ const Rankings = () => {
   const [selectedTeam, setSelectedTeam] = useState<string>(FILTER_ALL);
   /** Per-position cut-after ranks for personal tiers (RB: [5,15] → T1=1-5, T2=6-15, T3=16+). */
   const [positionTierCuts, setPositionTierCuts] = useState<PositionTierCuts>({});
+  /** Consensus cuts from all signed-in users in this rankings bucket. */
+  const [communityTierCuts, setCommunityTierCuts] = useState<PositionTierCuts>({});
   const positionTierPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<RankedPlayer | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -1156,14 +1158,25 @@ const Rankings = () => {
     return communityPlayers;
   }, [communityRawExcludingMe, players, communityPlayers]);
 
-  // ADP = current community rank (updates as user drags). Used to override player.adp in My Rankings column.
+  // Live community overall rank (moves as the user drags when live-merge is on).
   const communityRankMap = useMemo(
     () => new Map(displayedCommunityPlayers.map((p, i) => [p.id, i + 1])),
     [displayedCommunityPlayers]
   );
+  // Stable consensus ADP for row labels — frozen at fetch, does not follow drag / My RK.
+  const stableCommunityAdpMap = useMemo(() => {
+    const source =
+      communityConsensusForStuds.length > 0 ? communityConsensusForStuds : communityPlayers;
+    return new Map(
+      source.map((p, i) => {
+        const fromAdp = Number(p.adp);
+        return [p.id, fromAdp > 0 ? fromAdp : i + 1] as const;
+      })
+    );
+  }, [communityConsensusForStuds, communityPlayers]);
   const getDisplayAdp = useCallback(
-    (playerId: string, fallback: number) => communityRankMap.get(playerId) ?? fallback,
-    [communityRankMap]
+    (playerId: string, fallback: number) => stableCommunityAdpMap.get(playerId) ?? fallback,
+    [stableCommunityAdpMap]
   );
   const communityDefenseRankFromList = useMemo(
     () =>
@@ -1224,6 +1237,10 @@ const Rankings = () => {
   }, [players, myPosRankMap]);
 
   const playersById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  const communityPlayersById = useMemo(
+    () => new Map(displayedCommunityPlayers.map((p) => [p.id, p])),
+    [displayedCommunityPlayers]
+  );
 
   const getPlayerTier = useCallback(
     (playerId: string): number | null => {
@@ -1232,9 +1249,23 @@ const Rankings = () => {
       const myPosRank = myPosRankMap.get(playerId);
       if (myPosRank == null) return null;
       const cuts = getCutsForPosition(positionTierCuts, player.position);
+      if (cuts.length === 0) return null;
       return getTierNumber(myPosRank, cuts);
     },
     [playersById, myPosRankMap, positionTierCuts]
+  );
+
+  const getCommunityPlayerTier = useCallback(
+    (playerId: string): number | null => {
+      const player = communityPlayersById.get(playerId) ?? playersById.get(playerId);
+      if (!player) return null;
+      const communityPosRank = communityPosRankMap.get(playerId);
+      if (communityPosRank == null) return null;
+      const cuts = getCutsForPosition(communityTierCuts, player.position);
+      if (cuts.length === 0) return null;
+      return getTierNumber(communityPosRank, cuts);
+    },
+    [communityPlayersById, playersById, communityPosRankMap, communityTierCuts]
   );
 
   const hasTierBreakAfterPlayer = useCallback(
@@ -1272,12 +1303,37 @@ const Rankings = () => {
           bucket: userRankingBucketFromDisplayBucket(displayBucket),
           cuts,
         });
+        const community = await fetchCommunityRankingTiers(
+          userRankingBucketFromDisplayBucket(displayBucket)
+        );
+        setCommunityTierCuts(community);
       } catch (err) {
         console.error('Failed to save ranking tiers:', err);
       }
     },
     [rankingTiersStorageKey, user, displayBucket, selectedLeague?.id]
   );
+
+  const loadCommunityTierCuts = useCallback(async () => {
+    try {
+      const community = await fetchCommunityRankingTiers(
+        userRankingBucketFromDisplayBucket(displayBucket)
+      );
+      setCommunityTierCuts(community);
+    } catch (err) {
+      console.error('Failed to load community ranking tiers:', err);
+      setCommunityTierCuts({});
+    }
+  }, [
+    displayBucket.scoringFormat,
+    displayBucket.leagueType,
+    displayBucket.isSuperflex,
+    displayBucket.rookiesOnly,
+  ]);
+
+  useEffect(() => {
+    void loadCommunityTierCuts();
+  }, [loadCommunityTierCuts]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1360,6 +1416,7 @@ const Rankings = () => {
         communityTrend:
           overallRank != null ? getCommunityTrend(playerId, overallRank) ?? null : null,
         tier: getPlayerTier(playerId),
+        communityTier: getCommunityPlayerTier(playerId),
         hasTierBreakAfter: hasTierBreakAfterPlayer(playerId),
       };
     },
@@ -1369,6 +1426,7 @@ const Rankings = () => {
       getMyPosRank,
       getCommunityTrend,
       getPlayerTier,
+      getCommunityPlayerTier,
       hasTierBreakAfterPlayer,
     ]
   );
@@ -1482,17 +1540,14 @@ const Rankings = () => {
       let defensePlayers = Array.from(uniqueDefenseMap.values());
       
       // Update ADPs for defenses to be between 150-200 (distribute evenly)
-      // Sort by name to ensure consistent ordering
-      defensePlayers = defensePlayers.sort((a, b) => a.name.localeCompare(b.name));
+      // Sort by fantasy D/ST rank order (HOU first … ARI last), not alphabetical
+      defensePlayers = defensePlayers.sort((a, b) => compareDefensesByFantasyRank(a.name, b.name));
       defensePlayers = defensePlayers.map((defense, index) => {
         const adp = 150 + Math.floor((index / Math.max(defensePlayers.length, 1)) * 50);
         const normalizedTeam = defense.team && defense.team !== 'FA'
           ? defense.team
           : (defenseTeamAbbrByName.get(defense.name) ?? defense.team);
-        if (Number(defense.adp) >= 200 || Number(defense.adp) < 150) {
-          return { ...defense, adp, team: normalizedTeam };
-        }
-        return { ...defense, team: normalizedTeam };
+        return { ...defense, adp, team: normalizedTeam };
       });
       
       // Do not persist defense ADP updates - RLS blocks anon update on players; in-memory is enough
@@ -2674,10 +2729,11 @@ const Rankings = () => {
                   <div className="space-y-2">
                     {filteredCommunityPlayers.map((player) => {
                       const rankMeta = getPlayerRankCardMeta(player.id);
+                      const stableAdp = getDisplayAdp(player.id, Number(player.adp) || 0);
                       return (
                       <PlayerCard
                         key={player.id}
-                        player={player}
+                        player={stableAdp !== Number(player.adp) ? { ...player, adp: stableAdp } : player}
                         rank={displayedCommunityPlayers.findIndex((p) => p.id === player.id) + 1}
                         onClick={() => handlePlayerClick(player)}
                         positionColoredRank
@@ -2686,7 +2742,7 @@ const Rankings = () => {
                         communityPosRank={rankMeta.communityPosRank}
                         myPosRank={rankMeta.myPosRank}
                         communityTrend={rankMeta.communityTrend}
-                        tier={rankMeta.tier}
+                        tier={rankMeta.communityTier}
                       />
                       );
                     })}
@@ -2911,10 +2967,11 @@ const Rankings = () => {
                   <div className="space-y-2">
                     {filteredCommunityPlayers.map((player) => {
                       const rankMeta = getPlayerRankCardMeta(player.id);
+                      const stableAdp = getDisplayAdp(player.id, Number(player.adp) || 0);
                       return (
                       <PlayerCard
                         key={player.id}
-                        player={player}
+                        player={stableAdp !== Number(player.adp) ? { ...player, adp: stableAdp } : player}
                         rank={displayedCommunityPlayers.findIndex((p) => p.id === player.id) + 1}
                         onClick={() => handlePlayerClick(player)}
                         positionColoredRank
@@ -2923,7 +2980,7 @@ const Rankings = () => {
                         communityPosRank={rankMeta.communityPosRank}
                         myPosRank={rankMeta.myPosRank}
                         communityTrend={rankMeta.communityTrend}
-                        tier={rankMeta.tier}
+                        tier={rankMeta.communityTier}
                       />
                       );
                     })}

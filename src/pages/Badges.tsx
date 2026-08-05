@@ -334,6 +334,52 @@ const Badges = () => {
             }
           }
         }
+
+        // Multiplayer mock results (logged-in badge awards)
+        const { data: mpResults, error: mpError } = await (supabase as any)
+          .from('multiplayer_draft_results')
+          .select(
+            'draft_id, detected_archetype_index, detected_chaos_archetype, badge_awarded, created_at, draft:multiplayer_drafts(name, completed_at)'
+          )
+          .eq('user_id', user.id)
+          .eq('badge_awarded', true)
+          .limit(500);
+        if (mpError) {
+          console.warn('Badges: failed to fetch multiplayer results', mpError);
+        } else if (mpResults?.length) {
+          diagnostics.draftsCount += mpResults.length;
+          for (const row of mpResults as Array<{
+            draft_id: string;
+            detected_archetype_index: number | null;
+            detected_chaos_archetype: string | null;
+            created_at: string;
+            draft?: { name?: string; completed_at?: string | null } | null;
+          }>) {
+            const unlockedAt = unlockedAtFromDraft({
+              completed_at: row.draft?.completed_at ?? row.created_at,
+              created_at: row.created_at,
+            });
+            const idx = row.detected_archetype_index;
+            if (
+              typeof idx === 'number' &&
+              idx >= 0 &&
+              idx < ARCHETYPE_LIST.length
+            ) {
+              mergeEarnedIndex(byIndex, idx, {
+                draftName: row.draft?.name || 'Multiplayer Mock',
+                draftId: row.draft_id,
+                unlockedAt,
+              });
+            }
+            if (row.detected_chaos_archetype) {
+              mergeEarnedChaos(chaosByName, row.detected_chaos_archetype, {
+                draftName: row.draft?.name || 'Multiplayer Mock',
+                draftId: row.draft_id,
+                unlockedAt,
+              });
+            }
+          }
+        }
       }
 
       const tempIds = tempDraftStorage.getDraftList();

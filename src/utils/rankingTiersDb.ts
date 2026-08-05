@@ -3,7 +3,11 @@ import {
   applyUserRankingsBucketMatch,
   type UserRankingBucketDb,
 } from '@/utils/userRankingsBucket';
-import { parsePositionTierCuts, type PositionTierCuts } from '@/utils/positionTiers';
+import {
+  aggregateCommunityTierCuts,
+  parsePositionTierCuts,
+  type PositionTierCuts,
+} from '@/utils/positionTiers';
 
 /** Generated DB types omit this table until regenerated — cast at the boundary. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,4 +61,26 @@ export async function upsertUserRankingTiers(params: {
     updated_at: updatedAt,
   });
   if (error) throw error;
+}
+
+/** Consensus position cuts for a rankings bucket (all signed-in submissions). */
+export async function fetchCommunityRankingTiers(
+  bucket: UserRankingBucketDb
+): Promise<PositionTierCuts> {
+  const { data, error } = await supabase.rpc('get_community_ranking_tier_submissions' as never, {
+    p_scoring_format: bucket.scoring_format,
+    p_league_type: bucket.league_type,
+    p_is_superflex: bucket.is_superflex,
+    p_rookies_only: bucket.rookies_only,
+  } as never);
+  if (error) throw error;
+
+  const submissions: PositionTierCuts[] = [];
+  if (Array.isArray(data)) {
+    for (const row of data) {
+      const parsed = parsePositionTierCuts(row);
+      if (Object.keys(parsed).length > 0) submissions.push(parsed);
+    }
+  }
+  return aggregateCommunityTierCuts(submissions);
 }

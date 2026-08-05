@@ -34,34 +34,41 @@ type RankCellProps = {
   tipPrefix: string;
 };
 
+/** Compact prefix in the rank cell (D/ST → DEF) so long names keep horizontal room. */
+function compactPosPrefix(position: string): string {
+  const pos = position.trim().toUpperCase();
+  if (pos === 'D/ST' || pos === 'DST' || pos === 'DEF') return 'DEF';
+  return pos;
+}
+
 function RankCell({ label, position, rank, tipPrefix }: RankCellProps) {
   const pos = position.trim().toUpperCase();
   const labelText = formatPositionalAdpRankLabel(pos, rank);
-  const rankParts = labelText.match(/^(.+?)(\d+)$/);
+  const compactPrefix = compactPosPrefix(pos);
+  const displayLabel = `${compactPrefix}${rank}`;
 
   return (
-    <div className="flex flex-col items-center min-w-[4.5rem] gap-1">
-      <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground leading-none whitespace-nowrap">
+    <div className="flex flex-col items-center gap-0.5">
+      <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground leading-none whitespace-nowrap">
         {label}
       </span>
       <Tooltip>
         <TooltipTrigger asChild>
           <span
             className={cn(
-              'inline-flex items-baseline gap-0.5 font-display text-lg font-bold leading-none cursor-default',
+              'inline-flex items-baseline gap-0.5 font-display text-base font-bold leading-none cursor-default',
               positionLabelClass(pos)
             )}
           >
-            <span className="tracking-[0.12em]">{rankParts?.[1] ?? labelText}</span>
-            {rankParts?.[2] != null && (
-              <span className="tabular-nums">{rankParts[2]}</span>
-            )}
+            <span className="tracking-[0.06em]">{compactPrefix}</span>
+            <span className="tabular-nums">{rank}</span>
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-xs text-xs">
           {tipPrefix}: {labelText} in rankings at this position
         </TooltipContent>
       </Tooltip>
+      <span className="sr-only">{displayLabel}</span>
     </div>
   );
 }
@@ -91,16 +98,16 @@ export function RankingsPosRankCompare({
   return (
     <div
       className={cn(
-        'shrink-0 px-5 border-x border-border/50 flex items-center justify-center gap-4',
+        'shrink-0 px-2 sm:px-3 border-x border-border/50 flex items-center justify-center gap-2',
         className
       )}
     >
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2.5 sm:gap-3">
         {communityPosRank != null && (
           <RankCell label="Comm RK" position={position} rank={communityPosRank} tipPrefix="Community" />
         )}
         {communityPosRank != null && myPosRank != null && (
-          <span className="text-border/80 select-none text-base px-0.5" aria-hidden>
+          <span className="text-border/80 select-none text-sm" aria-hidden>
             |
           </span>
         )}
@@ -112,7 +119,7 @@ export function RankingsPosRankCompare({
         <Tooltip>
           <TooltipTrigger asChild>
             <span
-              className="inline-flex items-center justify-center min-w-[2rem] h-7 px-2 rounded-md border border-border/60 text-xs font-display font-bold tracking-wide cursor-default"
+              className="inline-flex items-center justify-center min-w-[1.75rem] h-6 px-1.5 rounded-md border border-border/60 text-[11px] font-display font-bold tracking-wide cursor-default"
               style={{ color: tone.color, backgroundColor: tone.bgColor }}
             >
               {tone.label}

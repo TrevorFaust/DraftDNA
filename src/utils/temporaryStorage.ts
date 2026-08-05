@@ -29,6 +29,17 @@ export function getOrCreateGuestSessionId(): string {
   return id;
 }
 
+/**
+ * Mint a new guest session id (same browser profile / all incognito windows share storage,
+ * so a second tab looks like the same guest until you rotate this).
+ */
+export function resetGuestSessionId(): string {
+  if (typeof window === 'undefined') return generateUuid();
+  const id = generateUuid();
+  localStorage.setItem(GUEST_SESSION_ID_KEY, id);
+  return id;
+}
+
 // Temporary Draft Storage
 export const tempDraftStorage = {
   // Save a temporary draft

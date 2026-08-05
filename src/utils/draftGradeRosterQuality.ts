@@ -186,7 +186,8 @@ export function analyzeRosterQuality(
 
   for (const p of picks) {
     const invalidAdp = p.rawAdp <= 0 || p.rawAdp > poolSize + numTeams;
-    if (invalidAdp && ['QB', 'RB', 'WR', 'TE'].includes(p.pos)) {
+    // Missing ADP is a data gap, not "you drafted an unstartable" — only flag early picks.
+    if (invalidAdp && ['QB', 'RB', 'WR', 'TE'].includes(p.pos) && p.round_number <= 8) {
       fakeValuePickCount += 1;
       unstartablePickCount += 1;
     }
@@ -246,7 +247,12 @@ export function analyzeRosterQuality(
       score -= 2;
     }
 
-    if (['RB', 'WR', 'TE'].includes(p.pos) && p.adp > poolSize * 0.92) {
+    // Late dart throws (R11+) with bad ADP are normal bench filler — don't treat as disasters.
+    if (
+      ['RB', 'WR', 'TE'].includes(p.pos) &&
+      p.adp > poolSize * 0.92 &&
+      p.round_number <= 10
+    ) {
       unstartablePickCount += 1;
       score -= 2;
     }
@@ -291,7 +297,8 @@ export function analyzeRosterQuality(
     const roles = sorted.map((p) => getDepthRole(depthCtx, team, 'WR', p.adp));
     const hasAlpha = roles.includes('alpha');
     const competing = sorted.filter((p, i) => roles[i] === 'competing');
-    const shallowCount = roles.filter((r) => r === 'depth' || r === 'dart' || r === 'competing').length;
+    // WR2 ("competing") is fine in 12/14-team leagues. WR3+ is the problem.
+    const wr3PlusCount = roles.filter((r) => r === 'depth' || r === 'dart').length;
 
     const eliteCompetingEarly = competing.filter(
       (p) => p.round_number <= 6 && p.adp <= eliteWr2AdpCap
@@ -300,19 +307,18 @@ export function analyzeRosterQuality(
     if (
       hasAlpha &&
       eliteCompetingEarly.length === 1 &&
-      shallowCount <= 1 &&
+      wr3PlusCount === 0 &&
       !teamSynergyNote
     ) {
       const wr2 = eliteCompetingEarly[0].name;
       if (wr2) {
         teamSynergyNote = `Stacking ${wr2} with your ${team} WR1 is a bit volatile, but the talent is strong enough that it can work when you pay a fair price.`;
       }
-      sameTeamWrPenalty += 1;
-      score -= 1;
+      // Slight note only — WR1+WR2 stacks are common, not a real penalty.
       continue;
     }
 
-    if (shallowCount >= 2 && !isHealthySameTeamStack(sorted, depthCtx)) {
+    if (wr3PlusCount >= 2 && !isHealthySameTeamStack(sorted, depthCtx)) {
       sameTeamWrPenalty += 6;
       score -= 6;
       const names = sorted
@@ -445,6 +451,10 @@ interface TaglineContext {
   premiumSlotMiss?: boolean;
   earlyTeamWr2Count?: number;
   teamSynergyNote?: string | null;
+  keeperRosterNote?: string | null;
+  keeperStrategyNote?: string | null;
+  hasEliteWrKeeper?: boolean;
+  hasEliteRbKeeper?: boolean;
 }
 
 function polishTagline(text: string): string {
@@ -523,20 +533,30 @@ function teamSynergyBeat(ctx: TaglineContext): string | null {
 }
 
 function balanceThread(ctx: TaglineContext): string | null {
+  // Elite keepers already fill that position — don't ding the complementary early run.
+  if (ctx.keeperStrategyNote?.trim()) {
+    return ctx.keeperStrategyNote.trim();
+  }
   if (
     ctx.firstRbRound != null &&
     ctx.firstRbRound >= 6 &&
-    ctx.qualityWrCount >= 3
+    ctx.qualityWrCount >= 3 &&
+    !ctx.hasEliteRbKeeper
   ) {
     return `From there you loaded up at wideout and waited until round ${ctx.firstRbRound} for your first RB, leaning on ${ctx.qualityWrCount} strong receivers to cover the gap.`;
   }
-  if (ctx.firstRbRound != null && ctx.firstRbRound >= 6) {
+  if (ctx.firstRbRound != null && ctx.firstRbRound >= 6 && !ctx.hasEliteRbKeeper) {
     return `The build got thin when your first RB did not arrive until round ${ctx.firstRbRound}, so you need that backfield to hit.`;
   }
-  if (ctx.rb2Round != null && ctx.rb2Round >= 10) {
+  if (ctx.rb2Round != null && ctx.rb2Round >= 10 && !ctx.hasEliteRbKeeper) {
     return 'Running back depth stayed thin until late, so your early core has to carry the load.';
   }
-  if (ctx.wr2Round != null && ctx.wr2Round >= 11 && ctx.qualityWrCount < 3) {
+  if (
+    ctx.wr2Round != null &&
+    ctx.wr2Round >= 11 &&
+    ctx.qualityWrCount < 3 &&
+    !ctx.hasEliteWrKeeper
+  ) {
     return 'Receiver depth tapers off after your top options, so expect some uneven weeks there.';
   }
   const rbNote = ctx.rosterNotes.find((n) => n.includes('RB2') || n.includes('thin at RB'));
@@ -652,7 +672,7 @@ function negativeGradeFactors(ctx: TaglineContext): string[] {
   }
   if ((ctx.earlyTeamWr2Count ?? 0) >= 2) {
     factors.push(
-      'drafting secondary wideouts too early or too often while clearer starters were still available'
+      'drafting NFL WR3s too early while clearer WR2s were still available'
     );
   }
   if (ctx.reachCount >= 2) {
@@ -671,7 +691,8 @@ function negativeGradeFactors(ctx: TaglineContext): string[] {
   if (
     ctx.firstRbRound != null &&
     ctx.firstRbRound >= 7 &&
-    ctx.qualityWrCount < 3
+    ctx.qualityWrCount < 3 &&
+    !ctx.hasEliteRbKeeper
   ) {
     factors.push(`waiting until round ${ctx.firstRbRound} for your first RB`);
   }
@@ -681,7 +702,8 @@ function negativeGradeFactors(ctx: TaglineContext): string[] {
     ctx.qualityWrCount >= 5 &&
     comp.wrCount >= comp.rbCount + 2 &&
     ctx.firstRbRound != null &&
-    ctx.firstRbRound >= 5
+    ctx.firstRbRound >= 5 &&
+    !ctx.hasEliteRbKeeper
   ) {
     factors.push('loading up on WRs while RB lagged');
   }
@@ -838,6 +860,13 @@ function structureNoteFromCtx(ctx: TaglineContext): string | null {
 
 function buildNarrative(grade: string, ctx: TaglineContext, body: (string | null)[]): string {
   const segments = body.filter((p): p is string => Boolean(p));
+  // Keepers first so we never imply a late "find" before naming the keeper plan.
+  if (ctx.keeperRosterNote?.trim()) {
+    const note = ctx.keeperRosterNote.trim();
+    if (!segments.some((s) => s.includes(note.slice(0, 24)))) {
+      segments.unshift(note);
+    }
+  }
   const isWeakGrade =
     grade.startsWith('C') || grade.startsWith('D') || grade.startsWith('F');
   const foldHighlights = shouldFoldHighlightsIntoVerdict(
