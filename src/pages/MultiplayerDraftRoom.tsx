@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { supabase } from '@/integrations/supabase/client';
 import { getOrCreateGuestSessionId } from '@/utils/temporaryStorage';
 import {
@@ -62,6 +63,12 @@ import { detectChaosArchetype, type ChaosPick } from '@/utils/chaosDetection';
 import { buildDraftConfig } from '@/constants/buildDraftConfig';
 import { getArchetypeByNameOrImproviser } from '@/constants/archetypeListWithImproviser';
 import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
+import {
+  buildDefenseRankFromList,
+  buildPositionAdpRankMap,
+  resolvePositionAdpRankForDisplay,
+} from '@/utils/positionAdpRank';
+import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import type {
   MultiplayerDraft,
   MultiplayerKeeper,
@@ -69,7 +76,7 @@ import type {
   MultiplayerPick,
   MultiplayerResult,
 } from '@/types/multiplayerDraft';
-import type { DraftPick, RankedPlayer } from '@/types/database';
+import type { DraftPick, Player, RankedPlayer } from '@/types/database';
 import { toast } from 'sonner';
 import { ChevronRight, LogOut, Search, Timer, Trophy, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -97,6 +104,7 @@ const MultiplayerDraftRoom = () => {
   const { draftId } = useParams<{ draftId: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const player2025Stats = usePlayer2025Stats();
   const guestSessionId = useMemo(
     () => (!user ? getOrCreateGuestSessionId() : null),
     [user]
@@ -116,6 +124,22 @@ const MultiplayerDraftRoom = () => {
   const [picking, setPicking] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [myGrade, setMyGrade] = useState<DraftGradeResult | null>(null);
+  const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<Player | null>(null);
+  const [isStatsDialogOpen, setIsStatsDialogOpen] = useState(false);
+
+  const positionAdpRankMap = useMemo(() => buildPositionAdpRankMap(players), [players]);
+  const communityDefenseRankFromList = useMemo(
+    () =>
+      buildDefenseRankFromList(
+        players.map((p) => ({ id: p.id, position: p.position, rank: p.rank }))
+      ),
+    [players]
+  );
+
+  const openPlayerStats = useCallback((player: RankedPlayer) => {
+    setSelectedPlayerForStats(player);
+    setIsStatsDialogOpen(true);
+  }, []);
   const tickLock = useRef(false);
   const gradedRef = useRef(false);
   const boardLoadedRef = useRef(false);
@@ -293,11 +317,13 @@ const MultiplayerDraftRoom = () => {
     try {
       const data = await fetchPlayersByIds(ids);
       const byId = new Map(data.map((p) => [p.id, p]));
+      // Board order is community consensus (same as solo mock). Use board index as ADP.
       const ranked: RankedPlayer[] = ids
         .map((id, idx) => {
           const p = byId.get(id);
           if (!p) return null;
-          return { ...p, rank: idx + 1 } as RankedPlayer;
+          const boardRank = idx + 1;
+          return { ...p, rank: boardRank, adp: boardRank } as RankedPlayer;
         })
         .filter(Boolean) as RankedPlayer[];
       setPlayers(ranked);
@@ -799,22 +825,16 @@ const MultiplayerDraftRoom = () => {
       .map((pick) => players.find((p) => p.id === pick.player_id))
       .filter((p): p is RankedPlayer => !!p);
     const startingSlots = getStartingSlots();
-    const assignedPlayerIds = new Set<string>();
-    const filledSlots: (RankedPlayer | null)[] = [];
-    startingSlots.forEach((slot) => {
-      const availablePlayer = draftedPlayers.find((p) => {
-        const pos = p.position === 'D/ST' ? 'DEF' : p.position;
-        return slot.positions.includes(pos) && !assignedPlayerIds.has(p.id);
-      });
-      if (availablePlayer) {
-        assignedPlayerIds.add(availablePlayer.id);
-        filledSlots.push(availablePlayer);
-      } else {
-        filledSlots.push(null);
-      }
-    });
     const benchCount = positionLimits?.BENCH ?? 6;
-    const benchPlayers = draftedPlayers.filter((p) => !assignedPlayerIds.has(p.id)).slice(0, benchCount);
+    const myKeeperIds = keepers
+      .filter((k) => k.team_number === myTeam)
+      .map((k) => k.player_id);
+    const { filledSlots, benchPlayers } = fillDraftTeamLineup(
+      draftedPlayers,
+      startingSlots,
+      benchCount,
+      { keeperPlayerIds: myKeeperIds, isSuperflex: draft.is_superflex }
+    );
 
     const detectedArchetype =
       myResult?.detected_archetype ||
@@ -1056,10 +1076,14 @@ const MultiplayerDraftRoom = () => {
               .filter((p): p is RankedPlayer => !!p);
             const slots = getStartingSlots();
             const bench = positionLimits?.BENCH ?? 6;
+            const teamKeeperIds = keepers
+              .filter((k) => k.team_number === viewingResultTeam)
+              .map((k) => k.player_id);
             const { filledSlots: viewFilled, benchPlayers: viewBench } = fillDraftTeamLineup(
               drafted,
               slots,
-              bench
+              bench,
+              { keeperPlayerIds: teamKeeperIds, isSuperflex: draft.is_superflex }
             );
             const viewGrade =
               parseStoredDraftGrade(result.grade_payload) ||
@@ -1252,9 +1276,16 @@ const MultiplayerDraftRoom = () => {
                   className="flex items-center justify-between gap-3 px-2 py-2 rounded-md hover:bg-secondary/40"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{player.name}</div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="font-medium truncate cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => openPlayerStats(player)}
+                      >
+                        {player.name}
+                      </span>
                       <PositionBadge position={player.position} />
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       <span>
                         {displayTeamAbbrevOrFa(player.team, player.position, player.name)}
                       </span>
@@ -1267,7 +1298,10 @@ const MultiplayerDraftRoom = () => {
                   <Button
                     size="sm"
                     disabled={!isMyTurn || picking || players.length === 0 || Boolean(me?.is_autodraft)}
-                    onClick={() => handlePick(player)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePick(player);
+                    }}
                   >
                     Draft
                   </Button>
@@ -1308,10 +1342,14 @@ const MultiplayerDraftRoom = () => {
                     <div className="font-medium w-16 shrink-0 truncate">
                       {teamLabel(p.team_number)}
                     </div>
-                    <div className="flex-1 min-w-0 truncate text-muted-foreground">
+                    <button
+                      type="button"
+                      className="flex-1 min-w-0 truncate text-left text-muted-foreground hover:text-primary transition-colors"
+                      onClick={() => openPlayerStats(pl)}
+                    >
                       {pl.name}
                       {p.is_keeper ? ' · K' : p.is_autodraft ? ' · A' : ''}
-                    </div>
+                    </button>
                     <PositionBadge position={pl.position} className="shrink-0 text-[10px]" />
                   </div>
                 );
@@ -1325,6 +1363,24 @@ const MultiplayerDraftRoom = () => {
           </div>
         </div>
       </main>
+      <PlayerDetailDialog
+        player={selectedPlayerForStats}
+        open={isStatsDialogOpen}
+        onOpenChange={setIsStatsDialogOpen}
+        stats2025={
+          selectedPlayerForStats ? player2025Stats.get(selectedPlayerForStats.id) : undefined
+        }
+        allStats2025={player2025Stats}
+        positionAdpRank={
+          selectedPlayerForStats
+            ? resolvePositionAdpRankForDisplay(
+                selectedPlayerForStats,
+                positionAdpRankMap,
+                communityDefenseRankFromList
+              )
+            : null
+        }
+      />
     </div>
   );
 };

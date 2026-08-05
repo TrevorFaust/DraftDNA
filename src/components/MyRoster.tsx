@@ -1,4 +1,5 @@
 import { PositionBadge } from '@/components/PositionBadge';
+import { fillDraftTeamLineup } from '@/components/DraftTeamResultDialog';
 import type { RankedPlayer, DraftPick } from '@/types/database';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,23 @@ interface MyRosterProps {
   rookieDraftSlots?: number;
 }
 
+function KeeperBadge({
+  round,
+  drafted,
+}: {
+  round: number;
+  drafted: boolean;
+}) {
+  return (
+    <span
+      className="shrink-0 text-[10px] font-medium text-primary/90 bg-primary/20 px-1.5 py-0.5 rounded"
+      title="Keeper"
+    >
+      {drafted ? 'K' : `Rd ${round}`}
+    </span>
+  );
+}
+
 export const MyRoster = ({
   picks,
   players,
@@ -50,14 +68,18 @@ export const MyRoster = ({
     .map((pick) => players.find((p) => p.id === pick.player_id))
     .filter((p): p is RankedPlayer => !!p);
 
+  const keeperRoundByPlayerId = new Map(
+    (userKeepers || []).map((k) => [k.player_id, k.round_number])
+  );
+  const keeperPlayerIds = new Set(keeperRoundByPlayerId.keys());
+
   // Keepers not yet drafted (round in the future): include in roster display so user sees them from the start
-  const keeperEntries = (userKeepers || [])
-    .filter((k) => k.round_number > currentRound)
+  const draftedIds = new Set(draftedPlayers.map((p) => p.id));
+  const keeperPlayersNotYetDrafted = (userKeepers || [])
+    .filter((k) => k.round_number > currentRound && !draftedIds.has(k.player_id))
     .map((k) => ({ player: players.find((p) => p.id === k.player_id), round: k.round_number }))
     .filter((e): e is { player: RankedPlayer; round: number } => !!e.player);
-  const draftedIds = new Set(draftedPlayers.map((p) => p.id));
-  const keeperPlayersNotYetDrafted = keeperEntries.filter((e) => !draftedIds.has(e.player.id));
-  const keeperRoundByPlayerId = new Map(keeperPlayersNotYetDrafted.map((e) => [e.player.id, e.round]));
+
   const sortedUserPicks = [...userPicks].sort((a, b) => a.pick_number - b.pick_number);
 
   if (rookieDraftSlots != null && rookieDraftSlots > 0) {
@@ -78,12 +100,7 @@ export const MyRoster = ({
                 >
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
                     <span className="truncate font-medium">{e.player.name}</span>
-                    <span
-                      className="shrink-0 text-[10px] font-medium text-primary/90 bg-primary/20 px-1.5 py-0.5 rounded"
-                      title="Keeper"
-                    >
-                      Rd {e.round}
-                    </span>
+                    <KeeperBadge round={e.round} drafted={false} />
                   </div>
                   <PositionBadge position={e.player.position} className="text-[10px]" />
                 </div>
@@ -112,12 +129,7 @@ export const MyRoster = ({
                       <div className="flex-1 min-w-0 flex items-center gap-1.5">
                         <span className="truncate font-medium">{player.name}</span>
                         {keeperRound !== undefined && (
-                          <span
-                            className="shrink-0 text-[10px] font-medium text-primary/90 bg-primary/20 px-1.5 py-0.5 rounded"
-                            title="Keeper"
-                          >
-                            Rd {keeperRound}
-                          </span>
+                          <KeeperBadge round={keeperRound} drafted={draftedIds.has(player.id)} />
                         )}
                       </div>
                       <PositionBadge position={player.position} className="text-[10px]" />
@@ -135,7 +147,7 @@ export const MyRoster = ({
     );
   }
 
-  // Combined roster for slot assignment: drafted + keepers (so lineup shows keepers in position)
+  // Combined roster: drafted + future keepers. Keepers claim starter slots first.
   const combinedRoster = [...draftedPlayers, ...keeperPlayersNotYetDrafted.map((e) => e.player)];
 
   const benchCount = positionLimits?.BENCH ?? 6;
@@ -154,33 +166,12 @@ export const MyRoster = ({
     { label: 'K', positions: ['K'] },
   ];
 
-  const assignedPlayerIds = new Set<string>();
-  const filledSlots: (RankedPlayer | null)[] = [];
-  let qbPlacedInFlex = false;
-
-  startingSlots.forEach((slot) => {
-    const isFlex = slot.label === 'FLEX';
-    const effectivePositions = isFlex && isSuperflex && qbPlacedInFlex ? ['RB', 'WR', 'TE'] : slot.positions;
-    const posMatch = (p: RankedPlayer) => {
-      const pos = p.position === 'D/ST' ? 'DEF' : p.position;
-      return effectivePositions.includes(p.position) || effectivePositions.includes(pos);
-    };
-    const availablePlayer = combinedRoster.find(
-      (p) => posMatch(p) && !assignedPlayerIds.has(p.id)
-    );
-    if (availablePlayer) {
-      assignedPlayerIds.add(availablePlayer.id);
-      filledSlots.push(availablePlayer);
-      if (isFlex && (availablePlayer.position === 'QB' || availablePlayer.position === 'qb')) {
-        qbPlacedInFlex = true;
-      }
-    } else {
-      filledSlots.push(null);
-    }
-  });
-
-  // Remaining players go to bench
-  const benchPlayers = combinedRoster.filter((p) => !assignedPlayerIds.has(p.id));
+  const { filledSlots, benchPlayers } = fillDraftTeamLineup(
+    combinedRoster,
+    startingSlots,
+    benchCount,
+    { keeperPlayerIds, isSuperflex }
+  );
 
   return (
     <div className="glass-card p-4 w-full">
@@ -209,7 +200,10 @@ export const MyRoster = ({
                     <div className="flex-1 min-w-0 flex items-center gap-1.5">
                       <span className="truncate font-medium">{player.name}</span>
                       {keeperRound !== undefined && (
-                        <span className="shrink-0 text-[10px] font-medium text-primary/90 bg-primary/20 px-1.5 py-0.5 rounded" title="Keeper">Rd {keeperRound}</span>
+                        <KeeperBadge
+                          round={keeperRound}
+                          drafted={draftedIds.has(player.id)}
+                        />
                       )}
                     </div>
                     <PositionBadge position={player.position} className="text-[10px]" />
@@ -245,7 +239,10 @@ export const MyRoster = ({
                     <div className="flex-1 min-w-0 flex items-center gap-1.5">
                       <span className="truncate font-medium">{player.name}</span>
                       {keeperRound !== undefined && (
-                        <span className="shrink-0 text-[10px] font-medium text-primary/90 bg-primary/20 px-1.5 py-0.5 rounded" title="Keeper">Rd {keeperRound}</span>
+                        <KeeperBadge
+                          round={keeperRound}
+                          drafted={draftedIds.has(player.id)}
+                        />
                       )}
                     </div>
                     <PositionBadge position={player.position} className="text-[10px]" />

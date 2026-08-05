@@ -33,6 +33,7 @@ import {
   mpCreateDraft,
 } from '@/utils/multiplayerDraftApi';
 import { getOrCreateGuestSessionId, resetGuestSessionId } from '@/utils/temporaryStorage';
+import { resolveNextMockDraftName } from '@/utils/mockDraftDefaultName';
 
 const MockDraft = () => {
   const { user, loading: authLoading } = useAuth();
@@ -163,28 +164,10 @@ const MockDraft = () => {
   const resolveDraftName = async (): Promise<string> => {
     const trimmed = draftName.trim();
     if (trimmed) return trimmed;
-
-    let priorCount = 0;
-    if (user && selectedLeague?.id) {
-      const { count, error } = await supabase
-        .from('mock_drafts')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('league_id', selectedLeague.id);
-      if (error) console.error('Failed to count league drafts for default name:', error);
-      priorCount = count ?? 0;
-    } else if (user) {
-      const { count, error } = await supabase
-        .from('mock_drafts')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      if (error) console.error('Failed to count drafts for default name:', error);
-      priorCount = count ?? 0;
-    } else {
-      priorCount = tempDraftStorage.getDraftList().length;
-    }
-
-    return `Mock Draft #${priorCount + 1}`;
+    return resolveNextMockDraftName({
+      userId: user?.id ?? null,
+      leagueId: selectedLeague?.id ?? null,
+    });
   };
 
   const startDraft = async () => {

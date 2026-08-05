@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { PositionBadge } from '@/components/PositionBadge';
 import { MyRoster } from '@/components/MyRoster';
+import { fillDraftTeamLineup } from '@/components/DraftTeamResultDialog';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import {
   DraftMobilePanelTabs,
@@ -2039,28 +2040,18 @@ const DraftRoom = () => {
       .filter((p): p is RankedPlayer => !!p);
 
     const startingSlots = getStartingSlots();
-    const assignedPlayerIds = new Set<string>();
-    const filledSlots: (RankedPlayer | null)[] = [];
-
-    startingSlots.forEach((slot) => {
-      const availablePlayer = draftedPlayers.find(
-        (p) => {
-          const pos = p.position === 'D/ST' ? 'DEF' : p.position;
-          return slot.positions.includes(pos) && !assignedPlayerIds.has(p.id);
-        }
-      );
-      if (availablePlayer) {
-        assignedPlayerIds.add(availablePlayer.id);
-        filledSlots.push(availablePlayer);
-      } else {
-        filledSlots.push(null);
-      }
-    });
-
-    // Remaining players go to bench
     const benchCount = positionLimits?.BENCH ?? 6;
-    const benchPlayers = draftedPlayers.filter((p) => !assignedPlayerIds.has(p.id));
-    const teamName = teamNames.get(draft?.user_pick_position || 1) || 'MY TEAM';
+    const userTeam = draft?.user_pick_position || 1;
+    const userKeeperIds = keepers
+      .filter((k) => k.team_number === userTeam)
+      .map((k) => k.player_id);
+    const { filledSlots, benchPlayers } = fillDraftTeamLineup(
+      draftedPlayers,
+      startingSlots,
+      benchCount,
+      { keeperPlayerIds: userKeeperIds, isSuperflex }
+    );
+    const teamName = teamNames.get(userTeam) || 'MY TEAM';
     const sortedCompletionPicks = [...userPicks].sort((a, b) => a.pick_number - b.pick_number);
 
     // Detect archetype from user's picks

@@ -11,26 +11,60 @@ import type { RankedPlayer } from '@/types/database';
 
 export type DraftTeamSlot = { label: string; positions: string[] };
 
+export type FillDraftTeamLineupOptions = {
+  /** Keepers claim starter slots before non-keepers (WR1/RB1/QB/TE/DEF/K first). */
+  keeperPlayerIds?: Iterable<string>;
+  isSuperflex?: boolean;
+};
+
+function playerMatchesSlotPositions(player: RankedPlayer, positions: string[]): boolean {
+  const pos = player.position === 'D/ST' ? 'DEF' : player.position;
+  return positions.includes(player.position) || positions.includes(pos);
+}
+
+/**
+ * Assign roster to starter slots then bench.
+ * Keepers (when provided) fill matching starter slots first so drafted depth
+ * cannot bump a keeper out of WR1/RB1/QB/TE/DEF/K into flex/bench.
+ */
 export function fillDraftTeamLineup(
-  draftedPlayers: RankedPlayer[],
+  rosterPlayers: RankedPlayer[],
   startingSlots: DraftTeamSlot[],
-  benchCount: number
+  benchCount: number,
+  options?: FillDraftTeamLineupOptions
 ): { filledSlots: (RankedPlayer | null)[]; benchPlayers: RankedPlayer[] } {
+  const keeperIds = new Set(options?.keeperPlayerIds ?? []);
+  const isSuperflex = options?.isSuperflex ?? false;
   const assignedPlayerIds = new Set<string>();
   const filledSlots: (RankedPlayer | null)[] = [];
-  for (const slot of startingSlots) {
-    const availablePlayer = draftedPlayers.find((p) => {
-      const pos = p.position === 'D/ST' ? 'DEF' : p.position;
-      return slot.positions.includes(pos) && !assignedPlayerIds.has(p.id);
+  let qbPlacedInFlex = false;
+
+  const findForSlot = (positions: string[], preferKeepers: boolean) =>
+    rosterPlayers.find((p) => {
+      if (assignedPlayerIds.has(p.id)) return false;
+      if (preferKeepers !== keeperIds.has(p.id)) return false;
+      return playerMatchesSlotPositions(p, positions);
     });
+
+  for (const slot of startingSlots) {
+    const isFlex = slot.label === 'FLEX';
+    const effectivePositions =
+      isFlex && isSuperflex && qbPlacedInFlex ? ['RB', 'WR', 'TE'] : slot.positions;
+    const availablePlayer =
+      (keeperIds.size > 0 ? findForSlot(effectivePositions, true) : undefined) ??
+      findForSlot(effectivePositions, false);
     if (availablePlayer) {
       assignedPlayerIds.add(availablePlayer.id);
       filledSlots.push(availablePlayer);
+      if (isFlex && availablePlayer.position.toUpperCase() === 'QB') {
+        qbPlacedInFlex = true;
+      }
     } else {
       filledSlots.push(null);
     }
   }
-  const benchPlayers = draftedPlayers
+
+  const benchPlayers = rosterPlayers
     .filter((p) => !assignedPlayerIds.has(p.id))
     .slice(0, benchCount);
   return { filledSlots, benchPlayers };

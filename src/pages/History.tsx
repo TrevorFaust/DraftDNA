@@ -45,6 +45,7 @@ import {
   fetchCommunityRankingsForDraft,
 } from '@/utils/communityRankingsMerge';
 import { fetchMyCompletedMpHistory } from '@/utils/multiplayerDraftApi';
+import { isAutoMockDraftName, repairAutoMockDraftNames } from '@/utils/mockDraftDefaultName';
 
 interface DraftWithPicks extends MockDraft {
   picks: (DraftPick & { player: Player })[];
@@ -216,6 +217,13 @@ const History = () => {
     }
 
     try {
+      // Fix off-by-one / duplicate "Mock Draft #N" names from the old counter.
+      try {
+        await repairAutoMockDraftNames(user.id);
+      } catch (repairErr) {
+        console.warn('Draft name repair skipped:', repairErr);
+      }
+
       // Fetch solo drafts
       const { data: draftsData, error: draftsError } = await supabase
         .from('mock_drafts')
@@ -757,6 +765,37 @@ const History = () => {
     }
   };
 
+  /**
+   * Auto-named drafts show Mock Draft #N from chronological order in their league
+   * (solo + multiplayer). Custom names are unchanged. This keeps the list correct
+   * even when a stored multiplayer name is stale.
+   */
+  const displayNameByDraftId = useMemo(() => {
+    const map = new Map<string, string>();
+    const byLeague = new Map<string, DraftWithPicks[]>();
+    for (const draft of drafts) {
+      const key = draft.league_id || '__none__';
+      const list = byLeague.get(key) || [];
+      list.push(draft);
+      byLeague.set(key, list);
+    }
+    for (const list of byLeague.values()) {
+      list.sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      list.forEach((draft, index) => {
+        map.set(
+          draft.id,
+          isAutoMockDraftName(draft.name) ? `Mock Draft #${index + 1}` : draft.name
+        );
+      });
+    }
+    return map;
+  }, [drafts]);
+
+  const getDraftDisplayName = (draft: DraftWithPicks) =>
+    displayNameByDraftId.get(draft.id) || draft.name;
+
   // Filter drafts by league, search term, and favorites
   const filteredDrafts = drafts.filter((draft) => {
     // Filter by league
@@ -772,7 +811,8 @@ const History = () => {
     // Filter by search term
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
-      return draft.name.toLowerCase().includes(searchLower);
+      const display = getDraftDisplayName(draft).toLowerCase();
+      return draft.name.toLowerCase().includes(searchLower) || display.includes(searchLower);
     }
     
     return true;
@@ -877,7 +917,7 @@ const History = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-display text-xl">{draft.name}</h3>
+                        <h3 className="font-display text-xl">{getDraftDisplayName(draft)}</h3>
                         <span className={cn(
                           'px-2 py-0.5 rounded text-xs font-medium',
                           draft.status === 'completed'
@@ -1177,7 +1217,7 @@ const History = () => {
                         </form>
                       ) : (
                         <div className="flex items-center gap-1">
-                          <h3 className="font-display text-xl">{draft.name}</h3>
+                          <h3 className="font-display text-xl">{getDraftDisplayName(draft)}</h3>
                           {!draft.isMultiplayer && (
                             <Button
                               type="button"
@@ -1187,7 +1227,7 @@ const History = () => {
                               aria-label="Rename draft"
                               onClick={() => {
                                 setEditingDraftId(draft.id);
-                                setEditingDraftName(draft.name);
+                                setEditingDraftName(getDraftDisplayName(draft));
                               }}
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -1397,7 +1437,7 @@ const History = () => {
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl flex items-center gap-2 flex-wrap">
-              <span>{selectedDraft?.name}</span>
+              <span>{selectedDraft ? getDraftDisplayName(selectedDraft) : ''}</span>
               {selectedDraft?.isMultiplayer && (
                 <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/15 text-primary border border-primary/25 font-sans tracking-normal">
                   Multiplayer
