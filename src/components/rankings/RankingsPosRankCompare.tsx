@@ -60,7 +60,8 @@ function RankCell({ label, position, rank, tipPrefix }: RankCellProps) {
               positionLabelClass(pos)
             )}
           >
-            <span className="tracking-[0.04em] sm:tracking-[0.06em]">{compactPrefix}</span>
+            {/* Prefix is redundant on phone when filtering by position; keeps Comm/Mine narrow. */}
+            <span className="hidden sm:inline tracking-[0.06em]">{compactPrefix}</span>
             <span className="tabular-nums">{rank}</span>
           </span>
         </TooltipTrigger>
@@ -105,7 +106,7 @@ export function RankingsPosRankCompare({
         className
       )}
     >
-      <div className="flex items-center gap-1.5 sm:gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {communityPosRank != null && (
           <RankCell label="Comm" position={position} rank={communityPosRank} tipPrefix="Community" />
         )}

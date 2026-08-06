@@ -7,7 +7,8 @@ import { RankingsDragRow } from '@/components/rankings/RankingsDragRow';
 import type { CommunityRankTrend } from '@/utils/communityRankTrend';
 
 /** Fixed row height (card + mb-2 gap) — avoids dynamic measure churn while scrolling. */
-export const RANKINGS_ROW_ESTIMATE_PX = 96;
+/** Includes phone layout where Comm/Mine/tier sit under the player name. */
+export const RANKINGS_ROW_ESTIMATE_PX = 118;
 
 type Player2025StatsEntry = {
   avgPointsPerGame: number | null;
@@ -138,7 +139,7 @@ const GapRow = memo(function GapRow({ virtualRow }: GapRowProps) {
         zIndex: 1,
       }}
     >
-      <div className="mb-2 min-h-[84px] rounded-lg border-2 border-dashed border-primary/60 bg-primary/5" />
+      <div className="mb-2 min-h-[110px] rounded-lg border-2 border-dashed border-primary/60 bg-primary/5" />
     </div>
   );
 });

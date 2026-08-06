@@ -128,8 +128,10 @@ export const PlayerCard = ({
       
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 sm:gap-1">
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-          <span className="font-semibold truncate text-sm sm:text-base" title={player.name}>{player.name}</span>
-          <PositionBadge position={player.position} className="shrink-0" />
+          <span className="font-semibold text-sm sm:text-base leading-snug sm:truncate" title={player.name}>
+            {player.name}
+          </span>
+          <PositionBadge position={player.position} className="hidden sm:inline-flex shrink-0" />
         </div>
         <PlayerHeaderStatsLine
           position={player.position}
@@ -141,6 +143,14 @@ export const PlayerCard = ({
           layout={useCompactStats ? 'compact' : 'stacked'}
           className="mt-0 text-[11px] sm:text-xs"
         />
+        <RankingsPosRankCompare
+          position={player.position}
+          communityPosRank={communityPosRank}
+          myPosRank={myPosRank}
+          tier={tier}
+          tierSource={tierSource}
+          className="mt-1.5 border-0 border-t border-border/40 px-0 pt-1.5 justify-start sm:hidden"
+        />
       </div>
 
       <RankingsPosRankCompare
@@ -149,6 +159,7 @@ export const PlayerCard = ({
         myPosRank={myPosRank}
         tier={tier}
         tierSource={tierSource}
+        className="hidden sm:flex"
       />
 
       {useCompactStats && <Rankings2025PpgCell stats2025={stats2025} className="px-3 py-1" />}

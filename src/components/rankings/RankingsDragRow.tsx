@@ -108,7 +108,7 @@ export const RankingsDragRow = memo(function RankingsDragRow({
         !tone && 'border-l-transparent',
         breakTone != null && 'mt-3',
         isOverlay && 'border-primary shadow-lg ring-1 ring-primary/40 cursor-grabbing',
-        isSourceGhost && 'opacity-40 border-dashed border-2 border-primary/60 bg-primary/5 min-h-[84px]',
+        isSourceGhost && 'opacity-40 border-dashed border-2 border-primary/60 bg-primary/5 min-h-[110px]',
         isSourceHidden && 'opacity-0',
         className
       )}
@@ -127,9 +127,9 @@ export const RankingsDragRow = memo(function RankingsDragRow({
               }
             : undefined
         }
-        className="flex flex-1 min-w-0 items-center gap-1.5 sm:gap-3"
+        className="flex flex-1 min-w-0 items-start sm:items-center gap-1.5 sm:gap-3"
       >
-        <div className="flex flex-col items-center gap-1 shrink-0 w-7">
+        <div className="flex flex-col items-center gap-1 shrink-0 w-7 pt-0.5 sm:pt-0">
           <div
             className={cn(
               'w-7 h-7 shrink-0 rounded-md flex items-center justify-center font-display text-sm',
@@ -142,21 +142,30 @@ export const RankingsDragRow = memo(function RankingsDragRow({
         </div>
         <div className="flex-1 min-w-0 pr-0.5 sm:pr-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="font-semibold truncate text-sm sm:text-base" title={player.name}>
+            <span className="font-semibold text-sm sm:text-base leading-snug sm:truncate" title={player.name}>
               {player.name}
             </span>
-            <PositionBadge position={player.position} className="shrink-0" />
+            <PositionBadge position={player.position} className="hidden sm:inline-flex shrink-0" />
           </div>
           <p className="text-[11px] sm:text-xs text-muted-foreground truncate mt-0.5">
             {displayTeamAbbrevOrFa(player.team, player.position, player.name)} · ADP {displayAdp}
             {player.bye_week != null ? ` · Bye ${player.bye_week}` : ''}
           </p>
+          {/* Phone: Comm / Mine / tier under the name so long names are not truncated. */}
+          <RankingsPosRankCompare
+            position={player.position}
+            communityPosRank={communityPosRank}
+            myPosRank={myPosRank}
+            tier={tier}
+            className="mt-1.5 border-0 border-t border-border/40 px-0 pt-1.5 justify-start sm:hidden"
+          />
         </div>
         <RankingsPosRankCompare
           position={player.position}
           communityPosRank={communityPosRank}
           myPosRank={myPosRank}
           tier={tier}
+          className="hidden sm:flex"
         />
         <Rankings2025PpgCell stats2025={stats2025} />
       </div>
