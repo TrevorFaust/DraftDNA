@@ -22,6 +22,7 @@ import { BrandedLoader } from '@/components/BrandedLoader';
 import { PlayerJerseyWithNumber } from '@/components/PlayerJerseyWithNumber';
 import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTeamJerseyColors';
 import { resolveTeamAbbrForDisplay } from '@/utils/teamMapping';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 import {
   Select,
   SelectContent,
@@ -554,7 +555,9 @@ const Statistics = () => {
       if (error?.message?.includes('rate limit') || error?.code === 'PGRST116' || error?.status === 429) {
         toast.error('Rate limit exceeded. Please wait a moment and refresh the page. Your data is safe.');
       } else {
-        toast.error(`Failed to load players: ${error instanceof Error ? error.message : 'Unknown error'}. Your data is safe - try refreshing.`);
+        toast.error(
+          userFacingErrorMessage(error, "Couldn't load players. Your data is safe. Try refreshing.")
+        );
       }
       
       // DON'T clear existing data on error - keep what we have
@@ -1331,28 +1334,28 @@ const Statistics = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="font-display text-4xl tracking-wide">DRAFT STATS</h1>
-          <p className="text-muted-foreground">
+      <main className="max-w-7xl mx-auto px-3 py-4 sm:px-4 sm:py-8">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="font-display text-3xl sm:text-4xl tracking-wide">DRAFT STATS</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Your drafting and rankings statistics
           </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Most Drafted Player */}
-          <div className="bg-secondary/30 rounded-lg border border-border/50 p-6">
-            <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
+          <div className="bg-secondary/30 rounded-lg border border-border/50 p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4 pb-2 border-b border-border">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-primary" />
                 <div>
-                  <h2 className="font-display text-xl tracking-wide">Draft Faves</h2>
+                  <h2 className="font-display text-lg sm:text-xl tracking-wide">Draft Faves</h2>
                   <p className="text-xs text-muted-foreground">(most drafted players)</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={selectedRound} onValueChange={setSelectedRound}>
-                  <SelectTrigger className="w-[140px] bg-secondary/50 border-border/50">
+                  <SelectTrigger className="w-[min(100%,9rem)] sm:w-[140px] h-9 bg-secondary/50 border-border/50">
                     <SelectValue placeholder="All Rounds" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1365,7 +1368,7 @@ const Statistics = () => {
                   </SelectContent>
                 </Select>
                 <Select value={selectedFavesPosition} onValueChange={setSelectedFavesPosition}>
-                  <SelectTrigger className="w-[140px] bg-secondary/50 border-border/50">
+                  <SelectTrigger className="w-[min(100%,9rem)] sm:w-[140px] h-9 bg-secondary/50 border-border/50">
                     <SelectValue placeholder="All Positions" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1406,7 +1409,7 @@ const Statistics = () => {
                       Most drafted players across all rounds
                       {isAllLeagues ? ' (all leagues)' : ` (${selectedLeague?.name || 'league'})`}
                     </p>
-                    <div className={`flex items-end gap-3 sm:gap-4 h-[500px] overflow-x-auto ${topPlayers.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
+                    <div className={`flex items-end gap-3 sm:gap-4 h-[min(52dvh,340px)] sm:h-[500px] overflow-x-auto ${topPlayers.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
                       {topPlayers.map((item, index) => {
                         // Get round breakdown for this player
                         const roundBreakdown: number[] = [];
@@ -1433,7 +1436,7 @@ const Statistics = () => {
                         return (
                           <div
                             key={item.player.id}
-                            className="group relative flex flex-col items-center cursor-pointer w-[80px] sm:w-[100px] h-[500px] flex-shrink-0"
+                            className="group relative flex flex-col items-center cursor-pointer w-[68px] sm:w-[100px] h-[min(52dvh,340px)] sm:h-[500px] flex-shrink-0"
                             onClick={() => {
                               const rankedPlayer: RankedPlayer = {
                                 ...item.player,
@@ -1538,7 +1541,7 @@ const Statistics = () => {
                         Most drafted players in Round {round}
                         {isAllLeagues ? ' (all leagues)' : ` (${selectedLeague?.name || 'league'})`}
                       </p>
-                      <div className={`flex items-end gap-3 sm:gap-4 h-[500px] overflow-x-auto ${topPlayers.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
+                      <div className={`flex items-end gap-3 sm:gap-4 h-[min(52dvh,340px)] sm:h-[500px] overflow-x-auto ${topPlayers.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
                         {topPlayers.map((item, index) => {
                           // Linear scaling: most drafted = 100%, others scale proportionally
                           const barHeight = (item.count / maxCount) * 100;
@@ -1546,7 +1549,7 @@ const Statistics = () => {
                           return (
                             <div
                               key={item.player.id}
-                              className="group flex flex-col items-center cursor-pointer w-[80px] sm:w-[100px] h-full flex-shrink-0"
+                              className="group flex flex-col items-center cursor-pointer w-[68px] sm:w-[100px] h-full flex-shrink-0"
                               onClick={() => {
                                 const rankedPlayer: RankedPlayer = {
                                   ...item.player,
@@ -1601,13 +1604,13 @@ const Statistics = () => {
           </div>
 
           {/* Avoided Players (Fade Score) */}
-          <div className="bg-secondary/30 rounded-lg border border-border/50 p-6">
-            <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
+          <div className="bg-secondary/30 rounded-lg border border-border/50 p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4 pb-2 border-b border-border">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-red-400" />
                 <div className="flex items-center gap-2">
                   <div>
-                    <h2 className="font-display text-xl tracking-wide">Draft Fades</h2>
+                    <h2 className="font-display text-lg sm:text-xl tracking-wide">Draft Fades</h2>
                     <p className="text-xs text-muted-foreground">(least drafted players)</p>
                   </div>
                   <Popover>
@@ -1643,7 +1646,7 @@ const Statistics = () => {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={selectedAvoidedRound} onValueChange={setSelectedAvoidedRound}>
-                  <SelectTrigger className="w-[140px] bg-secondary/50 border-border/50">
+                  <SelectTrigger className="w-[min(100%,9rem)] sm:w-[140px] h-9 bg-secondary/50 border-border/50">
                     <SelectValue placeholder="All Rounds" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1656,7 +1659,7 @@ const Statistics = () => {
                   </SelectContent>
                 </Select>
                 <Select value={selectedFadesPosition} onValueChange={setSelectedFadesPosition}>
-                  <SelectTrigger className="w-[140px] bg-secondary/50 border-border/50">
+                  <SelectTrigger className="w-[min(100%,9rem)] sm:w-[140px] h-9 bg-secondary/50 border-border/50">
                     <SelectValue placeholder="All Positions" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1727,7 +1730,7 @@ const Statistics = () => {
                       </span>
                     </p>
                     <TooltipProvider>
-                      <div className={`flex items-end gap-3 sm:gap-4 h-[500px] overflow-x-auto ${topAvoided.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
+                      <div className={`flex items-end gap-3 sm:gap-4 h-[min(52dvh,340px)] sm:h-[500px] overflow-x-auto ${topAvoided.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
                         {topAvoided.map((item, index) => {
                         const missedCount = Math.max(0, item.opportunityCount - item.selectionCount);
                         const fadeScore = item.fadeScore;
@@ -1781,7 +1784,7 @@ const Statistics = () => {
                         return (
                           <div
                             key={item.player.id}
-                            className="group flex flex-col items-center cursor-pointer w-[80px] sm:w-[100px] h-full flex-shrink-0"
+                            className="group flex flex-col items-center cursor-pointer w-[68px] sm:w-[100px] h-full flex-shrink-0"
                             onClick={() => {
                               const rankedPlayer: RankedPlayer = {
                                 ...item.player,
@@ -1937,7 +1940,7 @@ const Statistics = () => {
                         </span>
                       </p>
                       <TooltipProvider>
-                        <div className={`flex items-end gap-3 sm:gap-4 h-[500px] overflow-x-auto ${topAvoided.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
+                        <div className={`flex items-end gap-3 sm:gap-4 h-[min(52dvh,340px)] sm:h-[500px] overflow-x-auto ${topAvoided.length === 1 ? 'justify-center' : 'justify-around px-4'}`}>
                           {topAvoided.map((item, index) => {
                             const missedCount = Math.max(0, item.opportunityCount - item.selectionCount);
                             const fadeScore = item.fadeScore;
@@ -1990,7 +1993,7 @@ const Statistics = () => {
                           return (
                             <div
                               key={item.player.id}
-                              className="group flex flex-col items-center cursor-pointer w-[80px] sm:w-[100px] h-full flex-shrink-0"
+                              className="group flex flex-col items-center cursor-pointer w-[68px] sm:w-[100px] h-full flex-shrink-0"
                               onClick={() => {
                                 const rankedPlayer: RankedPlayer = {
                                   ...item.player,
@@ -2069,17 +2072,17 @@ const Statistics = () => {
 
           {/* Studs and Duds Breakdown */}
           {players.length > 0 && communityPlayers.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Your Studs */}
-              <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
-                <div className="flex items-center justify-center gap-2 mb-4 pb-2 border-b border-green-500/30">
+              <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-3 sm:p-4">
+                <div className="flex items-center justify-center gap-2 mb-2 sm:mb-4 pb-2 border-b border-green-500/30">
                   <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <h2 className="font-display text-xl tracking-wide text-green-400">YOUR STUDS</h2>
+                  <h2 className="font-display text-lg sm:text-xl tracking-wide text-green-400">YOUR STUDS</h2>
                 </div>
-                <p className="text-sm text-muted-foreground mb-4 text-center leading-snug">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-4 text-center leading-snug">
                   All your studs vs. community consensus.
                 </p>
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
+                <div className="space-y-2 max-h-[min(55dvh,28rem)] sm:max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                   {studsDudsFromRankings.studs.length > 0 ? (
                     studsDudsFromRankings.studs.map(({ player, myRank, communityRank, diff }) => (
                       <div
@@ -2119,15 +2122,15 @@ const Statistics = () => {
               </div>
 
               {/* Your Duds */}
-              <div className="bg-red-500/10 rounded-lg border border-red-500/30 p-4">
-                <div className="flex items-center justify-center gap-2 mb-4 pb-2 border-b border-red-500/30">
+              <div className="bg-red-500/10 rounded-lg border border-red-500/30 p-3 sm:p-4">
+                <div className="flex items-center justify-center gap-2 mb-2 sm:mb-4 pb-2 border-b border-red-500/30">
                   <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <h2 className="font-display text-xl tracking-wide text-red-400">YOUR DUDS</h2>
+                  <h2 className="font-display text-lg sm:text-xl tracking-wide text-red-400">YOUR DUDS</h2>
                 </div>
-                <p className="text-sm text-muted-foreground mb-4 text-center leading-snug">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-4 text-center leading-snug">
                   All your duds vs. community consensus.
                 </p>
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
+                <div className="space-y-2 max-h-[min(55dvh,28rem)] sm:max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                   {studsDudsFromRankings.duds.length > 0 ? (
                     studsDudsFromRankings.duds.map(({ player, myRank, communityRank, diff }) => (
                       <div

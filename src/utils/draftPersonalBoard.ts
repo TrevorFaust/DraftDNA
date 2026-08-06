@@ -270,19 +270,21 @@ export async function loadPersonalDraftBoardOverlay(params: {
   });
   let usesCommunityTiers = false;
 
-  // Guests (and anyone without personal breaks) still get community tier lines.
-  if (Object.keys(positionTierCuts).length === 0) {
-    try {
-      const communityCuts = eligiblePositionTierCuts(
-        await fetchCommunityRankingTiers(dbBucket)
-      );
-      if (Object.keys(communityCuts).length > 0) {
-        positionTierCuts = communityCuts;
-        usesCommunityTiers = true;
-      }
-    } catch (err) {
-      console.error('[draftPersonalBoard] Failed to load community ranking tiers:', err);
+  // Fill positions the viewer never cut (e.g. only QB/RB saved) from community.
+  // Personal cuts win per position; empty personal board uses community fully.
+  try {
+    const communityCuts = eligiblePositionTierCuts(
+      await fetchCommunityRankingTiers(dbBucket)
+    );
+    if (Object.keys(communityCuts).length > 0) {
+      const personalKeys = new Set(Object.keys(positionTierCuts));
+      positionTierCuts = mergePositionTierCuts(positionTierCuts, communityCuts);
+      usesCommunityTiers =
+        personalKeys.size === 0 ||
+        Object.keys(communityCuts).some((pos) => !personalKeys.has(pos));
     }
+  } catch (err) {
+    console.error('[draftPersonalBoard] Failed to load community ranking tiers:', err);
   }
 
   const metaById = new Map<string, PersonalDraftPlayerMeta>();

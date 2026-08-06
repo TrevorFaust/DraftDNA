@@ -2023,19 +2023,24 @@ export const PlayerDetailDialog = ({
   const displayPosRank = stats2025?.positionRank ? (stats2025.positionRank.match(/\d+$/)?.[0] ?? stats2025.positionRank) : null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
-        <DialogHeader className="relative pb-2">
-          <div className="flex items-stretch justify-between gap-4">
-            <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
-              <DialogTitle className="flex items-center gap-3 flex-wrap">
-                <PlayerJerseyWithNumber
-                  team={jerseyTeamAbbr}
-                  jerseyNumber={player.jersey_number ?? 0}
-                  numberFillColor={numberFill}
-                  size="dialog"
-                  position={player.position}
-                />
-                <span className="font-display text-2xl">{player.name}</span>
+      <DialogContent
+        className="max-w-2xl max-h-[92dvh] sm:max-h-[85vh] w-[calc(100%-1rem)] sm:w-full overflow-hidden flex flex-col p-3 sm:p-6 gap-2 sm:gap-4"
+        aria-describedby={undefined}
+      >
+        <DialogHeader className="relative pb-1 sm:pb-2 shrink-0 space-y-0 text-left">
+          <div className="flex flex-col sm:flex-row items-stretch justify-between gap-2.5 sm:gap-4">
+            <div className="flex min-w-0 flex-1 flex-col justify-between gap-1 sm:gap-2">
+              <DialogTitle className="flex items-center gap-2 sm:gap-3 flex-wrap pr-8">
+                <div className="hidden sm:block shrink-0">
+                  <PlayerJerseyWithNumber
+                    team={jerseyTeamAbbr}
+                    jerseyNumber={player.jersey_number ?? 0}
+                    numberFillColor={numberFill}
+                    size="dialog"
+                    position={player.position}
+                  />
+                </div>
+                <span className="font-display text-xl sm:text-2xl leading-tight">{player.name}</span>
                 <PositionBadge position={player.position} />
               </DialogTitle>
               <PlayerHeaderStatsLine
@@ -2046,62 +2051,67 @@ export const PlayerDetailDialog = ({
                 byeWeek={player.bye_week}
                 age={playerAge}
                 positionAdpRank={positionAdpRank}
-                className="mt-0 mb-0"
+                className="mt-0 mb-0 text-xs sm:text-sm"
               />
             </div>
             {stats2025 && (
-              <div className="shrink-0 rounded-lg border-2 border-primary/30 bg-primary/5 px-5 py-4 min-w-[200px]">
-                <p className="text-sm font-semibold text-foreground mb-3">2025 Stats</p>
-                <div className="flex items-center justify-between gap-6 text-base mb-3">
-                  <span><span className="text-muted-foreground">Pos Rk:</span> <span className="font-semibold">{displayPosRank}</span></span>
-                  <span>
-                    <span className="text-muted-foreground">Pts:</span>{' '}
-                    {isDefensePosition(player.position) ? (
-                      <span className="font-semibold text-primary">{stats2025.totalFantasyPoints.toFixed(1)}</span>
-                    ) : (
-                      <FantasyPointsWithBreakdown
-                        displayValue={stats2025.totalFantasyPoints.toFixed(1)}
-                        stats={seasonHeaderOffenseInput}
-                        breakdownOverride={
-                          player.position === 'K' ? seasonKickerHeaderBreakdownOverride ?? undefined : undefined
-                        }
-                        scoringFormat={scoringFormat}
-                      />
-                    )}
-                  </span>
+              <div className="shrink-0 rounded-lg border border-primary/30 sm:border-2 bg-primary/5 px-3 py-2 sm:px-5 sm:py-4 w-full sm:w-auto sm:min-w-[200px]">
+                <div className="flex items-center justify-between gap-3 mb-1.5 sm:mb-3">
+                  <p className="text-xs sm:text-sm font-semibold text-foreground">2025 Stats</p>
+                  <div className="flex items-center gap-3 sm:gap-6 text-sm sm:text-base">
+                    <span>
+                      <span className="text-muted-foreground">Pos Rk:</span>{' '}
+                      <span className="font-semibold">{displayPosRank}</span>
+                    </span>
+                    <span>
+                      <span className="text-muted-foreground">Pts:</span>{' '}
+                      {isDefensePosition(player.position) ? (
+                        <span className="font-semibold text-primary">{stats2025.totalFantasyPoints.toFixed(1)}</span>
+                      ) : (
+                        <FantasyPointsWithBreakdown
+                          displayValue={stats2025.totalFantasyPoints.toFixed(1)}
+                          stats={seasonHeaderOffenseInput}
+                          breakdownOverride={
+                            player.position === 'K' ? seasonKickerHeaderBreakdownOverride ?? undefined : undefined
+                          }
+                          scoringFormat={scoringFormat}
+                        />
+                      )}
+                    </span>
+                  </div>
                 </div>
-                <div className="pt-2 border-t border-border/50 space-y-1.5 text-sm">
+                <div className="pt-1.5 sm:pt-2 border-t border-border/50 grid grid-cols-2 sm:grid-cols-1 gap-x-3 gap-y-1 sm:gap-y-1.5 text-xs sm:text-sm">
                   {isDefensePosition(player.position) && (
                     <>
-                      <div className="flex justify-between gap-4">
+                      <div className="flex justify-between gap-2 sm:gap-4">
                         <span className="text-muted-foreground">Sacks</span>
                         <span className="font-medium">{stats2025.totalDefSacks.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">Interceptions</span>
+                      <div className="flex justify-between gap-2 sm:gap-4">
+                        <span className="text-muted-foreground">INTs</span>
                         <span className="font-medium">{stats2025.totalDefInterceptions.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">Fumble Recoveries</span>
+                      <div className="flex justify-between gap-2 sm:gap-4">
+                        <span className="text-muted-foreground">Fum Rec</span>
                         <span className="font-medium">{stats2025.totalDefFumbleRecoveries.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between gap-4 pt-1">
-                        <span className="text-muted-foreground">Total TDs</span>
+                      <div className="flex justify-between gap-2 sm:gap-4">
+                        <span className="text-muted-foreground">TDs</span>
                         <span className="font-medium">{stats2025.totalDefTds.toLocaleString()}</span>
                       </div>
                     </>
                   )}
                   {(player.position === 'QB') && (
                     <>
-                      <div className="flex justify-between gap-4">
+                      <div className="flex justify-between gap-2 sm:gap-4">
                         <span className="text-muted-foreground">Pass Yds</span>
                         <span className="font-medium">{stats2025.totalPassYards.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between gap-4">
+                      <div className="flex justify-between gap-2 sm:gap-4">
                         <span className="text-muted-foreground">Rush Yds</span>
                         <span className="font-medium">{stats2025.totalRushYards.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between gap-4">
+                      <div className="flex justify-between gap-2 sm:gap-4">
                         <span className="text-muted-foreground">INT</span>
                         <span className="font-medium">{stats2025.totalInterceptions.toLocaleString()}</span>
                       </div>
@@ -2109,34 +2119,34 @@ export const PlayerDetailDialog = ({
                   )}
                   {(player.position === 'WR' || player.position === 'TE') && (
                     <>
-                      <div className="flex justify-between gap-4">
+                      <div className="flex justify-between gap-2 sm:gap-4">
                         <span className="text-muted-foreground">Rec Yds</span>
                         <span className="font-medium">{stats2025.totalRecYards.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between gap-4">
+                      <div className="flex justify-between gap-2 sm:gap-4">
                         <span className="text-muted-foreground">Targets</span>
                         <span className="font-medium">{stats2025.totalTargets.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">Receptions</span>
+                      <div className="flex justify-between gap-2 sm:gap-4">
+                        <span className="text-muted-foreground">Rec</span>
                         <span className="font-medium">{stats2025.totalReceptions.toLocaleString()}</span>
                       </div>
                     </>
                   )}
                   {(player.position === 'RB' || player.position === 'FB') && (
                     <>
-                      <div className="flex justify-between gap-4">
+                      <div className="flex justify-between gap-2 sm:gap-4">
                         <span className="text-muted-foreground">Rush Yds</span>
                         <span className="font-medium">{stats2025.totalRushYards.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between gap-4">
+                      <div className="flex justify-between gap-2 sm:gap-4">
                         <span className="text-muted-foreground">Rec Yds</span>
                         <span className="font-medium">{stats2025.totalRecYards.toLocaleString()}</span>
                       </div>
                     </>
                   )}
                   {(player.position === 'QB' || player.position === 'RB' || player.position === 'FB' || player.position === 'WR' || player.position === 'TE') && (
-                    <div className="flex justify-between gap-4 pt-1">
+                    <div className="flex justify-between gap-2 sm:gap-4 col-span-2 sm:col-span-1 sm:pt-1">
                       <span className="text-muted-foreground">Total TDs</span>
                       <span className="font-medium">
                         {(stats2025.totalPassTds + stats2025.totalRushTds + stats2025.totalRecTds).toLocaleString()}
@@ -2154,21 +2164,21 @@ export const PlayerDetailDialog = ({
             <BrandedLoader size={44} />
           </div>
         ) : (
-          <Tabs defaultValue="stats" className="-mt-1 flex min-h-0 flex-1 flex-col overflow-hidden">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="stats" className="gap-2">
-                <BarChart3 className="w-4 h-4" />
+          <Tabs defaultValue="stats" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <TabsList className="grid w-full grid-cols-2 shrink-0 h-10 sm:h-11">
+              <TabsTrigger value="stats" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Game Stats
               </TabsTrigger>
-              <TabsTrigger value="comparison" className="gap-2">
-                <GitCompareArrows className="w-4 h-4" />
-                Player Comparison
+              <TabsTrigger value="comparison" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                <GitCompareArrows className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                Compare
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="stats" className="flex-1 min-h-0 overflow-auto mt-4 scrollbar-thin">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Season Stats</h3>
+            <TabsContent value="stats" className="flex-1 min-h-0 overflow-auto mt-2 sm:mt-4 scrollbar-thin">
+              <div className="flex items-center justify-between mb-2 sm:mb-4">
+                <h3 className="font-semibold text-sm sm:text-base">Season Stats</h3>
                 <Button
                   variant="default"
                   size="sm"
@@ -2180,7 +2190,7 @@ export const PlayerDetailDialog = ({
               </div>
               
               {showStatTabs && (
-                <div className="flex gap-2 mb-4">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2 sm:mb-4">
                   {player.position === 'QB' && (
                     <>
                       <Button

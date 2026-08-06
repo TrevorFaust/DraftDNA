@@ -773,35 +773,41 @@ export default function PlayersSpreadsheet() {
     );
   }
 
+  const stickyAdpClass =
+    "sticky left-0 z-30 bg-background group-hover:bg-muted/50 w-10 sm:w-14 px-1.5 sm:px-4";
+  const stickyPlayerClass =
+    "sticky left-10 sm:left-14 z-30 bg-background group-hover:bg-muted/50 w-[7.25rem] sm:w-[220px] max-w-[7.25rem] sm:max-w-none px-1.5 sm:px-4 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.35)]";
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="max-w-screen-2xl mx-auto px-6 py-8">
-        <div className="mb-6">
-          <h1 className="font-display text-4xl tracking-wide">PLAYER STATS</h1>
-          <p className="text-muted-foreground mt-1">ADP reflects community consensus for current league format.</p>
-          <p className="text-sm text-muted-foreground/90 mt-2 font-medium">{bucketBadgeLine}</p>
+      <main className="max-w-screen-2xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="font-display text-3xl sm:text-4xl tracking-wide">PLAYER STATS</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">ADP reflects community consensus for current league format.</p>
+          <p className="text-xs sm:text-sm text-muted-foreground/90 mt-1.5 sm:mt-2 font-medium">{bucketBadgeLine}</p>
         </div>
 
         <div
-          className="mb-6 flex w-max max-w-full items-start gap-2 rounded-lg border border-primary/25 bg-primary/5 py-2.5 pl-3 pr-8 text-sm text-muted-foreground"
+          className="mb-3 sm:mb-6 flex w-full max-w-full items-start gap-2 rounded-lg border border-primary/25 bg-primary/5 py-2 pl-2.5 pr-3 sm:py-2.5 sm:pl-3 sm:pr-8 text-xs sm:text-sm text-muted-foreground"
           role="note"
         >
           <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
           <p className="min-w-0 leading-snug">
             <span className="font-medium text-foreground">Tip:</span> Filter by a position to show extra stat columns related to that group.
+            <span className="sm:hidden"> Swipe sideways for team ranks and SOS.</span>
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-6">
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search player name..."
-            className="w-[220px] md:w-[240px] bg-secondary/50 border-border/50"
+            className="w-full min-w-[10rem] flex-1 sm:flex-none sm:w-[220px] md:w-[240px] h-9 bg-secondary/50 border-border/50"
           />
           <Select value={positionFilter} onValueChange={setPositionFilter}>
-            <SelectTrigger className="w-[135px] bg-secondary/50 border-border/50">
+            <SelectTrigger className="w-[min(100%,8.5rem)] sm:w-[135px] h-9 bg-secondary/50 border-border/50">
               <SelectValue placeholder="Position" />
             </SelectTrigger>
             <SelectContent>
@@ -815,7 +821,7 @@ export default function PlayersSpreadsheet() {
             </SelectContent>
           </Select>
           <Select value={teamFilter} onValueChange={setTeamFilter}>
-            <SelectTrigger className="w-[115px] bg-secondary/50 border-border/50">
+            <SelectTrigger className="w-[min(100%,7rem)] sm:w-[115px] h-9 bg-secondary/50 border-border/50">
               <SelectValue placeholder="Team" />
             </SelectTrigger>
             <SelectContent>
@@ -829,45 +835,53 @@ export default function PlayersSpreadsheet() {
           </Select>
         </div>
 
-        <div className="rounded-lg border border-border/50 bg-secondary/20 min-w-0 max-w-full overflow-x-auto overflow-y-visible scrollbar-thin">
-          <Table disableInnerScroll className="min-w-max">
+        <div className="rounded-lg border border-border/50 bg-secondary/20 min-w-0 max-w-full overflow-x-auto overflow-y-visible scrollbar-thin -mx-0.5">
+          <Table
+            disableInnerScroll
+            className="min-w-max text-xs sm:text-sm [&_th]:h-9 sm:[&_th]:h-12 [&_th]:px-1.5 sm:[&_th]:px-4 [&_td]:px-1.5 sm:[&_td]:px-4 [&_td]:py-2 sm:[&_td]:py-4"
+          >
             <TableHeader className="shadow-[inset_0_-1px_0_0_hsl(var(--border))]">
-              <TableRow>
+              <TableRow className="group">
                 <SortableHeader
                   label="ADP"
                   sortKey="adp"
                   sortable
-                  className="text-center"
+                  className={cn("text-center", stickyAdpClass)}
                   tooltip={headerTooltips.adp}
                 />
-                <SortableHeader label="Player" sortKey="player" sortable={false} className="text-left w-[220px]" />
-                <SortableHeader label="Team" sortKey="team" sortable={false} className="text-left" />
+                <SortableHeader
+                  label="Player"
+                  sortKey="player"
+                  sortable={false}
+                  className={cn("text-left", stickyPlayerClass)}
+                />
+                <SortableHeader label="Team" sortKey="team" sortable={false} className="text-left hidden sm:table-cell" />
                 {!hideAgeGpForDstView && (
-                  <SortableHeader label="Age" sortKey="age" sortable className="text-center" />
+                  <SortableHeader label="Age" sortKey="age" sortable className="text-center hidden sm:table-cell" />
                 )}
                 <SortableHeader
                   label="Pos Rk"
                   sortKey="posRank"
                   sortable
-                  className="text-center"
+                  className="text-center whitespace-nowrap"
                   tooltip={headerTooltips.posRank}
                 />
                 <SortableHeader
                   label="Total Pts"
                   sortKey="totalPoints"
                   sortable
-                  className="text-center"
+                  className="text-center whitespace-nowrap"
                   tooltip={headerTooltips.totalPts}
                 />
                 <SortableHeader
                   label="PPG"
                   sortKey="ppg"
                   sortable
-                  className="text-center"
+                  className="text-center whitespace-nowrap font-semibold"
                   tooltip={headerTooltips.ppg}
                 />
                 {activeStatColumns.map((col) => (
-                  <SortableHeader key={col.key} label={col.label} sortKey={col.key} sortable={col.isSortable} className="text-center" />
+                  <SortableHeader key={col.key} label={col.label} sortKey={col.key} sortable={col.isSortable} className="text-center whitespace-nowrap" />
                 ))}
                 {!hideAgeGpForDstView && (
                   <SortableHeader label="GP" sortKey="gp" sortable className="text-center" tooltip="Regular season games played." />
@@ -878,7 +892,7 @@ export default function PlayersSpreadsheet() {
                     label={col.label}
                     sortKey={col.sortKey}
                     sortable
-                    className="text-center whitespace-nowrap min-w-[4.25rem]"
+                    className="text-center whitespace-nowrap min-w-[3.5rem] sm:min-w-[4.25rem]"
                     tooltip={col.tooltip}
                   />
                 ))}
@@ -886,12 +900,12 @@ export default function PlayersSpreadsheet() {
                   label="OL Overall"
                   sortKey={OL_UNIT_OVERALL_SORT_KEY}
                   sortable
-                  className="text-center whitespace-nowrap min-w-[4.25rem]"
+                  className="text-center whitespace-nowrap min-w-[3.5rem] sm:min-w-[4.25rem]"
                   tooltip="PFF-style unit overall offensive line rank for the player's NFL team (2025, 1 = best). Hover or click for pass/run ranks and advanced metrics."
                 />
                 <TableHead
                   className={cn(
-                    "text-center whitespace-nowrap min-w-[10rem] border-b border-border bg-background text-muted-foreground shadow-[inset_0_-1px_0_0_hsl(var(--border))]"
+                    "text-center whitespace-nowrap min-w-[7.5rem] sm:min-w-[10rem] border-b border-border bg-background text-muted-foreground shadow-[inset_0_-1px_0_0_hsl(var(--border))] px-1.5 sm:px-4"
                   )}
                 >
                   <div className="flex items-center justify-center gap-0.5">
@@ -947,25 +961,34 @@ export default function PlayersSpreadsheet() {
                 return (
                   <TableRow
                     key={player.id}
-                    className="cursor-pointer"
+                    className="group cursor-pointer"
                     onClick={() => {
                       setSelectedPlayer(player);
                       setDetailDialogOpen(true);
                     }}
                   >
-                    <TableCell className="text-center">{player.adp ?? player.rank}</TableCell>
-                    <TableCell className="w-[220px]">
-                      <span className={cn("position-badge", getPositionBadgeClass(normalizedPosition), "inline-block max-w-full truncate text-sm px-2.5 py-1")}>
+                    <TableCell className={cn("text-center tabular-nums", stickyAdpClass)}>
+                      {player.adp ?? player.rank}
+                    </TableCell>
+                    <TableCell className={stickyPlayerClass}>
+                      <span
+                        className={cn(
+                          "position-badge",
+                          getPositionBadgeClass(normalizedPosition),
+                          "inline-block max-w-full truncate text-[11px] sm:text-sm px-1.5 sm:px-2.5 py-0.5 sm:py-1"
+                        )}
+                        title={player.name}
+                      >
                         {player.name}
                       </span>
                     </TableCell>
-                    <TableCell>{team}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{team}</TableCell>
                     {!hideAgeGpForDstView && (
-                      <TableCell className="text-center">{age == null ? "-" : age}</TableCell>
+                      <TableCell className="text-center hidden sm:table-cell">{age == null ? "-" : age}</TableCell>
                     )}
-                    <TableCell className="text-center">{displayPosRank}</TableCell>
-                    <TableCell className="text-center">{formatOneDecimal(stats?.totalFantasyPoints)}</TableCell>
-                    <TableCell className="text-center font-semibold">{formatOneDecimal(stats?.avgPointsPerGame)}</TableCell>
+                    <TableCell className="text-center tabular-nums">{displayPosRank}</TableCell>
+                    <TableCell className="text-center tabular-nums">{formatOneDecimal(stats?.totalFantasyPoints)}</TableCell>
+                    <TableCell className="text-center font-semibold tabular-nums">{formatOneDecimal(stats?.avgPointsPerGame)}</TableCell>
                     {activeStatColumns.map((col) => (
                       <TableCell key={col.key} className="text-center">
                         {col.render(stats)}
