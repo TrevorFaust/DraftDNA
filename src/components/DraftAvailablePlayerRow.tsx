@@ -104,7 +104,7 @@ export const DraftAvailablePlayerRow = memo(function DraftAvailablePlayerRow({
 
       <div
         className={cn(
-          'flex items-center gap-2 sm:gap-2.5 px-2 py-1.5 rounded-lg hover:bg-secondary/50 transition-colors group',
+          'flex items-center gap-1.5 sm:gap-2.5 px-1.5 sm:px-2 py-1.5 rounded-lg hover:bg-secondary/50 transition-colors group min-h-11',
           highlighted && 'bg-accent/20 border-2 border-accent/50 ring-2 ring-accent/30',
           borderTone && 'border-l-4',
           !borderTone && 'border-l-4 border-l-transparent'
@@ -173,12 +173,15 @@ export const DraftAvailablePlayerRow = memo(function DraftAvailablePlayerRow({
           size="sm"
           variant="ghost"
           disabled={draftDisabled}
+          className="shrink-0 h-9 px-2 sm:px-3"
+          aria-label={draftLabel}
           onClick={(e) => {
             e.stopPropagation();
             onDraft(player);
           }}
         >
-          <Check className="w-4 h-4" /> {draftLabel}
+          <Check className="w-4 h-4" />
+          <span className="hidden sm:inline">{draftLabel}</span>
         </Button>
       </div>
     </div>

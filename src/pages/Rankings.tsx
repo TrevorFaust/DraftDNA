@@ -131,6 +131,8 @@ import {
   buildPoolRankSamplesFromSavedRows,
   fetchAllRankRows,
 } from '@/utils/applySavedRanksToPool';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
+import { cn } from '@/lib/utils';
 
 /** Disable dnd-kit built-in auto-scroll — rankings use custom fast edge scroll. */
 const autoScrollConfig = false;
@@ -631,6 +633,10 @@ const Rankings = () => {
   const [allLeaguesBucketSuperflex, setAllLeaguesBucketSuperflex] = useState(false);
   const [allLeaguesBucketRookiesOnly, setAllLeaguesBucketRookiesOnly] = useState(false);
   const [allLeaguesSelectedMatchingLeagueId, setAllLeaguesSelectedMatchingLeagueId] = useState<string | null>(null);
+  /** Phone: show one compare board at a time so the list can use most of the viewport. */
+  const [mobileRankingsBoard, setMobileRankingsBoard] = useState<'community' | 'mine'>('mine');
+  const compareBoardScrollClassName =
+    'h-[min(70dvh,640px)] lg:h-[560px] overflow-y-auto pr-2 scrollbar-thin';
   const fetchInProgressRef = useRef(false);
   const myRankingsScrollRef1 = useRef<HTMLDivElement>(null);
   const myRankingsScrollRef2 = useRef<HTMLDivElement>(null);
@@ -2052,7 +2058,9 @@ const Rankings = () => {
         toast.error('Rate limit exceeded. Please wait a moment and refresh the page. Your data is safe.');
         console.error('Supabase rate limit hit. Consider reducing query frequency.');
       } else {
-        toast.error(`Failed to load players: ${error instanceof Error ? error.message : 'Unknown error'}. Your data is safe - try refreshing.`);
+        toast.error(
+          userFacingErrorMessage(error, "Couldn't load players. Your data is safe. Try refreshing.")
+        );
       }
       
       // DON'T clear existing data on error - keep what we have so user doesn't lose their view
@@ -2255,7 +2263,7 @@ const Rankings = () => {
       onSuccess?.();
     } catch (error: any) {
       console.error('Failed to save rankings:', error);
-      toast.error(`Failed to save rankings: ${error?.message || 'Unknown error'}`);
+      toast.error(userFacingErrorMessage(error, "Couldn't save rankings. Please try again."));
       throw error;
     } finally {
       setSaving(false);
@@ -2628,10 +2636,10 @@ const Rankings = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="max-w-screen-2xl mx-auto px-6 py-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+      <main className="max-w-screen-2xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div className="flex flex-col gap-2">
-            <h1 className="font-display text-4xl tracking-wide">
+            <h1 className="font-display text-3xl sm:text-4xl tracking-wide">
               {isAllLeagues ? 'RANKINGS' : 'MY RANKINGS'}
             </h1>
             {/* All Leagues + guest: show bucket dropdowns under title instead of format badge */}
@@ -2781,8 +2789,8 @@ const Rankings = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3 mb-6">
-          <div className="relative flex-1 min-w-[200px]">
+        <div className="flex flex-wrap gap-2 sm:gap-3 mb-3 sm:mb-6">
+          <div className="relative flex-1 min-w-[160px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search players..."
@@ -2824,27 +2832,76 @@ const Rankings = () => {
         </div>
 
         {positionFilterActive ? (
-          <p className="text-sm text-muted-foreground mb-4">
-            Use the scissors on a player to end their tier below them. This {selectedPosition} board
-            shows every tier boundary for the position. Community uses everyone&apos;s cuts the same
-            way.
-          </p>
+          <>
+            <p className="text-xs text-muted-foreground mb-3 sm:hidden">
+              Scissors end a {selectedPosition} tier below that player.
+            </p>
+            <p className="hidden sm:block text-sm text-muted-foreground mb-4">
+              Use the scissors on a player to end their tier below them. This {selectedPosition} board
+              shows every tier boundary for the position. Community uses everyone&apos;s cuts the same
+              way.
+            </p>
+          </>
         ) : (
-          <p className="text-sm text-muted-foreground mb-4">
-            Filter by position to set tier cuts. On All positions, one break appears per tier at the
-            first player who enters that tier overall (later Tier 1 players at other spots can sit
-            after a Tier 1 break). Community follows the same overall-break rule.
-          </p>
+          <>
+            <p className="text-xs text-muted-foreground mb-3 sm:hidden">
+              Filter by position to set tier cuts with the scissors.
+            </p>
+            <p className="hidden sm:block text-sm text-muted-foreground mb-4">
+              Filter by position to set tier cuts. On All positions, one break appears per tier at the
+              first player who enters that tier overall (later Tier 1 players at other spots can sit
+              after a Tier 1 break). Community follows the same overall-break rule.
+            </p>
+          </>
         )}
 
         {((!user && !isEditMode) || (user && isAllLeagues && !isEditMode)) ? (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div
+              role="tablist"
+              aria-label="Rankings boards"
+              className="lg:hidden grid grid-cols-2 gap-1 rounded-lg bg-secondary/60 p-1 border border-border/40 mb-3"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mobileRankingsBoard === 'community'}
+                onClick={() => setMobileRankingsBoard('community')}
+                className={cn(
+                  'min-h-11 rounded-md text-sm font-medium transition-colors',
+                  mobileRankingsBoard === 'community'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                )}
+              >
+                Community
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mobileRankingsBoard === 'mine'}
+                onClick={() => setMobileRankingsBoard('mine')}
+                className={cn(
+                  'min-h-11 rounded-md text-sm font-medium transition-colors',
+                  mobileRankingsBoard === 'mine'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                )}
+              >
+                My Rankings
+              </button>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
               {/* Community Rankings Column */}
-              <div className="bg-secondary/30 rounded-lg border border-border/50 p-5">
-                <div className="flex flex-wrap items-center gap-2 mb-3 pb-2 border-b border-border">
+              <div
+                className={cn(
+                  'bg-secondary/30 rounded-lg border border-border/50 p-3 sm:p-5',
+                  mobileRankingsBoard !== 'community' && 'hidden lg:block'
+                )}
+              >
+                <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3 pb-2 border-b border-border">
                   <Users className="w-5 h-5 text-accent shrink-0" />
-                  <h2 className="font-display text-xl tracking-wide shrink-0">COMMUNITY RANKINGS</h2>
+                  <h2 className="font-display text-lg sm:text-xl tracking-wide shrink-0">COMMUNITY RANKINGS</h2>
                   <div className="ml-auto">
                     <RankingsColumnExportMenu
                       players={filteredCommunityPlayers}
@@ -2853,8 +2910,8 @@ const Rankings = () => {
                     />
                   </div>
                 </div>
-                <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
-                  <div className="space-y-2">
+                <div className={compareBoardScrollClassName}>
+                  <div className="space-y-1.5 sm:space-y-2">
                     {filteredCommunityPlayers.map((player) => {
                       const rankMeta = getPlayerRankCardMeta(player.id);
                       const stableAdp = getDisplayAdp(player.id, Number(player.adp) || 0);
@@ -2880,10 +2937,15 @@ const Rankings = () => {
               </div>
 
               {/* My Rankings Column */}
-              <div className="bg-secondary/30 rounded-lg border border-border/50 p-5">
-                <div className="flex flex-wrap items-center gap-2 mb-3 pb-2 border-b border-border">
+              <div
+                className={cn(
+                  'bg-secondary/30 rounded-lg border border-border/50 p-3 sm:p-5',
+                  mobileRankingsBoard !== 'mine' && 'hidden lg:block'
+                )}
+              >
+                <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3 pb-2 border-b border-border">
                   <User className="w-5 h-5 text-primary shrink-0" />
-                  <h2 className="font-display text-xl tracking-wide shrink-0">MY RANKINGS</h2>
+                  <h2 className="font-display text-lg sm:text-xl tracking-wide shrink-0">MY RANKINGS</h2>
                   {isAllLeagues && user && matchingLeaguesForBucket.length > 1 && (
                     <Select
                       value={allLeaguesSelectedMatchingLeagueId ?? 'average'}
@@ -2912,7 +2974,7 @@ const Rankings = () => {
                     />
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-3">
                   Drag to reorder your personal rankings
                 </p>
                 <RankingsCompareDragPanel
@@ -2926,7 +2988,7 @@ const Rankings = () => {
                   player2025Stats={player2025Stats}
                   onPlayerClick={handlePlayerClick}
                   onCommitPreview={commitRankingsPreview}
-                  scrollClassName="h-[480px] overflow-y-auto pr-2 scrollbar-thin"
+                  scrollClassName={compareBoardScrollClassName}
                 />
               </div>
             </div>
@@ -2940,12 +3002,13 @@ const Rankings = () => {
                     <div className="w-3 h-3 rounded-full bg-green-500" />
                     <h2 className="font-display text-xl tracking-wide text-green-400">YOUR STUDS</h2>
                   </div>
-                  <div className="mb-4 space-y-1.5 text-center text-sm text-muted-foreground leading-snug">
-                    <p className="text-balance">Top 10 players you rank higher than community consensus.</p>
-                    <p>
+                  <div className="mb-3 sm:mb-4 space-y-1 text-center text-xs sm:text-sm text-muted-foreground leading-snug">
+                    <p className="sm:hidden">Top 10 vs community (both in top {STUDS_DUDS_RANKINGS_WINDOW}).</p>
+                    <p className="hidden sm:block text-balance">Top 10 players you rank higher than community consensus.</p>
+                    <p className="hidden sm:block">
                       (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
                     </p>
-                    <p>See all studs in the Draft Stats tab.</p>
+                    <p className="hidden sm:block">See all studs in the Draft Stats tab.</p>
                   </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {studsDudsVsConsensus.studsTop10.map(({ player, myRank, communityRank, diff }) => (
@@ -2979,12 +3042,13 @@ const Rankings = () => {
                     <div className="w-3 h-3 rounded-full bg-red-500" />
                     <h2 className="font-display text-xl tracking-wide text-red-400">YOUR DUDS</h2>
                   </div>
-                  <div className="mb-4 space-y-1.5 text-center text-sm text-muted-foreground leading-snug">
-                    <p className="text-balance">Top 10 players you rank lower than community consensus.</p>
-                    <p>
+                  <div className="mb-3 sm:mb-4 space-y-1 text-center text-xs sm:text-sm text-muted-foreground leading-snug">
+                    <p className="sm:hidden">Top 10 vs community (both in top {STUDS_DUDS_RANKINGS_WINDOW}).</p>
+                    <p className="hidden sm:block text-balance">Top 10 players you rank lower than community consensus.</p>
+                    <p className="hidden sm:block">
                       (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
                     </p>
-                    <p>See all duds in the Draft Stats tab.</p>
+                    <p className="hidden sm:block">See all duds in the Draft Stats tab.</p>
                   </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {studsDudsVsConsensus.dudsTop10.map(({ player, myRank, communityRank, diff }) => (
@@ -3016,7 +3080,7 @@ const Rankings = () => {
           </>
         ) : (isEditMode || (!user && !hasExistingRankings)) ? (
           // Edit Mode - Drag and drop rankings (for logged-in users editing, or non-logged-in users who haven't finalized)
-          <div ref={bindMyRankingsScroll2} className="h-[70vh] min-h-[500px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin" style={{ touchAction: 'pan-y' }}>
+          <div ref={bindMyRankingsScroll2} className="h-[min(75dvh,720px)] min-h-[320px] sm:min-h-[500px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin" style={{ touchAction: 'pan-y' }}>
           <DndContext
             sensors={sensors}
             collisionDetection={rankingsListCollisionDetection}
@@ -3079,12 +3143,51 @@ const Rankings = () => {
         ) : (
           // Comparison View - Similar to All Leagues
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div
+              role="tablist"
+              aria-label="Rankings boards"
+              className="lg:hidden grid grid-cols-2 gap-1 rounded-lg bg-secondary/60 p-1 border border-border/40 mb-3"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mobileRankingsBoard === 'community'}
+                onClick={() => setMobileRankingsBoard('community')}
+                className={cn(
+                  'min-h-11 rounded-md text-sm font-medium transition-colors',
+                  mobileRankingsBoard === 'community'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                )}
+              >
+                Community
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mobileRankingsBoard === 'mine'}
+                onClick={() => setMobileRankingsBoard('mine')}
+                className={cn(
+                  'min-h-11 rounded-md text-sm font-medium transition-colors',
+                  mobileRankingsBoard === 'mine'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                )}
+              >
+                My Rankings
+              </button>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
               {/* Community Rankings Column */}
-              <div className="bg-secondary/30 rounded-lg border border-border/50 p-5">
-                <div className="flex flex-wrap items-center gap-2 mb-3 pb-2 border-b border-border">
+              <div
+                className={cn(
+                  'bg-secondary/30 rounded-lg border border-border/50 p-3 sm:p-5',
+                  mobileRankingsBoard !== 'community' && 'hidden lg:block'
+                )}
+              >
+                <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3 pb-2 border-b border-border">
                   <Users className="w-5 h-5 text-accent shrink-0" />
-                  <h2 className="font-display text-xl tracking-wide shrink-0">COMMUNITY RANKINGS</h2>
+                  <h2 className="font-display text-lg sm:text-xl tracking-wide shrink-0">COMMUNITY RANKINGS</h2>
                   <div className="ml-auto">
                     <RankingsColumnExportMenu
                       players={filteredCommunityPlayers}
@@ -3093,8 +3196,8 @@ const Rankings = () => {
                     />
                   </div>
                 </div>
-                <div className="h-[480px] overflow-y-auto pr-2 scrollbar-thin">
-                  <div className="space-y-2">
+                <div className={compareBoardScrollClassName}>
+                  <div className="space-y-1.5 sm:space-y-2">
                     {filteredCommunityPlayers.map((player) => {
                       const rankMeta = getPlayerRankCardMeta(player.id);
                       const stableAdp = getDisplayAdp(player.id, Number(player.adp) || 0);
@@ -3120,10 +3223,15 @@ const Rankings = () => {
               </div>
 
               {/* My Rankings Column */}
-              <div className="bg-secondary/30 rounded-lg border border-border/50 p-5">
-                <div className="flex flex-wrap items-center gap-2 mb-3 pb-2 border-b border-border">
+              <div
+                className={cn(
+                  'bg-secondary/30 rounded-lg border border-border/50 p-3 sm:p-5',
+                  mobileRankingsBoard !== 'mine' && 'hidden lg:block'
+                )}
+              >
+                <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3 pb-2 border-b border-border">
                   <User className="w-5 h-5 text-primary shrink-0" />
-                  <h2 className="font-display text-xl tracking-wide shrink-0">MY RANKINGS</h2>
+                  <h2 className="font-display text-lg sm:text-xl tracking-wide shrink-0">MY RANKINGS</h2>
                   {isAllLeagues && user && matchingLeaguesForBucket.length > 1 && (
                     <Select
                       value={allLeaguesSelectedMatchingLeagueId ?? 'average'}
@@ -3152,7 +3260,7 @@ const Rankings = () => {
                     />
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-3">
                   Drag the handle to adjust rankings
                 </p>
                 <RankingsCompareDragPanel
@@ -3166,7 +3274,7 @@ const Rankings = () => {
                   player2025Stats={player2025Stats}
                   onPlayerClick={handlePlayerClick}
                   onCommitPreview={commitRankingsPreview}
-                  scrollClassName="h-[480px] overflow-y-auto pr-2 scrollbar-thin"
+                  scrollClassName={compareBoardScrollClassName}
                 />
               </div>
             </div>
@@ -3180,12 +3288,13 @@ const Rankings = () => {
                     <div className="w-3 h-3 rounded-full bg-green-500" />
                     <h2 className="font-display text-xl tracking-wide text-green-400">YOUR STUDS</h2>
                   </div>
-                  <div className="mb-4 space-y-1.5 text-center text-sm text-muted-foreground leading-snug">
-                    <p className="text-balance">Top 10 players you rank higher than community consensus.</p>
-                    <p>
+                  <div className="mb-3 sm:mb-4 space-y-1 text-center text-xs sm:text-sm text-muted-foreground leading-snug">
+                    <p className="sm:hidden">Top 10 vs community (both in top {STUDS_DUDS_RANKINGS_WINDOW}).</p>
+                    <p className="hidden sm:block text-balance">Top 10 players you rank higher than community consensus.</p>
+                    <p className="hidden sm:block">
                       (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
                     </p>
-                    <p>See all studs in the Draft Stats tab.</p>
+                    <p className="hidden sm:block">See all studs in the Draft Stats tab.</p>
                   </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {studsDudsVsConsensus.studsTop10.map(({ player, myRank, communityRank, diff }) => (
@@ -3219,12 +3328,13 @@ const Rankings = () => {
                     <div className="w-3 h-3 rounded-full bg-red-500" />
                     <h2 className="font-display text-xl tracking-wide text-red-400">YOUR DUDS</h2>
                   </div>
-                  <div className="mb-4 space-y-1.5 text-center text-sm text-muted-foreground leading-snug">
-                    <p className="text-balance">Top 10 players you rank lower than community consensus.</p>
-                    <p>
+                  <div className="mb-3 sm:mb-4 space-y-1 text-center text-xs sm:text-sm text-muted-foreground leading-snug">
+                    <p className="sm:hidden">Top 10 vs community (both in top {STUDS_DUDS_RANKINGS_WINDOW}).</p>
+                    <p className="hidden sm:block text-balance">Top 10 players you rank lower than community consensus.</p>
+                    <p className="hidden sm:block">
                       (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
                     </p>
-                    <p>See all duds in the Draft Stats tab.</p>
+                    <p className="hidden sm:block">See all duds in the Draft Stats tab.</p>
                   </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                     {studsDudsVsConsensus.dudsTop10.map(({ player, myRank, communityRank, diff }) => (

@@ -92,7 +92,7 @@ export const PlayerCard = ({
     <div
       onClick={onClick}
       className={cn(
-        'relative glass-card p-4 flex items-center gap-4 transition-all duration-200 hover:bg-secondary/60 border-l-4',
+        'relative glass-card p-2.5 sm:p-4 flex items-center gap-2 sm:gap-4 transition-all duration-200 hover:bg-secondary/60 border-l-4',
         !tone && 'border-l-transparent',
         breakTone != null && 'mt-3',
         isDragging && 'dragging border-primary'
@@ -116,18 +116,20 @@ export const PlayerCard = ({
         <RankingsCommunityTrendBadge communityTrend={communityTrend} />
       </div>
 
-      <PlayerJerseyWithNumber
-        team={jerseyTeamAbbr}
-        jerseyNumber={player.jersey_number ?? 0}
-        numberFillColor={numberFill}
-        size="card"
-        position={player.position}
-      />
+      <div className="hidden sm:block shrink-0">
+        <PlayerJerseyWithNumber
+          team={jerseyTeamAbbr}
+          jerseyNumber={player.jersey_number ?? 0}
+          numberFillColor={numberFill}
+          size="card"
+          position={player.position}
+        />
+      </div>
       
-      <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold truncate">{player.name}</span>
-          <PositionBadge position={player.position} />
+      <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 sm:gap-1">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <span className="font-semibold truncate text-sm sm:text-base" title={player.name}>{player.name}</span>
+          <PositionBadge position={player.position} className="shrink-0" />
         </div>
         <PlayerHeaderStatsLine
           position={player.position}
@@ -137,7 +139,7 @@ export const PlayerCard = ({
           byeWeek={player.bye_week}
           positionAdpRank={useCompactStats ? undefined : positionAdpRank}
           layout={useCompactStats ? 'compact' : 'stacked'}
-          className="mt-0"
+          className="mt-0 text-[11px] sm:text-xs"
         />
       </div>
 

@@ -83,6 +83,7 @@ import type { DraftPick, Player, RankedPlayer } from '@/types/database';
 import { toast } from 'sonner';
 import { ChevronRight, LogOut, Search, Timer, Trophy, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import { Label } from '@/components/ui/label';
 import {
@@ -413,7 +414,7 @@ const MultiplayerDraftRoom = () => {
       }
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.message || 'Failed to load players');
+      toast.error(userFacingErrorMessage(e, "Couldn't load players"));
       setPlayers([]);
     } finally {
       boardLoadedRef.current = true;
@@ -490,7 +491,7 @@ const MultiplayerDraftRoom = () => {
           }
         }
       } catch (e: any) {
-        toast.error(e?.message || 'Failed to load draft');
+        toast.error(userFacingErrorMessage(e, "Couldn't load draft"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -740,7 +741,7 @@ const MultiplayerDraftRoom = () => {
       await refresh();
       void runTick();
     } catch (e: any) {
-      toast.error(e?.message || 'Pick failed');
+      toast.error(userFacingErrorMessage(e, "Couldn't make that pick"));
     } finally {
       setPicking(false);
     }
@@ -763,7 +764,7 @@ const MultiplayerDraftRoom = () => {
         toast.message('Autodraft off');
       }
     } catch (e: any) {
-      toast.error(e?.message || 'Could not update autodraft');
+      toast.error(userFacingErrorMessage(e, 'Could not update autodraft'));
     }
   };
 
@@ -1399,9 +1400,8 @@ const MultiplayerDraftRoom = () => {
               {turnStatus}
             </div>
             {!user && (
-              <p className="text-xs text-muted-foreground px-0.5 shrink-0 mb-1 leading-snug">
-                Guest view: player order and tier breaks use community rankings for this league
-                type. Sign in to draft from your personal board and tiers.
+              <p className="text-[11px] text-muted-foreground px-0.5 shrink-0 mb-1 leading-snug line-clamp-2 sm:line-clamp-none">
+                Guest board uses community rankings. Sign in for your personal board.
               </p>
             )}
 

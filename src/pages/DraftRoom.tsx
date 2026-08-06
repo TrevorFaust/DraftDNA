@@ -34,6 +34,7 @@ import {
   PLAYER_POOL_CURRENT_SEASON,
 } from '@/constants/playerPoolSeason';
 import { cn, capitalizeSentenceStart } from '@/lib/utils';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 import { tempDraftStorage, tempSettingsStorage, getOrCreateGuestSessionId } from '@/utils/temporaryStorage';
 import {
   buildDraftRankingsFromCommunity,
@@ -628,10 +629,7 @@ const DraftRoom = () => {
     } catch (error: any) {
       console.error('Error loading draft:', error);
       setIsRookiesOnlyDraft(false);
-      const errorMessage = error?.message || 'Unknown error occurred';
-      toast.error(`Failed to load draft: ${errorMessage}`);
-      
-      // Show error details in console for debugging
+      toast.error(userFacingErrorMessage(error, "Couldn't load draft. Please try again."));
       if (error?.details) {
         console.error('Error details:', error.details);
       }
@@ -1085,7 +1083,7 @@ const DraftRoom = () => {
               if (isUserTurn) toast.info(`Keeper: ${keeperPlayer.name}`);
             }
           } catch (e: any) {
-            toast.error(`Keeper pick failed: ${e?.message || 'Unknown error'}`);
+            toast.error(userFacingErrorMessage(e, "Couldn't place keeper pick. Please try again."));
           } finally {
             setIsDrafting(false);
           }
@@ -1300,9 +1298,7 @@ const DraftRoom = () => {
               console.error('Rapid CPU pick save failed:', error);
               setPicks((prev) => prev.filter((p) => p.pick_number !== pickNumber));
               setCurrentPick(pickNumber);
-              toast.error(
-                `Failed to save CPU pick: ${error instanceof Error ? error.message : 'Unknown error'}`
-              );
+              toast.error(userFacingErrorMessage(error, "Couldn't save CPU pick. Please try again."));
             });
           return;
         }
@@ -1315,7 +1311,7 @@ const DraftRoom = () => {
         setIsDrafting(false);
       } catch (error: any) {
         console.error('CPU draft error:', error);
-        toast.error(`Failed to make CPU pick: ${error?.message || 'Unknown error'}`);
+        toast.error(userFacingErrorMessage(error, "Couldn't make CPU pick. Please try again."));
         setIsDrafting(false);
       }
     };
@@ -2400,128 +2396,89 @@ const DraftRoom = () => {
     );
   }
 
+  const toggleDraftPaused = () => {
+    const newPausedState = !isDraftPaused;
+    setIsDraftPaused(newPausedState);
+    isDraftPausedRef.current = newPausedState;
+    if (newPausedState && cpuDraftTimeoutRef.current) {
+      clearTimeout(cpuDraftTimeoutRef.current);
+      cpuDraftTimeoutRef.current = null;
+    }
+  };
+
   return (
     <div className="h-screen bg-background overflow-hidden flex flex-col">
-      <Navbar />
+      {/* Hide site nav on short phones so the pick list keeps height */}
+      <div className="shrink-0 [@media(max-height:640px)]:hidden">
+        <Navbar />
+      </div>
 
-      <main className="flex-1 min-h-0 overflow-hidden flex flex-col max-w-[1400px] w-full mx-auto px-4 py-4">
+      <main className="flex-1 min-h-0 overflow-hidden flex flex-col max-w-[1400px] w-full mx-auto px-3 py-2 gap-2 sm:px-4 sm:py-3 sm:gap-3 [@media(max-height:700px)]:py-1.5 [@media(max-height:700px)]:gap-1.5">
         {/* Draft Header */}
-        <div className="glass-card p-4 mb-4 flex items-center justify-between flex-shrink-0">
-          <div>
-            <h1 className="font-display text-2xl">{draft?.name}</h1>
-            <p className="text-sm text-muted-foreground">
+        <div className="glass-card px-3 py-2 sm:p-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 shrink-0 [@media(max-height:700px)]:py-1.5">
+          <div className="hidden md:block min-w-0 [@media(max-height:700px)]:hidden">
+            <h1 className="font-display text-xl lg:text-2xl truncate">{draft?.name}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {draft?.num_teams} teams • {draft?.num_rounds} rounds • {draft?.draft_order} draft
             </p>
           </div>
-          
-          <div className="flex items-center gap-6">
+
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             {/* Timer - show when user has a timer set, pause button always available */}
             {draft && draft.pick_timer && draft.pick_timer > 0 && (
               <div className="text-center">
                 {isUserPick && timeRemaining !== null ? (
                   <>
-                    <div className="text-sm text-muted-foreground flex items-center gap-1 justify-center">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-0.5 justify-center leading-none mb-0.5">
                       <Timer className="w-3 h-3" /> Timer
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <div className={cn(
-                        "font-display text-3xl transition-colors",
+                        "font-display text-xl sm:text-2xl leading-none transition-colors",
                         timeRemaining <= 5 ? "text-destructive animate-pulse" : "text-accent"
                       )}>
                         {timeRemaining}s
                       </div>
                       <Button
                         variant="outline"
-                        size="default"
-                        className="h-10 px-4 gap-2 border-2 border-primary/30 bg-primary/10 hover:bg-primary/20 hover:border-primary/50"
-                        onClick={() => {
-                          const newPausedState = !isDraftPaused;
-                          console.log('🛑 PAUSE BUTTON CLICKED (timer view):', {
-                            currentState: isDraftPaused,
-                            newState: newPausedState,
-                            refBefore: isDraftPausedRef.current,
-                            isDrafting,
-                            hasTimeout: !!cpuDraftTimeoutRef.current,
-                            currentPick
-                          });
-                          setIsDraftPaused(newPausedState);
-                          isDraftPausedRef.current = newPausedState;
-                          console.log('🛑 PAUSE STATE UPDATED (timer view):', {
-                            state: newPausedState,
-                            refAfter: isDraftPausedRef.current
-                          });
-                          // Clear any pending CPU picks immediately when pausing
-                          if (newPausedState && cpuDraftTimeoutRef.current) {
-                            console.log('🛑 Clearing CPU timeout (timer view)');
-                            clearTimeout(cpuDraftTimeoutRef.current);
-                            cpuDraftTimeoutRef.current = null;
-                          }
-                          // When resuming, the useEffect will automatically re-run due to isDraftPaused in dependency array
-                          if (!newPausedState) {
-                            console.log('▶️ RESUMED: useEffect should re-run to continue CPU picks');
-                          }
-                        }}
+                        size="sm"
+                        className="h-8 px-2.5 gap-1.5 border border-primary/30 bg-primary/10 hover:bg-primary/20 hover:border-primary/50"
+                        onClick={toggleDraftPaused}
                         title={isDraftPaused ? "Resume draft" : "Pause draft"}
                       >
                         {isDraftPaused ? (
                           <>
-                            <Play className="w-4 h-4" />
-                            <span className="text-sm">Resume</span>
+                            <Play className="w-3.5 h-3.5" />
+                            <span className="text-xs">Resume</span>
                           </>
                         ) : (
                           <>
-                            <Pause className="w-4 h-4" />
-                            <span className="text-sm">Pause</span>
+                            <Pause className="w-3.5 h-3.5" />
+                            <span className="text-xs">Pause</span>
                           </>
                         )}
                       </Button>
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-center gap-3">
-                    <div className="text-sm text-muted-foreground">Timer</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Timer</div>
                     <Button
                       variant="outline"
-                      size="default"
-                      className="h-10 px-4 gap-2 border-2 border-primary/30 bg-primary/10 hover:bg-primary/20 hover:border-primary/50"
-                      onClick={() => {
-                        const newPausedState = !isDraftPaused;
-                        console.log('🛑 PAUSE BUTTON CLICKED:', {
-                          currentState: isDraftPaused,
-                          newState: newPausedState,
-                          refBefore: isDraftPausedRef.current,
-                          isDrafting,
-                          hasTimeout: !!cpuDraftTimeoutRef.current,
-                          currentPick
-                        });
-                        setIsDraftPaused(newPausedState);
-                        isDraftPausedRef.current = newPausedState;
-                        console.log('🛑 PAUSE STATE UPDATED:', {
-                          state: newPausedState,
-                          refAfter: isDraftPausedRef.current
-                        });
-                        // Clear any pending CPU picks immediately when pausing
-                        if (newPausedState && cpuDraftTimeoutRef.current) {
-                          console.log('🛑 Clearing CPU timeout');
-                          clearTimeout(cpuDraftTimeoutRef.current);
-                          cpuDraftTimeoutRef.current = null;
-                        }
-                        // When resuming, the useEffect will automatically re-run due to isDraftPaused in dependency array
-                        if (!newPausedState) {
-                          console.log('▶️ RESUMED: useEffect should re-run to continue CPU picks');
-                        }
-                      }}
+                      size="sm"
+                      className="h-8 px-2.5 gap-1.5 border border-primary/30 bg-primary/10 hover:bg-primary/20 hover:border-primary/50"
+                      onClick={toggleDraftPaused}
                       title={isDraftPaused ? "Resume draft" : "Pause draft"}
                     >
                       {isDraftPaused ? (
                         <>
-                          <Play className="w-4 h-4" />
-                          <span className="text-sm">Resume</span>
+                          <Play className="w-3.5 h-3.5" />
+                          <span className="text-xs">Resume</span>
                         </>
                       ) : (
                         <>
-                          <Pause className="w-4 h-4" />
-                          <span className="text-sm">Pause</span>
+                          <Pause className="w-3.5 h-3.5" />
+                          <span className="text-xs">Pause</span>
                         </>
                       )}
                     </Button>
@@ -2530,21 +2487,21 @@ const DraftRoom = () => {
               </div>
             )}
             <div className="text-center">
-              <div className="text-sm text-muted-foreground">Round</div>
-              <div className="font-display text-3xl text-gradient">{getCurrentRound()}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none mb-0.5">Round</div>
+              <div className="font-display text-xl sm:text-2xl text-gradient leading-none">{getCurrentRound()}</div>
             </div>
             <div className="text-center">
-              <div className="text-sm text-muted-foreground">Pick</div>
-              <div className="font-display text-3xl text-gradient">{currentPick}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none mb-0.5">Pick</div>
+              <div className="font-display text-xl sm:text-2xl text-gradient leading-none">{currentPick}</div>
             </div>
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground">On the Clock</div>
+            <div className="text-center min-w-0">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none mb-0.5">On the Clock</div>
               <div className={cn(
-                "font-display text-3xl",
+                "font-display text-xl sm:text-2xl leading-none truncate max-w-[9rem] sm:max-w-[14rem]",
                 isUserPick ? "text-accent" : "text-foreground"
               )}>
                 {getTeamName(getCurrentTeam())}
-                {isUserPick && <span className="text-sm ml-2">(YOU)</span>}
+                {isUserPick && <span className="text-xs ml-1 font-sans font-medium">(YOU)</span>}
               </div>
             </div>
           </div>
@@ -2553,7 +2510,8 @@ const DraftRoom = () => {
             {currentPick > totalPicks && !isDraftComplete && (
               <Button 
                 variant="gold" 
-                size="sm" 
+                size="sm"
+                className="h-8"
                 onClick={async () => {
                   if (!draft) return;
                   const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
@@ -2632,22 +2590,23 @@ const DraftRoom = () => {
                   }
                 }}
               >
-                <Trophy className="w-4 h-4 mr-1" /> Finish Draft
+                <Trophy className="w-4 h-4 mr-1" /> Finish
               </Button>
             )}
             <Button 
               variant="destructive" 
               size="sm"
+              className="h-8"
               onClick={() => navigate('/mock-draft')}
             >
-              <LogOut className="w-4 h-4 mr-1" /> Exit Draft
+              <LogOut className="w-4 h-4 mr-1" /> Exit
             </Button>
           </div>
         </div>
 
-        <DraftMobilePanelTabs value={mobilePanel} onChange={setMobilePanel} className="mb-3" />
+        <DraftMobilePanelTabs value={mobilePanel} onChange={setMobilePanel} />
 
-        <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col lg:grid lg:grid-cols-4 gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden">
           {/* My Roster: align to top of row; scroll inside cell if roster is taller than the players column */}
           <div
             className={cn(
@@ -2670,55 +2629,52 @@ const DraftRoom = () => {
           {/* Available Players */}
           <div
             className={cn(
-              'lg:col-span-2 glass-card p-4 flex-col overflow-hidden',
+              'lg:col-span-2 glass-card p-2.5 sm:p-3 flex-col overflow-hidden',
               draftMobilePanelClass(mobilePanel, 'players')
             )}
           >
-            <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-2 flex-wrap">
-              <h2 className="font-display text-xl">AVAILABLE PLAYERS</h2>
-              <div className="flex items-center gap-2 flex-1 min-w-0 justify-end flex-wrap sm:flex-nowrap">
-                <Select value={positionFilter} onValueChange={setPositionFilter}>
-                  <SelectTrigger className="w-32 bg-secondary/50 border-border/50 h-9 shrink-0">
-                    <SelectValue placeholder="Position" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">All Positions</SelectItem>
-                    <SelectItem value="QB">QB</SelectItem>
-                    <SelectItem value="RB">RB</SelectItem>
-                    <SelectItem value="WR">WR</SelectItem>
-                    <SelectItem value="TE">TE</SelectItem>
-                    <SelectItem value="K">K</SelectItem>
-                    {!isRookiesOnlyDraft && draft && canDraftDefense(draft.user_pick_position) && (
-                      <SelectItem value="DEF">DEF</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                <div className="relative w-full sm:w-64 min-w-0 max-w-xs">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-secondary/50 border-border/50 h-9"
-                  />
-                </div>
+            <div className="flex flex-wrap gap-1.5 items-center shrink-0 mb-1.5">
+              <h2 className="font-display text-base sm:text-lg shrink-0 hidden sm:block">AVAILABLE PLAYERS</h2>
+              <div className="relative flex-1 min-w-[10rem]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search players"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 h-8 bg-secondary/50 border-border/50 text-sm"
+                />
               </div>
+              <Select value={positionFilter} onValueChange={setPositionFilter}>
+                <SelectTrigger className="w-[104px] h-8 bg-secondary/50 border-border/50 text-sm shrink-0">
+                  <SelectValue placeholder="Position" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Positions</SelectItem>
+                  <SelectItem value="QB">QB</SelectItem>
+                  <SelectItem value="RB">RB</SelectItem>
+                  <SelectItem value="WR">WR</SelectItem>
+                  <SelectItem value="TE">TE</SelectItem>
+                  <SelectItem value="K">K</SelectItem>
+                  {!isRookiesOnlyDraft && draft && canDraftDefense(draft.user_pick_position) && (
+                    <SelectItem value="DEF">DEF</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Show picks until next user pick */}
             {picksUntilNext() > 0 && (
-              <div className="mb-3 text-sm text-muted-foreground text-center flex-shrink-0">
+              <div className="mb-1 text-xs text-muted-foreground px-0.5 shrink-0">
                 {picksUntilNext()} pick{picksUntilNext() !== 1 ? 's' : ''} until your next pick
               </div>
             )}
             {!user && (
-              <p className="mb-3 text-xs text-muted-foreground text-center flex-shrink-0 leading-snug px-1">
-                Guest view: player order and tier breaks use community rankings for this
-                league type. Sign in to draft from your personal board and tiers.
+              <p className="mb-1 text-[11px] text-muted-foreground px-0.5 shrink-0 leading-snug line-clamp-2 sm:line-clamp-none">
+                Guest board uses community rankings. Sign in for your personal board.
               </p>
             )}
 
-            <div className="space-y-1 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
+            <div className="space-y-0.5 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
               {availableListRows.map((row) => (
                 <DraftAvailablePlayerRow
                   key={row.player.id}
@@ -2739,11 +2695,11 @@ const DraftRoom = () => {
           {/* Draft Board */}
           <div
             className={cn(
-              'glass-card p-4 flex-col overflow-hidden',
+              'glass-card p-2.5 sm:p-3 flex-col overflow-hidden',
               draftMobilePanelClass(mobilePanel, 'board')
             )}
           >
-            <h2 className="font-display text-xl mb-4 flex-shrink-0">DRAFT BOARD</h2>
+            <h2 className="font-display text-base sm:text-lg mb-2 flex-shrink-0">DRAFT BOARD</h2>
             <div 
               ref={draftBoardRef}
               onScroll={handleDraftBoardScroll}

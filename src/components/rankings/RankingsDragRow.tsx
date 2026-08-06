@@ -104,7 +104,7 @@ export const RankingsDragRow = memo(function RankingsDragRow({
         ...(tone ? { borderLeftColor: tone.color } : undefined),
       }}
       className={cn(
-        'relative glass-card p-3 flex items-center gap-3 border-l-4',
+        'relative glass-card p-2 sm:p-3 flex items-center gap-1.5 sm:gap-3 border-l-4',
         !tone && 'border-l-transparent',
         breakTone != null && 'mt-3',
         isOverlay && 'border-primary shadow-lg ring-1 ring-primary/40 cursor-grabbing',
@@ -127,7 +127,7 @@ export const RankingsDragRow = memo(function RankingsDragRow({
               }
             : undefined
         }
-        className="flex flex-1 min-w-0 items-center gap-3"
+        className="flex flex-1 min-w-0 items-center gap-1.5 sm:gap-3"
       >
         <div className="flex flex-col items-center gap-1 shrink-0 w-7">
           <div
@@ -140,14 +140,14 @@ export const RankingsDragRow = memo(function RankingsDragRow({
           </div>
           <RankingsCommunityTrendBadge communityTrend={communityTrend} />
         </div>
-        <div className="flex-1 min-w-0 pr-1">
+        <div className="flex-1 min-w-0 pr-0.5 sm:pr-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="font-semibold truncate" title={player.name}>
+            <span className="font-semibold truncate text-sm sm:text-base" title={player.name}>
               {player.name}
             </span>
             <PositionBadge position={player.position} className="shrink-0" />
           </div>
-          <p className="text-xs text-muted-foreground truncate mt-0.5">
+          <p className="text-[11px] sm:text-xs text-muted-foreground truncate mt-0.5">
             {displayTeamAbbrevOrFa(player.team, player.position, player.name)} · ADP {displayAdp}
             {player.bye_week != null ? ` · Bye ${player.bye_week}` : ''}
           </p>
