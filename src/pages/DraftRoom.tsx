@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Search, Check, Trophy, LogOut, Timer, Pause, Play } from 'lucide-react';
+import { Search, Trophy, LogOut, Timer, Pause, Play } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
   Select,
@@ -42,6 +42,7 @@ import {
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { fetchMergedPlayerPool } from '@/utils/playerPoolFetch';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
+import { useStickScrollToBottom } from '@/hooks/useStickScrollToBottom';
 import { selectCpuPick, assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
 import {
   detectArchetypeName,
@@ -74,20 +75,13 @@ import {
   buildPositionAdpRankMap,
   resolvePositionAdpRankForDisplay,
 } from '@/utils/positionAdpRank';
-function DraftPlayerHeaderLine({ player }: { player: RankedPlayer }) {
-  return (
-    <PlayerHeaderStatsLine
-      position={player.position}
-      team={player.team}
-      adp={player.adp}
-      byeWeek={player.bye_week}
-      layout="compact"
-      className="text-xs mt-0"
-    />
-  );
-}
-
-import { PlayerHeaderStatsLine } from '@/components/PlayerHeaderStatsLine';
+import { DraftAvailablePlayerRow } from '@/components/DraftAvailablePlayerRow';
+import {
+  buildDraftListTierBreakBeforeIds,
+  loadPersonalDraftBoardOverlay,
+  type DraftDisplayBucket,
+  type PersonalDraftBoardOverlay,
+} from '@/utils/draftPersonalBoard';
 
 /** Minimum ms between rapid CPU picks finishing — keeps pace steady when the board is lighter late in the draft. */
 const RAPID_CPU_PICK_GAP_MS = 360;
@@ -108,6 +102,9 @@ const DraftRoom = () => {
 
   const [draft, setDraft] = useState<MockDraft | null>(null);
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
+  const [draftBucket, setDraftBucket] = useState<DraftDisplayBucket | null>(null);
+  const [draftLeagueId, setDraftLeagueId] = useState<string | null>(null);
+  const [personalBoard, setPersonalBoard] = useState<PersonalDraftBoardOverlay | null>(null);
   const positionAdpRankMap = useMemo(
     () => buildPositionAdpRankMap(players),
     [players]
@@ -121,6 +118,11 @@ const DraftRoom = () => {
     [players]
   );
   const [picks, setPicks] = useState<DraftPick[]>([]);
+  const {
+    containerRef: draftBoardRef,
+    onScroll: handleDraftBoardScroll,
+    scrolledUp: draftBoardScrolledUp,
+  } = useStickScrollToBottom(picks.length);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState<string>('ALL');
@@ -157,13 +159,9 @@ const DraftRoom = () => {
   const [isRookiesOnlyDraft, setIsRookiesOnlyDraft] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const cpuDraftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const draftBoardRef = useRef<HTMLDivElement | null>(null);
-  const stickDraftBoardToBottomRef = useRef(true);
-  const draftBoardScrollRafRef = useRef<number | null>(null);
   const lastPickRef = useRef<number>(0);
   const lastRapidCpuPickAtRef = useRef(0);
   const isDraftPausedRef = useRef<boolean>(false);
-  const [draftBoardScrolledUp, setDraftBoardScrolledUp] = useState(false);
 
   // Keep ref in sync with state for async functions
   useEffect(() => {
@@ -622,6 +620,8 @@ const DraftRoom = () => {
       }
 
       setDraft(finalDraft);
+      setDraftBucket(draftBucket);
+      setDraftLeagueId((draftData as { league_id?: string | null }).league_id ?? null);
       setPlayers(sortedRankedPlayers);
       setPicks(loadedPicks);
       setCurrentPick(loadedPicks.length + 1);
@@ -656,6 +656,29 @@ const DraftRoom = () => {
       }
     }
   }, [user, draftId, fetchDraftData, isTempDraft]);
+
+  const soloPoolKey = useMemo(() => players.map((p) => p.id).join(','), [players]);
+
+  // Personal rankings + tiers for the available list (CPUs stay on community board).
+  useEffect(() => {
+    if (!draftBucket || players.length === 0) {
+      setPersonalBoard(null);
+      return;
+    }
+    let cancelled = false;
+    void loadPersonalDraftBoardOverlay({
+      userId: user?.id ?? null,
+      leagueId: draftLeagueId,
+      bucket: draftBucket,
+      poolPlayers: players.map((p) => ({ id: p.id, position: p.position })),
+    }).then((overlay) => {
+      if (!cancelled) setPersonalBoard(overlay);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pool via soloPoolKey
+  }, [draftBucket, draftLeagueId, user?.id, soloPoolKey]);
 
   const getCurrentTeam = () => {
     if (!draft) return 1;
@@ -1474,22 +1497,34 @@ const DraftRoom = () => {
   }, []);
 
 
-  const draftedPlayerIds = new Set(picks.map((p) => p.player_id));
-  const keeperPlayerIds = new Set(keepers.map((k) => k.player_id));
+  const draftedPlayerIds = useMemo(
+    () => new Set(picks.map((p) => p.player_id)),
+    [picks]
+  );
+  const keeperPlayerIds = useMemo(
+    () => new Set(keepers.map((k) => k.player_id)),
+    [keepers]
+  );
   // Deduplicate by id - exclude drafted and keeper players (keepers are auto-assigned in their round)
-  const availablePlayers = Array.from(
-    new Map(
-      players
-        .filter((p) => !draftedPlayerIds.has(p.id) && !keeperPlayerIds.has(p.id))
-        .map((p) => [p.id, p])
-    ).values()
+  const availablePlayers = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          players
+            .filter((p) => !draftedPlayerIds.has(p.id) && !keeperPlayerIds.has(p.id))
+            .map((p) => [p.id, p])
+        ).values()
+      ),
+    [players, draftedPlayerIds, keeperPlayerIds]
   );
 
   // Calculate user's current position counts
-  const userPicks = picks.filter((p) => p.team_number === (draft?.user_pick_position || 1));
-  const userDraftedPlayers = userPicks
-    .map((pick) => players.find((p) => p.id === pick.player_id))
-    .filter((p): p is RankedPlayer => !!p);
+  const userDraftedPlayers = useMemo(() => {
+    const userPicks = picks.filter((p) => p.team_number === (draft?.user_pick_position || 1));
+    return userPicks
+      .map((pick) => players.find((p) => p.id === pick.player_id))
+      .filter((p): p is RankedPlayer => !!p);
+  }, [picks, players, draft?.user_pick_position]);
   
   const userPositionCounts: Record<string, number> = {};
   userDraftedPlayers.forEach((player) => {
@@ -1583,77 +1618,159 @@ const DraftRoom = () => {
     return nextPick - currentPick;
   };
 
-  // Get all rank positions that correspond to user's upcoming picks
-  // Returns an array of rank positions that should be highlighted
-  const getHighlightRanks = (): number[] => {
-    const upcomingPicks = getUserUpcomingPicks();
-    const highlightRanks: number[] = [];
-    
-    upcomingPicks.forEach((pickNum) => {
-      // Skip if this pick has already been made
-      if (pickNum < currentPick) return;
-      
-      // Calculate how many picks until this pick
-      const picksUntil = pickNum - currentPick;
-      
-      // If it's currently the user's turn (picksUntil === 0), don't highlight
-      // Otherwise, highlight the player at the position that would be available at this pick
-      // If picksUntil = 1, that means 1 person picks before you, so they'll take rank 1, and you'll see rank 2
-      // Formula: highlightRank = picksUntil + 1 (because picksUntil people will pick before you)
-      if (picksUntil > 0) {
-        highlightRanks.push(picksUntil + 1);
-      }
-    });
-    
-    return highlightRanks;
-  };
+  const currentRound = draft ? Math.ceil(currentPick / draft.num_teams) : 1;
 
   // Filter players based on search term, position filter, position limits, and available roster spots (only for user's view)
   // Uses same search logic as Rankings page: name, team, or name parts (e.g. "Hunter" matches "Travis Hunter")
-  const filteredPlayers = availablePlayers.filter((p) => {
-    // Position filter
-    if (positionFilter !== 'ALL') {
-      const playerPos = p.position === 'D/ST' ? 'DEF' : p.position;
-      if (playerPos !== positionFilter) return false;
-    }
-    
-    // Search filter - same logic as Rankings page
+  const filteredPlayers = useMemo(() => {
     const searchLower = searchTerm.toLowerCase().trim();
-    const matchesSearch =
-      searchLower === '' ||
-      p.name.toLowerCase().includes(searchLower) ||
-      p.team?.toLowerCase().includes(searchLower) ||
-      p.name.toLowerCase().split(' ').some((part) => part.includes(searchLower));
-    if (!matchesSearch) return false;
-    
-    // Check if there's an available roster spot for this position (account for future keepers)
-    const spotOpts = draft ? { teamNumber: draft.user_pick_position, currentRound: getCurrentRound() } : undefined;
-    if (!hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts)) return false;
-    if (!isRookiesOnlyDraft && (p.position === 'DEF' || p.position === 'D/ST')) {
-      return draft ? canDraftDefense(draft.user_pick_position) : false;
-    }
-    return true;
-  });
+    const spotOpts = draft
+      ? { teamNumber: draft.user_pick_position, currentRound }
+      : undefined;
+    return availablePlayers.filter((p) => {
+      if (positionFilter !== 'ALL') {
+        const playerPos = p.position === 'D/ST' ? 'DEF' : p.position;
+        if (playerPos !== positionFilter) return false;
+      }
+      const matchesSearch =
+        searchLower === '' ||
+        p.name.toLowerCase().includes(searchLower) ||
+        p.team?.toLowerCase().includes(searchLower) ||
+        p.name.toLowerCase().split(' ').some((part) => part.includes(searchLower));
+      if (!matchesSearch) return false;
+      if (!hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts)) return false;
+      if (!isRookiesOnlyDraft && (p.position === 'DEF' || p.position === 'D/ST')) {
+        return draft ? canDraftDefense(draft.user_pick_position) : false;
+      }
+      return true;
+    });
+  }, [
+    availablePlayers,
+    searchTerm,
+    positionFilter,
+    draft,
+    currentRound,
+    userDraftedPlayers,
+    isRookiesOnlyDraft,
+  ]);
 
-  // Sort filtered players by rank to determine highlight position
-  // This shows which player would be available at user's pick if everyone picks in order
-  // Use filtered players so highlights work even when position-filtered
-  const sortedFilteredPlayers = [...filteredPlayers].sort((a, b) => a.rank - b.rank);
-  const highlightRanks = getHighlightRanks();
-  
-  // Get all players that should be highlighted (based on rank positions in all available players)
-  // Calculate from all available players to show which player you'd get if everyone picks in order
-  const sortedAvailablePlayers = [...availablePlayers].sort((a, b) => a.rank - b.rank);
-  const highlightedPlayerIds = new Set<string>();
-  highlightRanks.forEach((rankOffset) => {
-    const rankIndex = rankOffset - 1; // Convert to 0-based index
-    if (rankIndex >= 0 && rankIndex < sortedAvailablePlayers.length) {
-      const highlightedPlayer = sortedAvailablePlayers[rankIndex];
-      // Add the highlighted player even if it's not in filteredPlayers
-      // This ensures highlights show even when position-filtered or when player doesn't have roster spot
-      highlightedPlayerIds.add(highlightedPlayer.id);
+  const personalMetaById = personalBoard?.metaById;
+
+  // Highlight who falls to you at each remaining pick on YOUR board order
+  // (same sort as the available list): next round, then 5th/6th/7th… as you scroll.
+  // N picks before a slot → N players gone → index N in the remaining list.
+  const highlightedPlayerIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!draft) return ids;
+
+    const sortedAvailable = [...availablePlayers].sort((a, b) => {
+      const ra = personalMetaById?.get(a.id)?.overallRank ?? a.rank;
+      const rb = personalMetaById?.get(b.id)?.overallRank ?? b.rank;
+      return ra - rb;
+    });
+
+    for (const pickNum of getUserUpcomingPicks()) {
+      if (pickNum < currentPick) continue;
+      const picksUntil = pickNum - currentPick;
+      // On the clock: no forecast highlight for the current pick.
+      if (picksUntil <= 0) continue;
+      const target = sortedAvailable[picksUntil];
+      if (target) ids.add(target.id);
     }
-  });
+    return ids;
+  }, [
+    availablePlayers,
+    personalMetaById,
+    currentPick,
+    draft?.user_pick_position,
+    draft?.num_teams,
+    draft?.num_rounds,
+    draft?.draft_order,
+  ]);
+
+  const availableListRows = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const hasActiveSearch = term.length > 0;
+    const hasPositionFilter = positionFilter !== 'ALL';
+    const filteredPlayerIds = new Set(filteredPlayers.map((p) => p.id));
+    const highlightedButNotFiltered =
+      hasActiveSearch || hasPositionFilter
+        ? []
+        : Array.from(highlightedPlayerIds)
+            .map((id) => availablePlayers.find((p) => p.id === id))
+            .filter((p): p is RankedPlayer => {
+              if (!p || filteredPlayerIds.has(p.id)) return false;
+              const spotOpts = draft
+                ? { teamNumber: draft.user_pick_position, currentRound }
+                : undefined;
+              if (!hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts)) {
+                return false;
+              }
+              if (!isRookiesOnlyDraft && (p.position === 'DEF' || p.position === 'D/ST')) {
+                return draft ? canDraftDefense(draft.user_pick_position) : false;
+              }
+              return true;
+            });
+
+    const combined = [...filteredPlayers, ...highlightedButNotFiltered];
+    const seenIds = new Set<string>();
+    const deduped = combined.filter((p) => {
+      if (seenIds.has(p.id)) return false;
+      seenIds.add(p.id);
+      return true;
+    });
+
+    const personalRank = (p: RankedPlayer) =>
+      personalMetaById?.get(p.id)?.overallRank ?? p.rank;
+    const playersToRender = deduped.sort((a, b) => personalRank(a) - personalRank(b));
+
+    // All Positions: fixed breaks from board load (never reset when a late T1 QB rises).
+    // Position filter: live frontier breaks for that position's leftovers.
+    const breakBeforeIds =
+      positionFilter === 'ALL'
+        ? personalBoard?.allViewBreakBeforeIds ?? new Set<string>()
+        : buildDraftListTierBreakBeforeIds(
+            playersToRender.map((p) => ({
+              id: p.id,
+              tier: personalMetaById?.get(p.id)?.tier ?? null,
+            }))
+          );
+
+    return playersToRender.map((player) => {
+      const meta = personalMetaById?.get(player.id);
+      return {
+        player,
+        displayRank: meta?.overallRank ?? player.rank,
+        myPosRank: meta?.posRank ?? null,
+        tier: meta?.tier ?? null,
+        hasTierBreakBefore: breakBeforeIds.has(player.id),
+        highlighted: highlightedPlayerIds.has(player.id),
+      };
+    });
+  }, [
+    searchTerm,
+    positionFilter,
+    filteredPlayers,
+    highlightedPlayerIds,
+    availablePlayers,
+    draft,
+    currentRound,
+    userDraftedPlayers,
+    isRookiesOnlyDraft,
+    personalMetaById,
+    personalBoard?.allViewBreakBeforeIds,
+  ]);
+
+  const handleAvailablePlayerStats = useCallback((player: RankedPlayer) => {
+    setSelectedPlayerForStats(player);
+    setIsStatsDialogOpen(true);
+  }, []);
+
+  const handleUserDraftRef = useRef(handleUserDraft);
+  handleUserDraftRef.current = handleUserDraft;
+  const handleAvailablePlayerDraft = useCallback((player: RankedPlayer) => {
+    void handleUserDraftRef.current(player);
+  }, []);
 
   const isUserPick = draft && getCurrentTeam() === draft.user_pick_position;
   const totalPicks = draft ? draft.num_teams * draft.num_rounds : 0;
@@ -1680,43 +1797,6 @@ const DraftRoom = () => {
   });
   
   const isRosterComplete = filledSlots.every(filled => filled);
-
-  // Stick draft board to bottom on new picks only while the user is already pinned there.
-  useEffect(() => {
-    if (!draftBoardRef.current || picks.length === 0) return;
-    if (!stickDraftBoardToBottomRef.current) return;
-
-    if (draftBoardScrollRafRef.current != null) {
-      cancelAnimationFrame(draftBoardScrollRafRef.current);
-    }
-
-    draftBoardScrollRafRef.current = requestAnimationFrame(() => {
-      draftBoardScrollRafRef.current = requestAnimationFrame(() => {
-        const container = draftBoardRef.current;
-        if (!container || !stickDraftBoardToBottomRef.current) return;
-        container.scrollTop = container.scrollHeight;
-        setDraftBoardScrolledUp(false);
-        draftBoardScrollRafRef.current = null;
-      });
-    });
-
-    return () => {
-      if (draftBoardScrollRafRef.current != null) {
-        cancelAnimationFrame(draftBoardScrollRafRef.current);
-        draftBoardScrollRafRef.current = null;
-      }
-    };
-  }, [picks.length]);
-
-  // Pin/unpin stick-to-bottom from user scroll; also drives scrollbar visibility.
-  const handleDraftBoardScroll = useCallback(() => {
-    const container = draftBoardRef.current;
-    if (!container) return;
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isNearBottom = distanceFromBottom < 40;
-    stickDraftBoardToBottomRef.current = isNearBottom;
-    setDraftBoardScrolledUp(!isNearBottom);
-  }, []);
 
   // Bucket-based archetype assignment: prefer unearned badges in the same strategy bucket, then rotate when the bucket is fully earned.
   const resolveArchetypeForCompletion = useCallback(
@@ -2631,97 +2711,28 @@ const DraftRoom = () => {
                 {picksUntilNext()} pick{picksUntilNext() !== 1 ? 's' : ''} until your next pick
               </div>
             )}
-            
+            {!user && (
+              <p className="mb-3 text-xs text-muted-foreground text-center flex-shrink-0 leading-snug px-1">
+                Guest view: player order and tier breaks use community rankings for this
+                league type. Sign in to draft from your personal board and tiers.
+              </p>
+            )}
+
             <div className="space-y-1 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
-              {/* Include highlighted players even if they're not in filteredPlayers (e.g., when position-filtered) */}
-              {(() => {
-                const term = searchTerm.trim().toLowerCase();
-                const hasActiveSearch = term.length > 0;
-                const hasPositionFilter = positionFilter !== 'ALL';
-                const filteredPlayerIds = new Set(filteredPlayers.map(p => p.id));
-                // Only add highlighted players when NOT searching AND NOT position-filtering - otherwise show only filtered results
-                const highlightedButNotFiltered = (hasActiveSearch || hasPositionFilter) ? [] : Array.from(highlightedPlayerIds)
-                  .map(id => availablePlayers.find(p => p.id === id))
-                  .filter((p): p is RankedPlayer => {
-                    if (!p || filteredPlayerIds.has(p.id)) return false;
-                    const spotOpts = draft ? { teamNumber: draft.user_pick_position, currentRound: getCurrentRound() } : undefined;
-                    if (!hasAvailableSpotForPosition(p.position, userDraftedPlayers, spotOpts)) return false;
-                    if (!isRookiesOnlyDraft && (p.position === 'DEF' || p.position === 'D/ST')) {
-                      return draft ? canDraftDefense(draft.user_pick_position) : false;
-                    }
-                    return true;
-                  });
-                
-                // Combine filtered players with highlighted players (only when no search/position filter)
-                // Deduplicate by id to avoid React key warnings and ensure correct display
-                const combined = [...filteredPlayers, ...highlightedButNotFiltered];
-                const seenIds = new Set<string>();
-                const deduped = combined.filter((p) => {
-                  if (seenIds.has(p.id)) return false;
-                  seenIds.add(p.id);
-                  return true;
-                });
-                const playersToRender = deduped.sort((a, b) => a.rank - b.rank);
-                
-                return playersToRender.map((player) => {
-                const getPositionRankClass = (pos: string) => {
-                  switch (pos.toUpperCase()) {
-                    case 'QB': return 'bg-qb/20 text-qb border border-qb/50';
-                    case 'RB': return 'bg-rb/20 text-rb border border-rb/50';
-                    case 'WR': return 'bg-wr/20 text-wr border border-wr/50';
-                    case 'TE': return 'bg-te/20 text-te border border-te/50';
-                    case 'K': return 'bg-k/20 text-k border border-k/50';
-                    case 'DEF': return 'bg-def/20 text-def border border-def/50';
-                    default: return 'bg-muted text-muted-foreground';
-                  }
-                };
-                
-                // Check if this player should be highlighted (one of the players that would be available at user's picks)
-                const shouldHighlight = highlightedPlayerIds.has(player.id);
-                
-                return (
-                  <div
-                    key={player.id}
-                    className={cn(
-                      "flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors group",
-                      shouldHighlight && "bg-accent/20 border-2 border-accent/50 ring-2 ring-accent/30"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-8 h-8 rounded flex items-center justify-center text-sm font-bold",
-                      getPositionRankClass(player.position)
-                    )}>
-                      {player.rank}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span 
-                          className="font-medium truncate cursor-pointer hover:text-primary transition-colors"
-                          onClick={() => {
-                            setSelectedPlayerForStats(player);
-                            setIsStatsDialogOpen(true);
-                          }}
-                        >
-                          {player.name}
-                        </span>
-                        <PositionBadge position={player.position} />
-                      </div>
-                      <DraftPlayerHeaderLine player={player} />
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUserDraft(player);
-                      }}
-                    >
-                      <Check className="w-4 h-4" /> Draft
-                    </Button>
-                  </div>
-                );
-                });
-              })()}
+              {availableListRows.map((row) => (
+                <DraftAvailablePlayerRow
+                  key={row.player.id}
+                  player={row.player}
+                  displayRank={row.displayRank}
+                  myPosRank={row.myPosRank}
+                  tier={row.tier}
+                  hasTierBreakBefore={row.hasTierBreakBefore}
+                  showPlayerTier={positionFilter !== 'ALL'}
+                  highlighted={row.highlighted}
+                  onNameClick={handleAvailablePlayerStats}
+                  onDraft={handleAvailablePlayerDraft}
+                />
+              ))}
             </div>
           </div>
 

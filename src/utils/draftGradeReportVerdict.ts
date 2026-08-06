@@ -3,7 +3,7 @@
  * @see draftGradeNarrativeStyle.ts
  */
 
-import { posRankTag } from '@/utils/draftGradePriorSeason';
+import { priorPosRankLabel } from '@/utils/draftGradePriorSeason';
 import type { PriorSeasonDraftProfile } from '@/utils/draftGradePriorSeason';
 
 export interface VerdictHighlightContext {
@@ -46,12 +46,14 @@ export function verdictPositiveClause(ctx: VerdictHighlightContext): string | nu
     const finishers = ps.rbWrFinishers.slice(0, 2);
     if (finishers.length === 1) {
       const f = finishers[0];
-      parts.push(`you did get ${f.name}, who was the ${y} ${posRankTag(f.pos, f.rank)}`);
+      parts.push(
+        `you did get ${f.name}, who was the ${priorPosRankLabel(f.pos, f.rank, y)}`
+      );
     } else {
       const a = finishers[0];
       const b = finishers[1];
       parts.push(
-        `you landed ${a.name} (${posRankTag(a.pos, a.rank)}) and ${b.name} (${posRankTag(b.pos, b.rank)})`
+        `you landed ${a.name} (${priorPosRankLabel(a.pos, a.rank, y)}) and ${b.name} (${priorPosRankLabel(b.pos, b.rank, y)})`
       );
     }
   }
@@ -83,7 +85,7 @@ export function capitalizeLead(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** "While [good]…, [bad] add up to a B- draft." */
+/** "[good]…, but [bad] add up to a B- draft." */
 export function balancedGradeVerdict(
   grade: string,
   positives: string | null,
@@ -92,7 +94,7 @@ export function balancedGradeVerdict(
   const joined = joinFactors(negatives);
   const verb = negatives.length > 1 ? 'add up' : 'adds up';
   if (positives) {
-    return `While ${positives}, ${joined} ${verb} to ${gradeArticle(grade)} ${grade} draft.`;
+    return `While ${positives}, but ${joined} ${verb} to ${gradeArticle(grade)} ${grade} draft.`;
   }
   return `${capitalizeLead(joined)} ${verb} to ${gradeArticle(grade)} ${grade} draft.`;
 }

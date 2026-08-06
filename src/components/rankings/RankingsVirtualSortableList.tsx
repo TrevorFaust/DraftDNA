@@ -28,7 +28,8 @@ type VirtualSortableRowProps = {
   communityTrend?: CommunityRankTrend | null;
   tier?: number | null;
   canEditTierBreak?: boolean;
-  hasTierBreakAfter?: boolean;
+  hasTierCutAfter?: boolean;
+  hasTierBreakBefore?: boolean;
   onToggleTierBreak?: (playerId: string) => void;
   stats2025?: Player2025StatsEntry;
   onPlayerClick: (player: RankedPlayer) => void;
@@ -44,7 +45,8 @@ const VirtualSortableRow = memo(function VirtualSortableRow({
   communityTrend,
   tier,
   canEditTierBreak = false,
-  hasTierBreakAfter = false,
+  hasTierCutAfter = false,
+  hasTierBreakBefore = false,
   onToggleTierBreak,
   stats2025,
   onPlayerClick,
@@ -74,7 +76,8 @@ const VirtualSortableRow = memo(function VirtualSortableRow({
       communityTrend={communityTrend}
       tier={tier}
       canEditTierBreak={canEditTierBreak}
-      hasTierBreakAfter={hasTierBreakAfter}
+      hasTierCutAfter={hasTierCutAfter}
+      hasTierBreakBefore={hasTierBreakBefore}
       onToggleTierBreak={
         onToggleTierBreak ? () => onToggleTierBreak(player.id) : undefined
       }
@@ -216,7 +219,8 @@ export type RankingsVirtualSortableListProps = {
   getCommunityTrend?: (playerId: string, overallRank: number) => CommunityRankTrend | null | undefined;
   getTier?: (playerId: string) => number | null | undefined;
   canEditTierBreakForPlayer?: (playerId: string) => boolean;
-  hasTierBreakAfterPlayer?: (playerId: string) => boolean;
+  hasTierCutAfterPlayer?: (playerId: string) => boolean;
+  hasTierBreakBeforePlayer?: (playerId: string) => boolean;
   onToggleTierBreak?: (playerId: string) => void;
   player2025Stats: Map<string, Player2025StatsEntry>;
   onPlayerClick: (player: RankedPlayer) => void;
@@ -235,7 +239,8 @@ export function RankingsVirtualSortableList({
   getCommunityTrend,
   getTier,
   canEditTierBreakForPlayer,
-  hasTierBreakAfterPlayer,
+  hasTierCutAfterPlayer,
+  hasTierBreakBeforePlayer,
   onToggleTierBreak,
   player2025Stats,
   onPlayerClick,
@@ -312,7 +317,8 @@ export function RankingsVirtualSortableList({
             communityTrend={getCommunityTrend?.(item.player.id, displayAdp)}
             tier={getTier?.(item.player.id)}
             canEditTierBreak={canEditTierBreakForPlayer?.(item.player.id) ?? false}
-            hasTierBreakAfter={hasTierBreakAfterPlayer?.(item.player.id) ?? false}
+            hasTierCutAfter={hasTierCutAfterPlayer?.(item.player.id) ?? false}
+            hasTierBreakBefore={hasTierBreakBeforePlayer?.(item.player.id) ?? false}
             onToggleTierBreak={onToggleTierBreak}
             stats2025={player2025Stats.get(item.player.id)}
             onPlayerClick={onPlayerClick}

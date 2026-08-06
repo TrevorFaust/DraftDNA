@@ -30,8 +30,12 @@ interface PlayerCardProps {
   myPosRank?: number | null;
   /** Community overall rank trend vs prior snapshot */
   communityTrend?: CommunityRankTrend | null;
-  /** Personal position tier (1-based) */
+  /** Position tier (1-based) for this board */
   tier?: number | null;
+  /** Whose cuts the tier badge reflects */
+  tierSource?: 'personal' | 'community';
+  /** Tier-start bar above this card (first player of Tier 2, 3, …). */
+  hasTierBreakBefore?: boolean;
   /** One-line ADP + bye only (rankings lists). Default follows showGrabHandle. */
   compactStats?: boolean;
 }
@@ -69,6 +73,8 @@ export const PlayerCard = ({
   myPosRank,
   communityTrend,
   tier,
+  tierSource = 'community',
+  hasTierBreakBefore = false,
   compactStats,
 }: PlayerCardProps) => {
   const useCompactStats = compactStats ?? showGrabHandle;
@@ -76,13 +82,19 @@ export const PlayerCard = ({
   const jerseyTeamAbbr = resolveTeamAbbrForDisplay(player.team, player.position, player.name);
   const numberFill = lookupJerseyNumberFill(jerseyColorsByAbbr, jerseyTeamAbbr);
   const tone = tier != null && tier >= 1 ? getTierTone(tier) : null;
+  // Label the tier that just ended (first Tier 2 player → "Tier 1" break, etc.).
+  const breakTone =
+    hasTierBreakBefore && tone != null && tone.tier >= 2
+      ? getTierTone(tone.tier - 1)
+      : null;
 
   return (
     <div
       onClick={onClick}
       className={cn(
-        'glass-card p-4 flex items-center gap-4 transition-all duration-200 hover:bg-secondary/60 border-l-4',
+        'relative glass-card p-4 flex items-center gap-4 transition-all duration-200 hover:bg-secondary/60 border-l-4',
         !tone && 'border-l-transparent',
+        breakTone != null && 'mt-3',
         isDragging && 'dragging border-primary'
       )}
       style={{
@@ -134,6 +146,7 @@ export const PlayerCard = ({
         communityPosRank={communityPosRank}
         myPosRank={myPosRank}
         tier={tier}
+        tierSource={tierSource}
       />
 
       {useCompactStats && <Rankings2025PpgCell stats2025={stats2025} className="px-3 py-1" />}
@@ -141,6 +154,21 @@ export const PlayerCard = ({
       {showGrabHandle && (
         <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors p-1">
           <GripVertical className="w-4 h-4" />
+        </div>
+      )}
+      {breakTone != null && (
+        <div
+          className="pointer-events-none absolute -top-2.5 left-3 right-3 flex items-center gap-2 z-[1]"
+          aria-hidden
+        >
+          <span className="h-0.5 flex-1 rounded-full" style={{ backgroundColor: breakTone.color }} />
+          <span
+            className="text-[10px] uppercase tracking-[0.14em] font-semibold whitespace-nowrap bg-card/90 px-1"
+            style={{ color: breakTone.color }}
+          >
+            Tier {breakTone.tier}
+          </span>
+          <span className="h-0.5 flex-1 rounded-full" style={{ backgroundColor: breakTone.color }} />
         </div>
       )}
     </div>

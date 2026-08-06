@@ -86,6 +86,57 @@ export function hasTierCutAfter(cuts: number[], afterRank: number): boolean {
   return normalizeCuts(cuts).includes(afterRank);
 }
 
+/**
+ * True when this positional rank is the first player of a new tier
+ * (a cut ended the previous tier immediately above them).
+ */
+export function hasTierBreakBefore(cuts: number[], posRank: number): boolean {
+  const rank = Math.floor(posRank);
+  if (!Number.isFinite(rank) || rank < 2) return false;
+  return hasTierCutAfter(cuts, rank - 1);
+}
+
+/**
+ * Overall (mixed-position) board: one break per tier number, at the first player
+ * in list order who belongs to that tier. Later first-of-tier players at other
+ * positions do not get another break for the same tier.
+ */
+export function buildOverallTierBreakBeforeIds(
+  orderedPlayerIds: readonly string[],
+  getTier: (playerId: string) => number | null | undefined
+): Set<string> {
+  const out = new Set<string>();
+  const seenTiers = new Set<number>();
+  for (const id of orderedPlayerIds) {
+    const tier = getTier(id);
+    if (tier == null || tier < 2) continue;
+    if (seenTiers.has(tier)) continue;
+    seenTiers.add(tier);
+    out.add(id);
+  }
+  return out;
+}
+
+/** Merge cuts: `primary` wins per position; `fallback` fills missing positions. */
+export function mergePositionTierCuts(
+  primary: PositionTierCuts,
+  fallback: PositionTierCuts
+): PositionTierCuts {
+  const out: PositionTierCuts = {};
+  const keys = new Set([
+    ...Object.keys(primary),
+    ...Object.keys(fallback),
+  ]);
+  for (const key of keys) {
+    const pos = normalizeTierPosition(key);
+    const fromPrimary = normalizeCuts(primary[key] ?? primary[pos] ?? []);
+    const fromFallback = normalizeCuts(fallback[key] ?? fallback[pos] ?? []);
+    const chosen = fromPrimary.length > 0 ? fromPrimary : fromFallback;
+    if (chosen.length > 0) out[pos] = chosen;
+  }
+  return out;
+}
+
 /** Toggle a cut after the given positional rank. */
 export function toggleTierCut(cuts: number[], afterRank: number): number[] {
   const rank = Math.floor(afterRank);
@@ -133,58 +184,76 @@ export function positionTierCutsEqual(a: PositionTierCuts, b: PositionTierCuts):
   return true;
 }
 
+function medianSorted(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const mid = Math.floor(values.length / 2);
+  if (values.length % 2 === 1) return values[mid]!;
+  return Math.round((values[mid - 1]! + values[mid]!) / 2);
+}
+
+/**
+ * Only positions where the user drew at least one tier break.
+ * Untouched positions stay implicit Tier 1 for everyone and must not
+ * enter community consensus.
+ */
+export function eligiblePositionTierCuts(cuts: PositionTierCuts): PositionTierCuts {
+  const out: PositionTierCuts = {};
+  for (const [rawPos, rawCuts] of Object.entries(cuts)) {
+    const pos = normalizeTierPosition(rawPos);
+    const normalized = normalizeCuts(rawCuts);
+    if (normalized.length >= 1) out[pos] = normalized;
+  }
+  return out;
+}
+
 /**
  * Build consensus cut points from many users' tier submissions.
- * Votes are smoothed ±1 rank, local peaks kept when they clear a share of submitters,
- * and near-duplicate peaks within 1 rank are collapsed to the stronger vote.
+ *
+ * For each position, the 1st cut across users (median) is the end of Tier 1 /
+ * start of Tier 2; the 2nd cut is the Tier 2→3 boundary, and so on. A user's
+ * cuts for a position count only when they set ≥1 break there (no default-T1
+ * submissions). Boundaries need enough submitters to be kept.
  */
 export function aggregateCommunityTierCuts(
   submissions: PositionTierCuts[],
   minShare = 0.2
 ): PositionTierCuts {
-  const histByPos = new Map<string, Map<number, number>>();
+  const cutsByPos = new Map<string, number[][]>();
   const submittersByPos = new Map<string, number>();
 
   for (const sub of submissions) {
-    for (const [rawPos, rawCuts] of Object.entries(sub)) {
-      const pos = normalizeTierPosition(rawPos);
-      const cuts = normalizeCuts(rawCuts);
-      if (cuts.length === 0) continue;
+    const eligible = eligiblePositionTierCuts(sub);
+    for (const [pos, cuts] of Object.entries(eligible)) {
       submittersByPos.set(pos, (submittersByPos.get(pos) ?? 0) + 1);
-      const hist = histByPos.get(pos) ?? new Map<number, number>();
-      for (const cut of cuts) {
-        hist.set(cut, (hist.get(cut) ?? 0) + 1);
-      }
-      histByPos.set(pos, hist);
+      const list = cutsByPos.get(pos) ?? [];
+      list.push(cuts);
+      cutsByPos.set(pos, list);
     }
   }
 
   const out: PositionTierCuts = {};
-  for (const [pos, hist] of histByPos) {
+  for (const [pos, allCuts] of cutsByPos) {
     const submitters = submittersByPos.get(pos) ?? 0;
-    if (submitters === 0 || hist.size === 0) continue;
+    if (submitters === 0) continue;
     const minVotes = Math.max(1, Math.ceil(submitters * minShare));
-    const maxRank = Math.max(...hist.keys());
-    const raw = (rank: number) => hist.get(rank) ?? 0;
-    const smooth = (rank: number) => raw(rank) + 0.5 * raw(rank - 1) + 0.5 * raw(rank + 1);
-
-    const peaks: { rank: number; score: number }[] = [];
-    for (let rank = 1; rank <= maxRank; rank++) {
-      if (raw(rank) < 1) continue;
-      const score = smooth(rank);
-      if (score + 1e-9 < minVotes) continue;
-      if (score + 1e-9 < smooth(rank - 1)) continue;
-      if (score + 1e-9 < smooth(rank + 1)) continue;
-      peaks.push({ rank, score });
-    }
-
-    peaks.sort((a, b) => b.score - a.score || a.rank - b.rank);
+    const maxDepth = Math.max(...allCuts.map((c) => c.length));
     const chosen: number[] = [];
-    for (const peak of peaks) {
-      if (chosen.some((existing) => Math.abs(existing - peak.rank) <= 1)) continue;
-      chosen.push(peak.rank);
+
+    for (let depth = 0; depth < maxDepth; depth++) {
+      const atDepth: number[] = [];
+      for (const cuts of allCuts) {
+        const cut = cuts[depth];
+        if (cut != null) atDepth.push(cut);
+      }
+      if (atDepth.length < minVotes) break;
+      atDepth.sort((a, b) => a - b);
+      const med = medianSorted(atDepth);
+      if (med == null) break;
+      // Keep boundaries strictly increasing (Tier 2 start before Tier 3 start).
+      if (chosen.length > 0 && med <= chosen[chosen.length - 1]!) break;
+      chosen.push(med);
     }
-    chosen.sort((a, b) => a - b);
+
     if (chosen.length > 0) out[pos] = chosen;
   }
   return out;

@@ -31,7 +31,10 @@ export type RankingsCompareDragPanelProps = {
     myPosRank: number | null;
     communityTrend: CommunityRankTrend | null;
     tier?: number | null;
-    hasTierBreakAfter?: boolean;
+    communityTier?: number | null;
+    hasTierCutAfter?: boolean;
+    hasTierBreakBefore?: boolean;
+    hasCommunityTierBreakBefore?: boolean;
   };
   canEditTierBreakForPlayer?: (playerId: string) => boolean;
   onToggleTierBreak?: (playerId: string) => void;

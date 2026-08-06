@@ -35,6 +35,7 @@ import {
   shouldFoldHighlightsIntoVerdict,
   verdictPositiveClause,
 } from '@/utils/draftGradeReportVerdict';
+import { placeKeeperNoteInSegments } from '@/utils/draftGradeKeepers';
 
 export interface RosterQualityPick {
   pick_number: number;
@@ -455,6 +456,13 @@ interface TaglineContext {
   keeperStrategyNote?: string | null;
   hasEliteWrKeeper?: boolean;
   hasEliteRbKeeper?: boolean;
+  keeperPrimaryDiscount?: {
+    name: string;
+    pos: string;
+    round: number;
+    marketRound: number;
+    discountPhrase: string;
+  } | null;
 }
 
 function polishTagline(text: string): string {
@@ -606,37 +614,34 @@ function middleBeat(ctx: TaglineContext): string | null {
 }
 
 function valueBeat(ctx: TaglineContext): string | null {
+  // Only early/mid reaches drag the story — late bench darts are mostly noise.
   const reachHeavy =
-    ctx.reachCount >= 4 ||
-    (ctx.negativeValuePickCount ?? 0) >= 5 ||
-    ctx.avgValueSpots < -6;
+    ctx.reachCount >= 5 ||
+    (ctx.negativeValuePickCount ?? 0) >= 6 ||
+    ctx.avgValueSpots < -8;
 
   if (reachHeavy) {
     const who =
       ctx.reachNames.length > 0
         ? formatPlayerNames(ctx.reachNames.slice(0, 2))
-        : 'several spots';
-    const extra =
-      ctx.reachCount >= 4
-        ? ' You left better players on the board when you reached past ADP.'
-        : '';
+        : 'several early and middle-round picks';
     return ctx.reachNames.length > 0
-      ? `Reaches on ${who} and other picks cost you value, and stronger options were still available.${extra}`
-      : `You reached past ADP on multiple picks and left stronger players on the board.${extra}`;
+      ? `Reaches on ${who} in the early and middle rounds cost you value while stronger options were still there.`
+      : `You reached past ADP a few times in the early and middle rounds and left stronger players on the board.`;
   }
 
   if (ctx.reachCount >= 3 || ctx.severeReachCount >= 2) {
     const who =
       ctx.reachNames.length > 0
         ? formatPlayerNames(ctx.reachNames.slice(0, 2))
-        : 'several players';
-    return `Reaches on ${who} and others cost you value before the roster was finished.`;
+        : 'a few middle-round picks';
+    return `Reaches on ${who} cost a little value before the roster was finished.`;
   }
   if (ctx.reachCount === 2 && ctx.reachNames.length > 0) {
-    return `Reaches on ${formatPlayerNames(ctx.reachNames.slice(0, 2))} were the main leaks on the board.`;
+    return `Reaches on ${formatPlayerNames(ctx.reachNames.slice(0, 2))} were small leaks more than draft-breakers.`;
   }
   if (ctx.reachCount === 1 && ctx.reachNames.length > 0) {
-    return `${ctx.reachNames[0]} seemed like a bit of a reach given what you already had, but the rest of the draft stayed closer to the board.`;
+    return `${ctx.reachNames[0]} was a bit of a reach, but the rest of the draft stayed closer to the board.`;
   }
   const stealNames = ctx.stealNames.filter(
     (name) =>
@@ -859,14 +864,13 @@ function structureNoteFromCtx(ctx: TaglineContext): string | null {
 }
 
 function buildNarrative(grade: string, ctx: TaglineContext, body: (string | null)[]): string {
-  const segments = body.filter((p): p is string => Boolean(p));
-  // Keepers first so we never imply a late "find" before naming the keeper plan.
-  if (ctx.keeperRosterNote?.trim()) {
-    const note = ctx.keeperRosterNote.trim();
-    if (!segments.some((s) => s.includes(note.slice(0, 24)))) {
-      segments.unshift(note);
-    }
-  }
+  let segments = body.filter((p): p is string => Boolean(p));
+  // Weave keeper talk into WR/RB/core beats, or slot mid-writeup — not always first.
+  segments = placeKeeperNoteInSegments(segments, {
+    rosterNote: ctx.keeperRosterNote ?? null,
+    strategyNote: ctx.keeperStrategyNote ?? null,
+    primaryDiscount: ctx.keeperPrimaryDiscount ?? null,
+  });
   const isWeakGrade =
     grade.startsWith('C') || grade.startsWith('D') || grade.startsWith('F');
   const foldHighlights = shouldFoldHighlightsIntoVerdict(

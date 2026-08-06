@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { PositionBadge } from '@/components/PositionBadge';
+import { DraftAvailablePlayerRow } from '@/components/DraftAvailablePlayerRow';
 import { MyRoster } from '@/components/MyRoster';
 import {
   DraftMobilePanelTabs,
   draftMobilePanelClass,
   type DraftMobilePanel,
 } from '@/components/DraftMobilePanelTabs';
+import { MultiplayerDraftChat } from '@/components/MultiplayerDraftChat';
 import { DraftGradeBanner } from '@/components/DraftGradeDisplay';
 import { ArchetypeBadge } from '@/components/ArchetypeBadge';
 import {
@@ -27,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
+import { useStickScrollToBottom } from '@/hooks/useStickScrollToBottom';
 import { supabase } from '@/integrations/supabase/client';
 import { getOrCreateGuestSessionId } from '@/utils/temporaryStorage';
 import {
@@ -82,6 +85,11 @@ import { ChevronRight, LogOut, Search, Timer, Trophy, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import { Label } from '@/components/ui/label';
+import {
+  buildDraftListTierBreakBeforeIds,
+  loadPersonalDraftBoardOverlay,
+  type PersonalDraftBoardOverlay,
+} from '@/utils/draftPersonalBoard';
 
 const RAPID_CPU_PICK_GAP_MS = 360;
 
@@ -114,7 +122,13 @@ const MultiplayerDraftRoom = () => {
   const [participants, setParticipants] = useState<MultiplayerParticipant[]>([]);
   const [keepers, setKeepers] = useState<MultiplayerKeeper[]>([]);
   const [picks, setPicks] = useState<MultiplayerPick[]>([]);
+  const {
+    containerRef: draftBoardRef,
+    onScroll: handleDraftBoardScroll,
+    scrolledUp: draftBoardScrolledUp,
+  } = useStickScrollToBottom(picks.length);
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
+  const [personalBoard, setPersonalBoard] = useState<PersonalDraftBoardOverlay | null>(null);
   const [results, setResults] = useState<MultiplayerResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -250,9 +264,11 @@ const MultiplayerDraftRoom = () => {
     });
   }, [players, draftedIds, keeperIds, draft, positionLimits, myTeamPosCounts, myRosterSize]);
 
+  const personalMetaById = personalBoard?.metaById;
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return available.filter((p) => {
+    const list = available.filter((p) => {
       const pos = mpNormalizePos(p.position);
       if (positionFilter !== 'ALL' && pos !== positionFilter) return false;
       if (!q) return true;
@@ -262,7 +278,70 @@ const MultiplayerDraftRoom = () => {
         p.position.toLowerCase().includes(q)
       );
     });
-  }, [available, search, positionFilter]);
+    const personalRank = (p: RankedPlayer) =>
+      personalMetaById?.get(p.id)?.overallRank ?? p.rank;
+    return list.sort((a, b) => personalRank(a) - personalRank(b));
+  }, [available, search, positionFilter, personalMetaById]);
+
+  const availableListRows = useMemo(() => {
+    // Keep a deep enough window that short viewports can still scroll a wide board.
+    const slice = filtered.slice(0, 200);
+    const breakBeforeIds =
+      positionFilter === 'ALL'
+        ? personalBoard?.allViewBreakBeforeIds ?? new Set<string>()
+        : buildDraftListTierBreakBeforeIds(
+            slice.map((p) => ({
+              id: p.id,
+              tier: personalMetaById?.get(p.id)?.tier ?? null,
+            }))
+          );
+    return slice.map((player) => {
+      const meta = personalMetaById?.get(player.id);
+      return {
+        player,
+        displayRank: meta?.overallRank ?? player.rank,
+        myPosRank: meta?.posRank ?? null,
+        tier: meta?.tier ?? null,
+        hasTierBreakBefore: breakBeforeIds.has(player.id),
+      };
+    });
+  }, [filtered, personalMetaById, positionFilter, personalBoard?.allViewBreakBeforeIds]);
+
+  const mpBucketKey = draft
+    ? `${draft.scoring_format || 'ppr'}/${draft.league_type || 'season'}/${Boolean(draft.is_superflex)}/${
+        draft.player_pool === 'rookies' || draft.player_pool === 'rookies_only'
+      }/${draft.source_league_id ?? 'none'}`
+    : null;
+  const mpPoolKey = useMemo(() => players.map((p) => p.id).join(','), [players]);
+
+  // Viewer's personal rankings + tiers (board/CPU order stays community).
+  useEffect(() => {
+    if (!draft || !mpBucketKey || players.length === 0) {
+      setPersonalBoard(null);
+      return;
+    }
+    let cancelled = false;
+    const rookiesOnly =
+      draft.player_pool === 'rookies' || draft.player_pool === 'rookies_only';
+    void loadPersonalDraftBoardOverlay({
+      userId: user?.id ?? null,
+      leagueId: draft.source_league_id,
+      bucket: {
+        scoringFormat: draft.scoring_format || 'ppr',
+        leagueType: draft.league_type || 'season',
+        isSuperflex: Boolean(draft.is_superflex),
+        rookiesOnly,
+      },
+      poolPlayers: players.map((p) => ({ id: p.id, position: p.position })),
+    }).then((overlay) => {
+      if (!cancelled) setPersonalBoard(overlay);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // mpPoolKey fingerprints the board; avoid reloading on every draft poll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- draft fields via mpBucketKey
+  }, [mpBucketKey, mpPoolKey, user?.id]);
 
   // If the active position chip has no draftable players left, snap back to ALL
   useEffect(() => {
@@ -666,6 +745,11 @@ const MultiplayerDraftRoom = () => {
       setPicking(false);
     }
   };
+  const handlePickRef = useRef(handlePick);
+  handlePickRef.current = handlePick;
+  const onDraftAvailable = useCallback((player: RankedPlayer) => {
+    void handlePickRef.current(player);
+  }, []);
 
   const handleToggleAutodraft = async (enabled: boolean) => {
     if (!draftId) return;
@@ -952,117 +1036,154 @@ const MultiplayerDraftRoom = () => {
             <p className="text-muted-foreground text-xs sm:text-sm mt-1 mb-0">{draft.name}</p>
           </div>
 
-          <div className="glass-card p-6 mt-2">
-            <h2 className="font-display text-2xl mb-4 text-center">{teamLabel(myTeam)}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <div className="text-sm text-muted-foreground uppercase tracking-wider mb-3 font-semibold">
-                  Starting Lineup
-                </div>
-                <div className="space-y-2">
-                  {startingSlots.map((slot, index) => {
-                    const player = filledSlots[index];
-                    return (
-                      <div
-                        key={`${slot.label}-${index}`}
-                        className={cn(
-                          'flex items-center gap-2 p-3 rounded-lg text-sm border',
-                          player ? 'bg-secondary/50 border-border/30' : 'bg-secondary/30 border-border/30'
-                        )}
-                      >
-                        <div className="w-14 text-xs font-semibold text-muted-foreground shrink-0">
-                          {slot.label}
-                        </div>
-                        {player ? (
-                          <>
-                            <div className="flex-1 truncate font-medium">{player.name}</div>
-                            <PositionBadge position={player.position} className="text-[10px]" />
-                            <div className="text-xs text-muted-foreground shrink-0">
-                              {displayTeamAbbrevOrFa(player.team, player.position, player.name)}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground uppercase tracking-wider mb-3 font-semibold">
-                  Bench
-                </div>
-                <div className="space-y-2">
-                  {Array.from({ length: benchCount }, (_, index) => {
-                    const player = benchPlayers[index];
-                    return (
-                      <div
-                        key={`bench-${index}`}
-                        className={cn(
-                          'flex items-center gap-2 p-3 rounded-lg text-sm border',
-                          player ? 'bg-secondary/50 border-border/30' : 'bg-secondary/30 border-border/30'
-                        )}
-                      >
-                        <div className="w-14 text-xs font-semibold text-muted-foreground shrink-0">
-                          BN
-                        </div>
-                        {player ? (
-                          <>
-                            <div className="flex-1 truncate font-medium">{player.name}</div>
-                            <PositionBadge position={player.position} className="text-[10px]" />
-                            <div className="text-xs text-muted-foreground shrink-0">
-                              {displayTeamAbbrevOrFa(player.team, player.position, player.name)}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {results.length > 0 && (
-            <div className="glass-card p-4 mt-4 space-y-2">
-              <h3 className="font-display text-lg">Everyone&apos;s grades</h3>
-              <p className="text-xs text-muted-foreground">Tap a team to see their roster and grade.</p>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {results.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setViewingResultTeam(r.team_number)}
-                    className={cn(
-                      'rounded-md border border-border/50 p-2 text-sm text-left w-full min-h-11',
-                      'hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                      'flex items-center gap-2 transition-colors',
-                      r.team_number === myTeam && 'border-accent/50 bg-accent/5'
-                    )}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium truncate">
-                        {teamLabel(r.team_number)}
-                        {r.team_number === myTeam ? ' (you)' : ''}
-                      </div>
-                      <div className="text-muted-foreground truncate">
-                        Grade {r.grade_letter}
-                        {r.user_id && (r.detected_chaos_archetype || r.detected_archetype)
-                          ? ` · ${r.detected_chaos_archetype || r.detected_archetype}`
-                          : !r.user_id
-                            ? ' · Guest (no badge)'
-                            : ''}
-                      </div>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,22rem)] lg:items-start mt-2">
+            <div className="space-y-4 min-w-0">
+              <div className="glass-card p-6">
+                <h2 className="font-display text-2xl mb-4 text-center">{teamLabel(myTeam)}</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <div className="text-sm text-muted-foreground uppercase tracking-wider mb-3 font-semibold">
+                      Starting Lineup
                     </div>
-                    <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" aria-hidden />
-                  </button>
-                ))}
+                    <div className="space-y-2">
+                      {startingSlots.map((slot, index) => {
+                        const player = filledSlots[index];
+                        return (
+                          <div
+                            key={`${slot.label}-${index}`}
+                            className={cn(
+                              'flex items-center gap-2 p-3 rounded-lg text-sm border',
+                              player
+                                ? 'bg-secondary/50 border-border/30'
+                                : 'bg-secondary/30 border-border/30'
+                            )}
+                          >
+                            <div className="w-14 text-xs font-semibold text-muted-foreground shrink-0">
+                              {slot.label}
+                            </div>
+                            {player ? (
+                              <>
+                                <div className="flex-1 truncate font-medium">{player.name}</div>
+                                <PositionBadge position={player.position} className="text-[10px]" />
+                                <div className="text-xs text-muted-foreground shrink-0">
+                                  {displayTeamAbbrevOrFa(player.team, player.position, player.name)}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground uppercase tracking-wider mb-3 font-semibold">
+                      Bench
+                    </div>
+                    <div className="space-y-2">
+                      {Array.from({ length: benchCount }, (_, index) => {
+                        const player = benchPlayers[index];
+                        return (
+                          <div
+                            key={`bench-${index}`}
+                            className={cn(
+                              'flex items-center gap-2 p-3 rounded-lg text-sm border',
+                              player
+                                ? 'bg-secondary/50 border-border/30'
+                                : 'bg-secondary/30 border-border/30'
+                            )}
+                          >
+                            <div className="w-14 text-xs font-semibold text-muted-foreground shrink-0">
+                              BN
+                            </div>
+                            {player ? (
+                              <>
+                                <div className="flex-1 truncate font-medium">{player.name}</div>
+                                <PositionBadge position={player.position} className="text-[10px]" />
+                                <div className="text-xs text-muted-foreground shrink-0">
+                                  {displayTeamAbbrevOrFa(player.team, player.position, player.name)}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex-1 text-muted-foreground/50 italic">Empty</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {results.length > 0 && (
+                <div className="glass-card p-4 space-y-2">
+                  <h3 className="font-display text-lg">Everyone&apos;s grades</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Tap a team to see their roster and grade.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {results.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setViewingResultTeam(r.team_number)}
+                        className={cn(
+                          'rounded-md border border-border/50 p-2 text-sm text-left w-full min-h-11',
+                          'hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                          'flex items-center gap-2 transition-colors',
+                          r.team_number === myTeam && 'border-accent/50 bg-accent/5'
+                        )}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">
+                            {teamLabel(r.team_number)}
+                            {r.team_number === myTeam ? ' (you)' : ''}
+                          </div>
+                          <div className="text-muted-foreground truncate">
+                            Grade {r.grade_letter}
+                            {r.user_id && (r.detected_chaos_archetype || r.detected_archetype)
+                              ? ` · ${r.detected_chaos_archetype || r.detected_archetype}`
+                              : !r.user_id
+                                ? ' · Guest (no badge)'
+                                : ''}
+                          </div>
+                        </div>
+                        <ChevronRight
+                          className="w-4 h-4 shrink-0 text-muted-foreground"
+                          aria-hidden
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-center gap-3 pt-2">
+                <Button variant="outline" onClick={() => navigate('/mock-draft')}>
+                  New draft
+                </Button>
+                {user && (
+                  <Button variant="hero" onClick={() => navigate('/badges')}>
+                    View badges
+                  </Button>
+                )}
               </div>
             </div>
-          )}
+
+            <aside className="lg:sticky lg:top-20 min-w-0">
+              <MultiplayerDraftChat
+                draftId={draft.id}
+                guestSessionId={guestSessionId}
+                userId={user?.id}
+                participantId={me?.id}
+                canSend={Boolean(me)}
+                variant="results"
+                fillHeight
+                className="lg:min-h-[28rem]"
+              />
+            </aside>
+          </div>
 
           {(() => {
             if (viewingResultTeam == null) return null;
@@ -1111,17 +1232,6 @@ const MultiplayerDraftRoom = () => {
               />
             );
           })()}
-
-          <div className="flex justify-center gap-3 mt-6">
-            <Button variant="outline" onClick={() => navigate('/mock-draft')}>
-              New draft
-            </Button>
-            {user && (
-              <Button variant="hero" onClick={() => navigate('/badges')}>
-                View badges
-              </Button>
-            )}
-          </div>
         </main>
       </div>
     );
@@ -1134,19 +1244,31 @@ const MultiplayerDraftRoom = () => {
         ? '—'
         : 'Off';
 
+  const turnStatus =
+    players.length === 0
+      ? 'Loading board…'
+      : me?.is_autodraft
+        ? 'Autodraft on'
+        : isMyTurn
+          ? 'Your turn — pick a player'
+          : `Waiting on ${teamLabel(currentTeam)}`;
+
   return (
     <div className="h-screen bg-background overflow-hidden flex flex-col">
-      <Navbar />
-      <main className="flex-1 min-h-0 overflow-hidden flex flex-col max-w-[1400px] w-full mx-auto px-4 py-4 gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 glass-card p-4 shrink-0">
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="text-center min-w-[4rem]">
-              <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
-                <Timer className="w-3.5 h-3.5" /> Timer
+      {/* Hide site nav on short viewports so the pick list keeps height */}
+      <div className="shrink-0 [@media(max-height:640px)]:hidden">
+        <Navbar />
+      </div>
+      <main className="flex-1 min-h-0 overflow-hidden flex flex-col max-w-[1400px] w-full mx-auto px-3 py-2 gap-2 sm:px-4 sm:py-3 sm:gap-3 [@media(max-height:700px)]:py-1.5 [@media(max-height:700px)]:gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 glass-card px-3 py-2 shrink-0 [@media(max-height:700px)]:py-1.5">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="text-center min-w-[3.25rem]">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center justify-center gap-0.5 leading-none mb-0.5">
+                <Timer className="w-3 h-3" /> Timer
               </div>
               <div
                 className={cn(
-                  'font-display text-3xl text-gradient',
+                  'font-display text-xl sm:text-2xl text-gradient leading-none',
                   timeRemaining != null && timeRemaining <= 5 && 'text-destructive animate-pulse'
                 )}
               >
@@ -1154,30 +1276,40 @@ const MultiplayerDraftRoom = () => {
               </div>
             </div>
             <div className="text-center">
-              <div className="text-sm text-muted-foreground">Round</div>
-              <div className="font-display text-3xl text-gradient">{currentRound}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none mb-0.5">
+                Round
+              </div>
+              <div className="font-display text-xl sm:text-2xl text-gradient leading-none">
+                {currentRound}
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-sm text-muted-foreground">Pick</div>
-              <div className="font-display text-3xl text-gradient">{displayPick}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none mb-0.5">
+                Pick
+              </div>
+              <div className="font-display text-xl sm:text-2xl text-gradient leading-none">
+                {displayPick}
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground">On the Clock</div>
+            <div className="text-center min-w-0">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none mb-0.5">
+                On the clock
+              </div>
               <div
                 className={cn(
-                  'font-display text-3xl',
+                  'font-display text-xl sm:text-2xl leading-none truncate max-w-[10rem] sm:max-w-[14rem]',
                   isMyTurn ? 'text-accent' : 'text-foreground'
                 )}
               >
                 {teamLabel(currentTeam)}
-                {isMyTurn && <span className="text-sm ml-2">(YOU)</span>}
+                {isMyTurn && <span className="text-xs ml-1 font-sans font-medium">(YOU)</span>}
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-md border border-border/40 px-3 py-1.5">
-              <Zap className={cn('w-4 h-4', me?.is_autodraft ? 'text-accent' : 'text-muted-foreground')} />
-              <Label htmlFor="mp-autodraft" className="text-sm cursor-pointer">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-md border border-border/40 px-2 py-1">
+              <Zap className={cn('w-3.5 h-3.5', me?.is_autodraft ? 'text-accent' : 'text-muted-foreground')} />
+              <Label htmlFor="mp-autodraft" className="text-xs cursor-pointer">
                 Autodraft
               </Label>
               <Switch
@@ -1187,21 +1319,25 @@ const MultiplayerDraftRoom = () => {
                 disabled={!me}
               />
             </div>
-            <div className="text-right mr-1 hidden sm:block">
-              <div className="font-display text-lg tracking-wide">{draft.name}</div>
-              <div className="text-xs text-muted-foreground">
-                {picks.length} / {totalPicks} picks · Multiplayer
+            <div className="text-right mr-0.5 hidden md:block [@media(max-height:700px)]:hidden">
+              <div className="font-display text-sm tracking-wide leading-tight">{draft.name}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight">
+                {picks.length}/{totalPicks} · Multiplayer
               </div>
             </div>
-            <Button variant="destructive" size="sm" onClick={() => void handleExit()}>
+            <Button variant="destructive" size="sm" className="h-8" onClick={() => void handleExit()}>
               <LogOut className="w-4 h-4 mr-1" /> Exit
             </Button>
           </div>
         </div>
 
-        <DraftMobilePanelTabs value={mobilePanel} onChange={setMobilePanel} />
+        <DraftMobilePanelTabs
+          value={mobilePanel}
+          onChange={setMobilePanel}
+          includeChat
+        />
 
-        <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col lg:grid lg:grid-cols-4 gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden">
           <div
             className={cn(
               'lg:col-span-1 flex-col justify-start overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin',
@@ -1224,22 +1360,22 @@ const MultiplayerDraftRoom = () => {
 
           <div
             className={cn(
-              'lg:col-span-2 glass-card p-4 flex-col overflow-hidden',
+              'lg:col-span-2 glass-card p-2.5 sm:p-3 flex-col overflow-hidden',
               draftMobilePanelClass(mobilePanel, 'players')
             )}
           >
-            <div className="flex flex-wrap gap-2 items-center shrink-0 mb-2">
-              <div className="relative flex-1 min-w-[12rem]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <div className="flex flex-wrap gap-1.5 items-center shrink-0 mb-1.5">
+              <div className="relative flex-1 min-w-[10rem]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
-                  className="pl-9 bg-secondary/50"
+                  className="pl-8 h-8 bg-secondary/50 text-sm"
                   placeholder="Search players"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
               <Select value={positionFilter} onValueChange={setPositionFilter}>
-                <SelectTrigger className="w-[120px] bg-secondary/50">
+                <SelectTrigger className="w-[104px] h-8 bg-secondary/50 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1254,111 +1390,126 @@ const MultiplayerDraftRoom = () => {
 
             <div
               className={cn(
-                'text-sm px-1 shrink-0 mb-2',
+                'text-xs px-0.5 shrink-0 mb-1',
                 isMyTurn && !me?.is_autodraft
                   ? 'text-accent font-medium'
                   : 'text-muted-foreground'
               )}
             >
-              {players.length === 0
-                ? 'Loading player board…'
-                : me?.is_autodraft
-                  ? 'Autodraft on — top available player will be taken for you'
-                  : isMyTurn
-                    ? 'Your turn — draft a player'
-                    : `Waiting on ${teamLabel(currentTeam)}`}
+              {turnStatus}
             </div>
+            {!user && (
+              <p className="text-xs text-muted-foreground px-0.5 shrink-0 mb-1 leading-snug">
+                Guest view: player order and tier breaks use community rankings for this league
+                type. Sign in to draft from your personal board and tiers.
+              </p>
+            )}
 
-            <div className="space-y-1 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
-              {filtered.slice(0, 100).map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between gap-3 px-2 py-2 rounded-md hover:bg-secondary/40"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="font-medium truncate cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => openPlayerStats(player)}
-                      >
-                        {player.name}
-                      </span>
-                      <PositionBadge position={player.position} />
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                      <span>
-                        {displayTeamAbbrevOrFa(player.team, player.position, player.name)}
-                      </span>
-                      <span>#{player.rank}</span>
-                      <span>
-                        ADP {typeof player.adp === 'number' ? player.adp.toFixed(1) : player.adp}
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={!isMyTurn || picking || players.length === 0 || Boolean(me?.is_autodraft)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePick(player);
-                    }}
-                  >
-                    Draft
-                  </Button>
-                </div>
+            <div className="space-y-0.5 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
+              {availableListRows.map((row) => (
+                <DraftAvailablePlayerRow
+                  key={row.player.id}
+                  player={row.player}
+                  displayRank={row.displayRank}
+                  myPosRank={row.myPosRank}
+                  tier={row.tier}
+                  hasTierBreakBefore={row.hasTierBreakBefore}
+                  showPlayerTier={positionFilter !== 'ALL'}
+                  draftDisabled={
+                    !isMyTurn || picking || players.length === 0 || Boolean(me?.is_autodraft)
+                  }
+                  onNameClick={openPlayerStats}
+                  onDraft={onDraftAvailable}
+                />
               ))}
               {players.length > 0 && filtered.length === 0 && (
-                <div className="p-6 text-center text-sm text-muted-foreground">
+                <div className="p-4 text-center text-sm text-muted-foreground">
                   No players match your filters.
                 </div>
               )}
             </div>
           </div>
 
+          {/* Board + chat share one column so only one chat instance mounts (realtime-safe). */}
           <div
             className={cn(
-              'glass-card p-4 flex-col overflow-hidden',
-              draftMobilePanelClass(mobilePanel, 'board')
+              'flex-col gap-2 overflow-hidden min-h-0',
+              mobilePanel === 'board' || mobilePanel === 'chat' ? 'flex flex-1' : 'hidden',
+              'lg:flex'
             )}
           >
-            <h2 className="font-display text-xl mb-4 flex-shrink-0">DRAFT BOARD</h2>
-            <div className="space-y-1 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
-              {picks.map((p) => {
-                const pl = players.find((x) => x.id === p.player_id);
-                if (!pl) return null;
-                return (
-                  <div
-                    key={p.id}
-                    className={cn(
-                      'flex items-center gap-2 p-2 rounded-lg text-sm min-w-0',
-                      p.team_number === myTeam
-                        ? 'bg-accent/10 border border-accent/30'
-                        : 'bg-secondary/30'
-                    )}
-                  >
-                    <div className="w-6 shrink-0 text-muted-foreground text-xs">
-                      {p.round_number}.{((p.pick_number - 1) % draft.num_teams) + 1}
-                    </div>
-                    <div className="font-medium w-16 shrink-0 truncate">
-                      {teamLabel(p.team_number)}
-                    </div>
-                    <button
-                      type="button"
-                      className="flex-1 min-w-0 truncate text-left text-muted-foreground hover:text-primary transition-colors"
-                      onClick={() => openPlayerStats(pl)}
-                    >
-                      {pl.name}
-                      {p.is_keeper ? ' · K' : p.is_autodraft ? ' · A' : ''}
-                    </button>
-                    <PositionBadge position={pl.position} className="shrink-0 text-[10px]" />
-                  </div>
-                );
-              })}
-              {picks.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  No picks yet. Click a player to draft them.
-                </div>
+            <div
+              className={cn(
+                'glass-card p-2.5 sm:p-3 flex-col overflow-hidden min-h-0',
+                mobilePanel === 'board' ? 'flex flex-1' : 'hidden',
+                'lg:flex lg:flex-1'
               )}
+            >
+              <h2 className="font-display text-base sm:text-lg mb-2 flex-shrink-0">DRAFT BOARD</h2>
+              <div
+                ref={draftBoardRef}
+                onScroll={handleDraftBoardScroll}
+                className={cn(
+                  'space-y-1 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2',
+                  draftBoardScrolledUp ? 'scrollbar-thin' : 'scrollbar-hide'
+                )}
+              >
+                {picks.map((p) => {
+                  const pl = players.find((x) => x.id === p.player_id);
+                  if (!pl) return null;
+                  return (
+                    <div
+                      key={p.id}
+                      className={cn(
+                        'flex items-center gap-2 p-2 rounded-lg text-sm min-w-0',
+                        p.team_number === myTeam
+                          ? 'bg-accent/10 border border-accent/30'
+                          : 'bg-secondary/30'
+                      )}
+                    >
+                      <div className="w-6 shrink-0 text-muted-foreground text-xs">
+                        {p.round_number}.{((p.pick_number - 1) % draft.num_teams) + 1}
+                      </div>
+                      <div className="font-medium w-16 shrink-0 truncate">
+                        {teamLabel(p.team_number)}
+                      </div>
+                      <button
+                        type="button"
+                        className="flex-1 min-w-0 truncate text-left text-muted-foreground hover:text-primary transition-colors"
+                        onClick={() => openPlayerStats(pl)}
+                      >
+                        {pl.name}
+                        {p.is_keeper ? ' · K' : p.is_autodraft ? ' · A' : ''}
+                      </button>
+                      <PositionBadge position={pl.position} className="shrink-0 text-[10px]" />
+                    </div>
+                  );
+                })}
+                {picks.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No picks yet. Click a player to draft them.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                'flex-col overflow-hidden min-h-0',
+                mobilePanel === 'chat' ? 'flex flex-1' : 'hidden',
+                'lg:flex lg:flex-none'
+              )}
+            >
+              <MultiplayerDraftChat
+                draftId={draft.id}
+                guestSessionId={guestSessionId}
+                userId={user?.id}
+                participantId={me?.id}
+                canSend={Boolean(me)}
+                variant={mobilePanel === 'chat' ? 'lobby' : 'room'}
+                fillHeight={mobilePanel === 'chat'}
+                className={cn(mobilePanel === 'chat' && 'flex-1 min-h-0')}
+              />
             </div>
           </div>
         </div>

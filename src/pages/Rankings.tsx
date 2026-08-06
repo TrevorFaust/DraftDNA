@@ -109,9 +109,14 @@ import {
   PLAYER_POOL_CURRENT_SEASON,
 } from '@/constants/playerPoolSeason';
 import {
+  buildOverallTierBreakBeforeIds,
+  eligiblePositionTierCuts,
   getCutsForPosition,
   getTierNumber,
+  hasTierBreakBefore,
   hasTierCutAfter,
+  mergePositionTierCuts,
+  positionTierCutsEqual,
   setCutsForPosition,
   toggleTierCut,
   type PositionTierCuts,
@@ -121,6 +126,11 @@ import {
   rankingTiersLocalStorage,
 } from '@/utils/rankingTiersStorage';
 import { fetchUserRankingTiers, upsertUserRankingTiers, fetchCommunityRankingTiers } from '@/utils/rankingTiersDb';
+import {
+  buildPoolRankMapFromSavedRows,
+  buildPoolRankSamplesFromSavedRows,
+  fetchAllRankRows,
+} from '@/utils/applySavedRanksToPool';
 
 /** Disable dnd-kit built-in auto-scroll — rankings use custom fast edge scroll. */
 const autoScrollConfig = false;
@@ -1242,6 +1252,20 @@ const Rankings = () => {
     [displayedCommunityPlayers]
   );
 
+  /**
+   * Community consensus, with the viewer's eligible cuts filling any positions
+   * the remote aggregate is missing (e.g. just saved locally, or sole submitter).
+   * Only positions with ≥1 break count — untouched groups stay untiered.
+   */
+  const effectiveCommunityTierCuts = useMemo(
+    () =>
+      mergePositionTierCuts(
+        communityTierCuts,
+        eligiblePositionTierCuts(positionTierCuts)
+      ),
+    [communityTierCuts, positionTierCuts]
+  );
+
   const getPlayerTier = useCallback(
     (playerId: string): number | null => {
       const player = playersById.get(playerId);
@@ -1249,6 +1273,7 @@ const Rankings = () => {
       const myPosRank = myPosRankMap.get(playerId);
       if (myPosRank == null) return null;
       const cuts = getCutsForPosition(positionTierCuts, player.position);
+      // No badge until this position has at least one break (default is not Tier 1).
       if (cuts.length === 0) return null;
       return getTierNumber(myPosRank, cuts);
     },
@@ -1261,22 +1286,86 @@ const Rankings = () => {
       if (!player) return null;
       const communityPosRank = communityPosRankMap.get(playerId);
       if (communityPosRank == null) return null;
-      const cuts = getCutsForPosition(communityTierCuts, player.position);
+      const cuts = getCutsForPosition(effectiveCommunityTierCuts, player.position);
       if (cuts.length === 0) return null;
       return getTierNumber(communityPosRank, cuts);
     },
-    [communityPlayersById, playersById, communityPosRankMap, communityTierCuts]
+    [communityPlayersById, playersById, communityPosRankMap, effectiveCommunityTierCuts]
   );
 
-  const hasTierBreakAfterPlayer = useCallback(
+  /** Scissors pressed state: cut stored after this player's positional rank. */
+  const hasTierCutAfterPlayer = useCallback(
     (playerId: string): boolean => {
       const player = playersById.get(playerId);
       if (!player) return false;
+      if (selectedPosition !== FILTER_ALL && player.position !== selectedPosition) return false;
       const myPosRank = myPosRankMap.get(playerId);
       if (myPosRank == null) return false;
       return hasTierCutAfter(getCutsForPosition(positionTierCuts, player.position), myPosRank);
     },
-    [playersById, myPosRankMap, positionTierCuts]
+    [selectedPosition, playersById, myPosRankMap, positionTierCuts]
+  );
+
+  /**
+   * All positions: one break per tier at the first overall player who enters that tier.
+   * Filtered: a break at every positional tier boundary for that group.
+   */
+  const myOverallTierBreakBeforeIds = useMemo(() => {
+    if (selectedPosition !== FILTER_ALL) return null;
+    const ordered = [...players].sort((a, b) => a.rank - b.rank).map((p) => p.id);
+    return buildOverallTierBreakBeforeIds(ordered, (id) => getPlayerTier(id));
+  }, [selectedPosition, players, getPlayerTier]);
+
+  const communityOverallTierBreakBeforeIds = useMemo(() => {
+    if (selectedPosition !== FILTER_ALL) return null;
+    const ordered = displayedCommunityPlayers.map((p) => p.id);
+    return buildOverallTierBreakBeforeIds(ordered, (id) => getCommunityPlayerTier(id));
+  }, [selectedPosition, displayedCommunityPlayers, getCommunityPlayerTier]);
+
+  const hasTierBreakBeforePlayer = useCallback(
+    (playerId: string): boolean => {
+      if (myOverallTierBreakBeforeIds) {
+        return myOverallTierBreakBeforeIds.has(playerId);
+      }
+      const player = playersById.get(playerId);
+      if (!player) return false;
+      if (player.position !== selectedPosition) return false;
+      const myPosRank = myPosRankMap.get(playerId);
+      if (myPosRank == null) return false;
+      return hasTierBreakBefore(getCutsForPosition(positionTierCuts, player.position), myPosRank);
+    },
+    [
+      myOverallTierBreakBeforeIds,
+      selectedPosition,
+      playersById,
+      myPosRankMap,
+      positionTierCuts,
+    ]
+  );
+
+  const hasCommunityTierBreakBeforePlayer = useCallback(
+    (playerId: string): boolean => {
+      if (communityOverallTierBreakBeforeIds) {
+        return communityOverallTierBreakBeforeIds.has(playerId);
+      }
+      const player = communityPlayersById.get(playerId) ?? playersById.get(playerId);
+      if (!player) return false;
+      if (player.position !== selectedPosition) return false;
+      const communityPosRank = communityPosRankMap.get(playerId);
+      if (communityPosRank == null) return false;
+      return hasTierBreakBefore(
+        getCutsForPosition(effectiveCommunityTierCuts, player.position),
+        communityPosRank
+      );
+    },
+    [
+      communityOverallTierBreakBeforeIds,
+      selectedPosition,
+      communityPlayersById,
+      playersById,
+      communityPosRankMap,
+      effectiveCommunityTierCuts,
+    ]
   );
 
   const canEditTierBreakForPlayer = useCallback(
@@ -1332,15 +1421,27 @@ const Rankings = () => {
   ]);
 
   useEffect(() => {
+    // Wait until league selection is restored so we don't fetch the default
+    // All-leagues PPR bucket (QB/RB only) and stick with a partial consensus.
+    if (user && leaguesLoading) return;
+    // Drop prior bucket's consensus immediately so dynasty/SF/PPR never flash
+    // onto a redraft/standard board while the next fetch is in flight.
+    setCommunityTierCuts({});
     void loadCommunityTierCuts();
-  }, [loadCommunityTierCuts]);
+  }, [loadCommunityTierCuts, user, leaguesLoading, bucketKey]);
 
   useEffect(() => {
     let cancelled = false;
-    const local = rankingTiersLocalStorage.get(rankingTiersStorageKey);
+    // Load cuts for this league + bucket only (storage key includes bucketKey).
+    const local = eligiblePositionTierCuts(
+      rankingTiersLocalStorage.get(rankingTiersStorageKey)
+    );
     setPositionTierCuts(local);
 
     if (!user) return () => {
+      cancelled = true;
+    };
+    if (leaguesLoading) return () => {
       cancelled = true;
     };
 
@@ -1352,18 +1453,20 @@ const Rankings = () => {
           bucket: userRankingBucketFromDisplayBucket(displayBucket),
         });
         if (cancelled) return;
-        // Prefer remote when it has data; otherwise keep local (guest→sign-in carryover).
-        const next = Object.keys(remote).length > 0 ? remote : local;
+        // Remote wins per position; local fills gaps so a partial remote row
+        // does not wipe other positions you already tiered this session.
+        const next = mergePositionTierCuts(remote, local);
         setPositionTierCuts(next);
-        if (Object.keys(remote).length === 0 && Object.keys(local).length > 0) {
+        rankingTiersLocalStorage.save(rankingTiersStorageKey, next);
+        if (Object.keys(next).length > 0 && !positionTierCutsEqual(next, remote)) {
           void upsertUserRankingTiers({
             userId: user.id,
             leagueId: selectedLeague?.id ?? null,
             bucket: userRankingBucketFromDisplayBucket(displayBucket),
-            cuts: local,
+            cuts: next,
+          }).then(() => {
+            void loadCommunityTierCuts();
           });
-        } else if (Object.keys(remote).length > 0) {
-          rankingTiersLocalStorage.save(rankingTiersStorageKey, remote);
         }
       } catch (err) {
         console.error('Failed to load ranking tiers:', err);
@@ -1373,7 +1476,17 @@ const Rankings = () => {
     return () => {
       cancelled = true;
     };
-  }, [rankingTiersStorageKey, user?.id, selectedLeague?.id, displayBucket.scoringFormat, displayBucket.leagueType, displayBucket.isSuperflex, displayBucket.rookiesOnly]);
+  }, [
+    rankingTiersStorageKey,
+    user?.id,
+    selectedLeague?.id,
+    displayBucket.scoringFormat,
+    displayBucket.leagueType,
+    displayBucket.isSuperflex,
+    displayBucket.rookiesOnly,
+    loadCommunityTierCuts,
+    leaguesLoading,
+  ]);
 
   const schedulePersistPositionTierCuts = useCallback(
     (cuts: PositionTierCuts) => {
@@ -1417,7 +1530,9 @@ const Rankings = () => {
           overallRank != null ? getCommunityTrend(playerId, overallRank) ?? null : null,
         tier: getPlayerTier(playerId),
         communityTier: getCommunityPlayerTier(playerId),
-        hasTierBreakAfter: hasTierBreakAfterPlayer(playerId),
+        hasTierCutAfter: hasTierCutAfterPlayer(playerId),
+        hasTierBreakBefore: hasTierBreakBeforePlayer(playerId),
+        hasCommunityTierBreakBefore: hasCommunityTierBreakBeforePlayer(playerId),
       };
     },
     [
@@ -1427,7 +1542,9 @@ const Rankings = () => {
       getCommunityTrend,
       getPlayerTier,
       getCommunityPlayerTier,
-      hasTierBreakAfterPlayer,
+      hasTierCutAfterPlayer,
+      hasTierBreakBeforePlayer,
+      hasCommunityTierBreakBeforePlayer,
     ]
   );
 
@@ -1741,30 +1858,32 @@ const Rankings = () => {
           : matchingLeagues.map((l) => l.id);
 
         // Signed-in All Leagues: always use rankings from each league (average or selected league), never a single "All Leagues" saved list
-        let allLeagueRankingsData: any[] = [];
+        let allLeagueRankingsData: { player_id: string; rank: number }[] = [];
         if (leagueIdsToFetch.length > 0) {
-          const qAll = applyUserRankingsBucketMatch(
-            supabase
-              .from('user_rankings')
-              .select('*')
-              .eq('user_id', user.id)
-              .not('league_id', 'is', null)
-              .in('league_id', leagueIdsToFetch),
-            rankingBucketCols
+          allLeagueRankingsData = await fetchAllRankRows<{ player_id: string; rank: number }>(
+            (from, to) => {
+              const q = applyUserRankingsBucketMatch(
+                supabase
+                  .from('user_rankings')
+                  .select('player_id, rank')
+                  .eq('user_id', user.id)
+                  .not('league_id', 'is', null)
+                  .in('league_id', leagueIdsToFetch),
+                rankingBucketCols
+              ) as ReturnType<typeof supabase.from>;
+              return (q as any)
+                .order('rank', { ascending: true })
+                .order('player_id', { ascending: true })
+                .range(from, to);
+            }
           );
-          const { data, error: allLeagueRankingsError } = await qAll;
-
-          if (allLeagueRankingsError) throw allLeagueRankingsError;
-          allLeagueRankingsData = data || [];
         }
 
-        const playerRankingsMap = new Map<string, number[]>();
-        allLeagueRankingsData.forEach((ranking) => {
-          if (!playerRankingsMap.has(ranking.player_id)) {
-            playerRankingsMap.set(ranking.player_id, []);
-          }
-          playerRankingsMap.get(ranking.player_id)!.push(ranking.rank);
-        });
+        const playerRankingsMap = await buildPoolRankSamplesFromSavedRows(
+          supabase,
+          allLeagueRankingsData,
+          allPlayersData
+        );
         let sortedPersonal: RankedPlayer[];
         if (playerRankingsMap.size === 0) {
           sortedPersonal = communityData.length > 0
@@ -1812,27 +1931,34 @@ const Rankings = () => {
         setCommunityPlayers(allLeaguesCommunity);
         setCommunityRawExcludingMe(null);
       } else {
-        // Fetch league-specific rankings
-        const qLeague = applyUserRankingsBucketMatch(
-          supabase
-            .from('user_rankings')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('league_id', selectedLeague.id),
-          rankingBucketCols
+        // Fetch league-specific rankings (paginated — boards often exceed 1000 rows)
+        const rankingsData = await fetchAllRankRows<{ player_id: string; rank: number }>(
+          (from, to) => {
+            const q = applyUserRankingsBucketMatch(
+              supabase
+                .from('user_rankings')
+                .select('player_id, rank')
+                .eq('user_id', user.id)
+                .eq('league_id', selectedLeague.id),
+              rankingBucketCols
+            ) as ReturnType<typeof supabase.from>;
+            return (q as any)
+              .order('rank', { ascending: true })
+              .order('player_id', { ascending: true })
+              .range(from, to);
+          }
         );
-        const { data: rankingsData, error: rankingsError } = await qLeague;
 
-        if (rankingsError) throw rankingsError;
-
-        const hasRankings = rankingsData && rankingsData.length > 0;
+        const hasRankings = rankingsData.length > 0;
 
         let rankedPlayers: RankedPlayer[];
 
         if (hasRankings) {
-          // Use existing league rankings
-          const rankingsMap = new Map(
-            rankingsData.map((r) => [r.player_id, r.rank])
+          // UUID + espn_id remap so cross-season player rows keep your saved rank
+          const rankingsMap = await buildPoolRankMapFromSavedRows(
+            supabase,
+            rankingsData,
+            allPlayersData
           );
 
           rankedPlayers = allPlayersData.map((p, index) => ({
@@ -2699,13 +2825,15 @@ const Rankings = () => {
 
         {positionFilterActive ? (
           <p className="text-sm text-muted-foreground mb-4">
-            Use the scissors on a player to start a new {selectedPosition} tier below them. Tier
-            colors show on every board with Comm RK and My RK.
+            Use the scissors on a player to end their tier below them. This {selectedPosition} board
+            shows every tier boundary for the position. Community uses everyone&apos;s cuts the same
+            way.
           </p>
         ) : (
           <p className="text-sm text-muted-foreground mb-4">
-            Filter by position to build tiers for that group. Your tier colors and badges show here
-            once you set them.
+            Filter by position to set tier cuts. On All positions, one break appears per tier at the
+            first player who enters that tier overall (later Tier 1 players at other spots can sit
+            after a Tier 1 break). Community follows the same overall-break rule.
           </p>
         )}
 
@@ -2743,6 +2871,7 @@ const Rankings = () => {
                         myPosRank={rankMeta.myPosRank}
                         communityTrend={rankMeta.communityTrend}
                         tier={rankMeta.communityTier}
+                        hasTierBreakBefore={rankMeta.hasCommunityTierBreakBefore}
                       />
                       );
                     })}
@@ -2918,7 +3047,8 @@ const Rankings = () => {
                 getCommunityTrend={getCommunityTrend}
                 getTier={getPlayerTier}
                 canEditTierBreakForPlayer={canEditTierBreakForPlayer}
-                hasTierBreakAfterPlayer={hasTierBreakAfterPlayer}
+                hasTierCutAfterPlayer={hasTierCutAfterPlayer}
+                hasTierBreakBeforePlayer={hasTierBreakBeforePlayer}
                 onToggleTierBreak={handleToggleTierBreak}
                 player2025Stats={player2025Stats}
                 onPlayerClick={handlePlayerClick}
@@ -2981,6 +3111,7 @@ const Rankings = () => {
                         myPosRank={rankMeta.myPosRank}
                         communityTrend={rankMeta.communityTrend}
                         tier={rankMeta.communityTier}
+                        hasTierBreakBefore={rankMeta.hasCommunityTierBreakBefore}
                       />
                       );
                     })}

@@ -18,6 +18,7 @@ import {
   mpStartDraft,
 } from '@/utils/multiplayerDraftApi';
 import type { MultiplayerDraft, MultiplayerParticipant } from '@/types/multiplayerDraft';
+import { MultiplayerDraftChat } from '@/components/MultiplayerDraftChat';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Check, Copy, Link2, Play, UserMinus, Users } from 'lucide-react';
@@ -317,7 +318,7 @@ const MultiplayerLobby = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         <div className="text-center">
           <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center mx-auto mb-3 shadow-glow">
             <Users className="w-8 h-8 text-primary-foreground" />
@@ -340,7 +341,7 @@ const MultiplayerLobby = () => {
         </div>
 
         {!me && (
-          <div className="glass-card p-4 space-y-3">
+          <div className="glass-card p-4 space-y-3 max-w-3xl">
             <p className="text-sm text-muted-foreground">
               {user
                 ? 'Join this lobby to claim a draft slot. You’ll appear under your profile name.'
@@ -371,182 +372,203 @@ const MultiplayerLobby = () => {
           </div>
         )}
 
-        <div className="glass-card p-4 space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <h2 className="font-display text-xl">DRAFT SLOTS</h2>
-            <p className="text-xs text-muted-foreground">
-              Seated players can rename their team before the draft starts
-            </p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {seats.map(({ team, occupant, teamName }) => {
-              const mine = me?.team_number === team;
-              const open = !occupant;
-              const canEditName = mine || isHost;
-              return (
-                <div
-                  key={team}
-                  className={cn(
-                    'rounded-lg border p-3 flex flex-col gap-2',
-                    mine ? 'border-primary bg-primary/10' : 'border-border/50 bg-secondary/30'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <div className="text-xs text-muted-foreground">Pick #{team}</div>
-                      {canEditName ? (
-                        <Input
-                          value={nameDrafts[team] ?? teamName}
-                          onChange={(e) =>
-                            setNameDrafts((prev) => ({ ...prev, [team]: e.target.value }))
-                          }
-                          onBlur={() => void saveTeamName(team, teamName)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.currentTarget.blur();
-                            }
-                          }}
-                          disabled={busy}
-                          maxLength={40}
-                          className="h-8 bg-background/60 text-sm font-medium"
-                          placeholder={`Team ${team}`}
-                          aria-label={`Team name for pick ${team}`}
-                        />
-                      ) : (
-                        <div className="font-medium text-sm truncate">{teamName}</div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,22rem)] lg:items-start">
+          <div className="space-y-6 min-w-0">
+            <div className="glass-card p-4 space-y-3">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <h2 className="font-display text-xl">DRAFT SLOTS</h2>
+                <p className="text-xs text-muted-foreground">
+                  Seated players can rename their team before the draft starts
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {seats.map(({ team, occupant, teamName }) => {
+                  const mine = me?.team_number === team;
+                  const open = !occupant;
+                  const canEditName = mine || isHost;
+                  return (
+                    <div
+                      key={team}
+                      className={cn(
+                        'rounded-lg border p-3 flex flex-col gap-2',
+                        mine ? 'border-primary bg-primary/10' : 'border-border/50 bg-secondary/30'
                       )}
-                      <div className="text-xs text-muted-foreground">
-                        {occupant
-                          ? `${occupant.display_name}${occupant.is_host ? ' (Host)' : ''}${
-                              occupant.is_ready ? ' · Ready' : ''
-                            }`
-                          : 'Open (CPU if empty)'}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <div className="text-xs text-muted-foreground">Pick #{team}</div>
+                          {canEditName ? (
+                            <Input
+                              value={nameDrafts[team] ?? teamName}
+                              onChange={(e) =>
+                                setNameDrafts((prev) => ({ ...prev, [team]: e.target.value }))
+                              }
+                              onBlur={() => void saveTeamName(team, teamName)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              disabled={busy}
+                              maxLength={40}
+                              className="h-8 bg-background/60 text-sm font-medium"
+                              placeholder={`Team ${team}`}
+                              aria-label={`Team name for pick ${team}`}
+                            />
+                          ) : (
+                            <div className="font-medium text-sm truncate">{teamName}</div>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {occupant
+                              ? `${occupant.display_name}${occupant.is_host ? ' (Host)' : ''}${
+                                  occupant.is_ready ? ' · Ready' : ''
+                                }`
+                              : 'Open (CPU if empty)'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {me && open && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={busy}
+                              onClick={() => handleClaim(team)}
+                            >
+                              Claim
+                            </Button>
+                          )}
+                          {mine && !me?.is_host && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={async () => {
+                                if (!draft) return;
+                                setBusy(true);
+                                try {
+                                  await mpReleaseSlot(draft.id, guestSessionId);
+                                  await refresh();
+                                } catch (e: any) {
+                                  toast.error(e?.message || 'Could not release');
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              Leave seat
+                            </Button>
+                          )}
+                          {isHost && occupant && !occupant.is_host && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Kick"
+                              disabled={busy}
+                              onClick={async () => {
+                                setBusy(true);
+                                try {
+                                  await mpHostMoveKick({
+                                    draftId: draft.id,
+                                    participantId: occupant.id,
+                                    action: 'kick',
+                                  });
+                                  await refresh();
+                                } catch (e: any) {
+                                  toast.error(e?.message || 'Kick failed');
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              <UserMinus className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {isHost && occupant && open === false && (
+                            <select
+                              className="h-8 rounded-md border border-border bg-background text-xs px-1"
+                              value={team}
+                              disabled={busy}
+                              onChange={async (e) => {
+                                const next = parseInt(e.target.value, 10);
+                                if (!next || next === team) return;
+                                setBusy(true);
+                                try {
+                                  await mpHostMoveKick({
+                                    draftId: draft.id,
+                                    participantId: occupant.id,
+                                    action: 'move',
+                                    newTeamNumber: next,
+                                  });
+                                  await refresh();
+                                } catch (err: any) {
+                                  toast.error(err?.message || 'Move failed');
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              {seats.map((s) => (
+                                <option key={s.team} value={s.team}>
+                                  → #{s.team}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {me && open && (
-                        <Button size="sm" variant="secondary" disabled={busy} onClick={() => handleClaim(team)}>
-                          Claim
-                        </Button>
-                      )}
-                      {mine && !me?.is_host && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={async () => {
-                            if (!draft) return;
-                            setBusy(true);
-                            try {
-                              await mpReleaseSlot(draft.id, guestSessionId);
-                              await refresh();
-                            } catch (e: any) {
-                              toast.error(e?.message || 'Could not release');
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          Leave seat
-                        </Button>
-                      )}
-                      {isHost && occupant && !occupant.is_host && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Kick"
-                          disabled={busy}
-                          onClick={async () => {
-                            setBusy(true);
-                            try {
-                              await mpHostMoveKick({
-                                draftId: draft.id,
-                                participantId: occupant.id,
-                                action: 'kick',
-                              });
-                              await refresh();
-                            } catch (e: any) {
-                              toast.error(e?.message || 'Kick failed');
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          <UserMinus className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {isHost && occupant && open === false && (
-                        <select
-                          className="h-8 rounded-md border border-border bg-background text-xs px-1"
-                          value={team}
-                          disabled={busy}
-                          onChange={async (e) => {
-                            const next = parseInt(e.target.value, 10);
-                            if (!next || next === team) return;
-                            setBusy(true);
-                            try {
-                              await mpHostMoveKick({
-                                draftId: draft.id,
-                                participantId: occupant.id,
-                                action: 'move',
-                                newTeamNumber: next,
-                              });
-                              await refresh();
-                            } catch (err: any) {
-                              toast.error(err?.message || 'Move failed');
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          {seats.map((s) => (
-                            <option key={s.team} value={s.team}>
-                              → #{s.team}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {me && (
+              <div className="glass-card p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {me.team_number
+                    ? me.is_ready
+                      ? 'You are ready. Waiting for the host to start.'
+                      : 'Claimed a seat — ready up when you are set.'
+                    : 'Claim any open pick slot.'}
                 </div>
-              );
-            })}
+                <div className="flex gap-2">
+                  <Button
+                    variant={me.is_ready ? 'secondary' : 'default'}
+                    disabled={busy || me.team_number == null}
+                    onClick={handleReady}
+                  >
+                    {me.is_ready ? (
+                      <>
+                        <Check className="w-4 h-4" /> Ready
+                      </>
+                    ) : (
+                      'Ready up'
+                    )}
+                  </Button>
+                  {isHost && (
+                    <Button variant="hero" disabled={busy || !allHumansReady} onClick={handleStart}>
+                      <Play className="w-4 h-4" />
+                      Start draft
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
+
+          <aside className="lg:sticky lg:top-20 min-w-0">
+            <MultiplayerDraftChat
+              draftId={draft.id}
+              guestSessionId={guestSessionId}
+              userId={user?.id}
+              participantId={me?.id}
+              canSend={Boolean(me)}
+              variant="lobby"
+              fillHeight
+              className="lg:min-h-[28rem]"
+            />
+          </aside>
         </div>
-
-        {me && (
-          <div className="glass-card p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-            <div className="text-sm text-muted-foreground">
-              {me.team_number
-                ? me.is_ready
-                  ? 'You are ready. Waiting for the host to start.'
-                  : 'Claimed a seat — ready up when you are set.'
-                : 'Claim any open pick slot.'}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant={me.is_ready ? 'secondary' : 'default'}
-                disabled={busy || me.team_number == null}
-                onClick={handleReady}
-              >
-                {me.is_ready ? (
-                  <>
-                    <Check className="w-4 h-4" /> Ready
-                  </>
-                ) : (
-                  'Ready up'
-                )}
-              </Button>
-              {isHost && (
-                <Button variant="hero" disabled={busy || !allHumansReady} onClick={handleStart}>
-                  <Play className="w-4 h-4" />
-                  Start draft
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
       </main>
     </div>
   );

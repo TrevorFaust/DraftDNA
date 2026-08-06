@@ -43,7 +43,10 @@ export type RankingsDragRowProps = {
   tier?: number | null;
   /** Show scissors control to start/remove a tier break after this player */
   canEditTierBreak?: boolean;
-  hasTierBreakAfter?: boolean;
+  /** Cut stored after this player (scissors pressed state) */
+  hasTierCutAfter?: boolean;
+  /** Draw the tier-start bar above this player (first of Tier 2, 3, …) */
+  hasTierBreakBefore?: boolean;
   onToggleTierBreak?: () => void;
   stats2025?: { avgPointsPerGame: number | null; gamesPlayed?: number; totalFantasyPoints?: number };
   onPlayerClick?: (player: RankedPlayer) => void;
@@ -70,7 +73,8 @@ export const RankingsDragRow = memo(function RankingsDragRow({
   communityTrend,
   tier,
   canEditTierBreak = false,
-  hasTierBreakAfter = false,
+  hasTierCutAfter = false,
+  hasTierBreakBefore = false,
   onToggleTierBreak,
   stats2025,
   onPlayerClick,
@@ -85,7 +89,11 @@ export const RankingsDragRow = memo(function RankingsDragRow({
   className,
 }: RankingsDragRowProps) {
   const tone = tier != null && tier >= 1 ? getTierTone(tier) : null;
-  const breakTone = hasTierBreakAfter && tone != null ? tone : null;
+  // Label the tier that just ended (first Tier 2 player → "Tier 1" break, etc.).
+  const breakTone =
+    hasTierBreakBefore && tone != null && tone.tier >= 2
+      ? getTierTone(tone.tier - 1)
+      : null;
 
   return (
     <div
@@ -98,6 +106,7 @@ export const RankingsDragRow = memo(function RankingsDragRow({
       className={cn(
         'relative glass-card p-3 flex items-center gap-3 border-l-4',
         !tone && 'border-l-transparent',
+        breakTone != null && 'mt-3',
         isOverlay && 'border-primary shadow-lg ring-1 ring-primary/40 cursor-grabbing',
         isSourceGhost && 'opacity-40 border-dashed border-2 border-primary/60 bg-primary/5 min-h-[84px]',
         isSourceHidden && 'opacity-0',
@@ -157,18 +166,18 @@ export const RankingsDragRow = memo(function RankingsDragRow({
             <button
               type="button"
               aria-label={
-                hasTierBreakAfter
+                hasTierCutAfter
                   ? `Remove tier break after ${player.name}`
                   : `Start a new tier after ${player.name}`
               }
-              aria-pressed={hasTierBreakAfter}
+              aria-pressed={hasTierCutAfter}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleTierBreak();
               }}
               className={cn(
                 'shrink-0 w-10 h-full min-h-[44px] flex items-center justify-center touch-manipulation',
-                hasTierBreakAfter
+                hasTierCutAfter
                   ? 'text-accent hover:text-accent'
                   : 'text-muted-foreground hover:text-foreground'
               )}
@@ -177,7 +186,7 @@ export const RankingsDragRow = memo(function RankingsDragRow({
             </button>
           </TooltipTrigger>
           <TooltipContent side="left" className="max-w-xs text-xs">
-            {hasTierBreakAfter
+            {hasTierCutAfter
               ? 'Remove tier break below this player'
               : 'Start a new tier below this player'}
           </TooltipContent>
@@ -205,7 +214,7 @@ export const RankingsDragRow = memo(function RankingsDragRow({
       )}
       {breakTone != null && (
         <div
-          className="pointer-events-none absolute -bottom-1 left-3 right-3 flex items-center gap-2"
+          className="pointer-events-none absolute -top-2.5 left-3 right-3 flex items-center gap-2 z-[1]"
           aria-hidden
         >
           <span className="h-0.5 flex-1 rounded-full" style={{ backgroundColor: breakTone.color }} />
@@ -213,7 +222,7 @@ export const RankingsDragRow = memo(function RankingsDragRow({
             className="text-[10px] uppercase tracking-[0.14em] font-semibold whitespace-nowrap bg-card/90 px-1"
             style={{ color: breakTone.color }}
           >
-            Tier {breakTone.tier} break
+            Tier {breakTone.tier}
           </span>
           <span className="h-0.5 flex-1 rounded-full" style={{ backgroundColor: breakTone.color }} />
         </div>

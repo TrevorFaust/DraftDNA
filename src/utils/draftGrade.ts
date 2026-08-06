@@ -176,6 +176,36 @@ function isSpecialTeams(pos: string): boolean {
   return pos === 'K' || pos === 'DEF';
 }
 
+/**
+ * Enough skill core that K/DEF is a bench/streaming pick, not a reach past holes.
+ * 2RB/2WR required. QB or TE can wait individually; missing both is a flag.
+ */
+function skillCoreReadyForSpecialTeams(prior: ParsedPick[]): boolean {
+  let rb = 0;
+  let wr = 0;
+  let qb = 0;
+  let te = 0;
+  for (const p of prior) {
+    if (p.pos === 'RB') rb += 1;
+    else if (p.pos === 'WR') wr += 1;
+    else if (p.pos === 'QB') qb += 1;
+    else if (p.pos === 'TE') te += 1;
+  }
+  return rb >= 2 && wr >= 2 && (qb >= 1 || te >= 1);
+}
+
+/**
+ * K/DEF is "early" only when it actually costs skill capital.
+ * R1–7 always early; R8–9 only without a ready skill core; R10+ never.
+ */
+function isEarlySpecialTeamsPick(pick: ParsedPick, allPicks: ParsedPick[]): boolean {
+  if (!isSpecialTeams(pick.pos)) return false;
+  if (pick.round_number <= 7) return true;
+  if (pick.round_number >= 10) return false;
+  const prior = allPicks.filter((p) => p.pick_number < pick.pick_number);
+  return !skillCoreReadyForSpecialTeams(prior);
+}
+
 function nflTeamTag(team?: string | null): string | null {
   const raw = (team || '').trim();
   if (!raw || raw.toUpperCase() === 'FA') return null;
@@ -401,7 +431,6 @@ export function computeDraftGrade(
 
   const skillStealThreshold = stealThreshold;
   const skillReachThreshold = reachThreshold;
-  const earlyKDefRound = Math.max(8, Math.ceil(numTeams * 0.85));
   let earlyKickerName: string | null = null;
   let earlyDefenseName: string | null = null;
   for (const pick of parsed) {
@@ -418,13 +447,17 @@ export function computeDraftGrade(
     const hasMarket = pick.rawAdp > 0 && pick.rawAdp <= poolSize + 12;
     const skill = isSkillPosition(pick.pos);
     const autodraftWeight = pick.is_autodraft ? 0.8 : 1;
+    // Late bench darts barely move the grade — starters/mid rounds matter most.
+    const roundWeight =
+      pick.round_number >= 10 ? 0.12 : pick.round_number >= 8 ? 0.4 : 1;
 
     if (skill && hasMarket) {
-      weightedValueSum += rawValue * autodraftWeight;
-      weightTotal += autodraftWeight;
+      const w = autodraftWeight * roundWeight;
+      weightedValueSum += rawValue * w;
+      weightTotal += w;
     }
 
-    if (!hasMarket && skill) {
+    if (!hasMarket && skill && pick.round_number <= 9) {
       fakeValuePickCount += 1;
     }
 
@@ -442,6 +475,7 @@ export function computeDraftGrade(
       poolSize
     );
 
+    // Steals still count late (nice finds), but reaches in R10+ are bench noise.
     if (skill && hasMarket && rawValue >= skillStealThreshold && !falseEarlySteal) {
       stealCount += 1;
       realStealCount += 1;
@@ -450,15 +484,30 @@ export function computeDraftGrade(
       stealCount += 1;
     }
 
-    if (skill && hasMarket && rawValue < 0) negativeValuePickCount += 1;
+    if (skill && hasMarket && rawValue < 0 && pick.round_number <= 7) {
+      negativeValuePickCount += 1;
+    }
 
-    if (skill && hasMarket && rawValue <= skillReachThreshold) {
+    // Reaches matter through the middle of the draft. R8+ bench darts barely count.
+    if (
+      skill &&
+      hasMarket &&
+      rawValue <= skillReachThreshold &&
+      pick.round_number <= 7
+    ) {
       reachCount += 1;
       if (pick.name) reachNames.push(pick.name);
     }
-    if (skill && hasMarket && rawValue <= severeReachThreshold) severeReachCount += 1;
+    if (
+      skill &&
+      hasMarket &&
+      rawValue <= severeReachThreshold &&
+      pick.round_number <= 7
+    ) {
+      severeReachCount += 1;
+    }
 
-    if (isSpecialTeams(pick.pos) && pick.round_number < earlyKDefRound && !chaos) {
+    if (!chaos && isEarlySpecialTeamsPick(pick, parsed)) {
       earlySpecialTeams += 1;
       if (pick.pos === 'K' && pick.name) earlyKickerName = pick.name;
       if (pick.pos === 'DEF' && pick.name) earlyDefenseName = pick.name;
@@ -816,8 +865,18 @@ export function computeDraftGrade(
     if (earlySpecialTeams >= 1 && skillEarly >= 3) {
       numericScore = Math.min(numericScore, 78); // B ceiling
     }
-    // Viable starters: floor in C family. Mild reaches / projection bets → C, not D.
+    // Solid starter core + only light early/mid reaches → at least B-.
+    // Late bench darts already ignored in reachCount, so this won't punish dart throws.
     if (
+      earlySpecialTeams === 0 &&
+      positionalValue.penalty <= 8 &&
+      draftedElite >= 2 &&
+      reachCount <= 2 &&
+      severeReachCount <= 1 &&
+      avgValueSpots >= -4
+    ) {
+      numericScore = Math.max(numericScore, 72); // B-
+    } else if (
       positionalValue.penalty <= 10 &&
       reachCount <= 4 &&
       severeReachCount <= 2 &&
@@ -906,6 +965,7 @@ export function computeDraftGrade(
       keeperStrategyNote: keeperCtx.strategyNote,
       hasEliteWrKeeper: keeperCtx.hasEliteWrKeeper,
       hasEliteRbKeeper: keeperCtx.hasEliteRbKeeper,
+      keeperPrimaryDiscount: keeperCtx.primaryDiscount,
     });
 
   return {

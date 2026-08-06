@@ -46,15 +46,21 @@ function isWrReach(p: EarlySlotPick, numTeams: number, poolSize: number): boolea
   return hasMarketAdp(p, poolSize) && valueSpots(p) < -numTeams * 0.5;
 }
 
+function depthAdp(pick: EarlySlotPick): number {
+  return pick.rawAdp > 0 ? pick.rawAdp : pick.adp;
+}
+
 function isWr1OnTeam(depthCtx: TeamDepthAnalysis, pick: EarlySlotPick): boolean {
   if (!pick.nflTeam) return false;
-  const role = getDepthRole(depthCtx, pick.nflTeam, 'WR', pick.adp);
-  return role === 'alpha' || role === 'starter';
+  const role = getDepthRole(depthCtx, pick.nflTeam, 'WR', depthAdp(pick));
+  // Fantasy WR1s (roughly top 24) count even if depth lookup misses.
+  if (role === 'alpha' || role === 'starter') return true;
+  return depthAdp(pick) > 0 && depthAdp(pick) <= 24;
 }
 
 function isShallowWrOnTeam(depthCtx: TeamDepthAnalysis, pick: EarlySlotPick): boolean {
   if (!pick.nflTeam) return false;
-  const role = getDepthRole(depthCtx, pick.nflTeam, 'WR', pick.adp);
+  const role = getDepthRole(depthCtx, pick.nflTeam, 'WR', depthAdp(pick));
   // WR2 ("competing") is startable; only WR3+ is shallow for early-slot judgment.
   return role === 'depth' || role === 'dart';
 }
@@ -157,9 +163,9 @@ function lateQbWithEarlyWrPenalty(
 
   const reasons: string[] = [];
   if (shallowCount >= 2) {
-    reasons.push('several early wideouts were WR3-or-lower on their teams');
+    reasons.push('a couple of those early receivers look like depth pieces, not the top option in their offense');
   } else if (shallowCount >= 1) {
-    reasons.push('at least one early wideout was a WR3-or-lower option on his team');
+    reasons.push('one of those early receivers looks more like a secondary option than a locked-in WR1');
   }
   if (sameTeamIssue) {
     reasons.push('you doubled up on the same passing game early');
@@ -167,15 +173,13 @@ function lateQbWithEarlyWrPenalty(
   if (wrReachCount >= 2) {
     reasons.push('those wideout picks came well ahead of ADP');
   } else if (wrReachCount >= 1 && shallowCount >= 1) {
-    reasons.push('you reached on depth-chart wideouts');
+    reasons.push('you reached on a depth-chart wideout');
   }
 
+  // No concrete WR-room problem → waiting on QB after stacking receivers is fine.
+  // (Do not ding just because you didn't draft three NFL WR1s.)
   if (reasons.length === 0) {
-    if (wr1Count < 3 && !goodLateQb) {
-      reasons.push('the early wideout run was not three clear WR1s on their teams');
-    } else {
-      return { penalty: 0, maxCap: null, note: null };
-    }
+    return { penalty: 0, maxCap: null, note: null };
   }
 
   const severity =
@@ -196,8 +200,8 @@ function lateQbWithEarlyWrPenalty(
   const qbRound = firstQb.round_number;
   const qbName = firstQb.name ?? 'your quarterback';
   const note = goodLateQb
-    ? `You found ${qbName} late at value, but ${reasonText} before quarterback in round ${qbRound}.`
-    : `You waited on quarterback until round ${qbRound} after loading up on wideouts because ${reasonText}.`;
+    ? `You found ${qbName} late at value, but ${reasonText} before you took a quarterback in round ${qbRound}.`
+    : `You waited until round ${qbRound} for a quarterback after stacking receivers early, and ${reasonText}.`;
 
   return { penalty, maxCap, note };
 }
@@ -263,16 +267,24 @@ export function analyzeEarlyDraftStructure(
     picks.map((p) => p.nflTeam).filter((t): t is string => Boolean(t))
   );
   const forDepth: PlayerAdpOnTeam[] = [];
+  const depthSeen = new Set<string>();
+  const pushDepth = (p: PlayerAdpOnTeam) => {
+    if (!p.nflTeam || !['WR', 'RB', 'TE'].includes(p.pos)) return;
+    const key = `${p.nflTeam}|${p.pos}|${Math.round(p.adp)}`;
+    if (depthSeen.has(key)) return;
+    depthSeen.add(key);
+    forDepth.push(p);
+  };
   if (playerPool) {
     for (const p of playerPool) {
-      if (p.nflTeam && teams.has(p.nflTeam) && ['WR', 'RB', 'TE'].includes(p.pos)) {
-        forDepth.push(p);
-      }
+      if (p.nflTeam && teams.has(p.nflTeam)) pushDepth(p);
     }
   }
   for (const p of picks) {
-    if (p.nflTeam && ['WR', 'RB', 'TE'].includes(p.pos)) {
-      forDepth.push({ pos: p.pos, adp: p.adp, nflTeam: p.nflTeam });
+    if (p.nflTeam) {
+      // Prefer market ADP so depth roles match the pool keys.
+      const adp = p.rawAdp > 0 ? p.rawAdp : p.adp;
+      pushDepth({ pos: p.pos, adp, nflTeam: p.nflTeam });
     }
   }
   const depthCtx = analyzeTeamDepthFromAdp(forDepth);
@@ -284,7 +296,7 @@ export function analyzeEarlyDraftStructure(
 
   for (const p of picks) {
     if (p.pos !== 'WR' || !p.nflTeam) continue;
-    const role = getDepthRole(depthCtx, p.nflTeam, 'WR', p.adp);
+    const role = getDepthRole(depthCtx, p.nflTeam, 'WR', depthAdp(p));
     if (role !== 'depth' && role !== 'dart') continue;
 
     if (p.round_number <= 6) {

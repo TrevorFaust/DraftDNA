@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type {
   MpKeeperInput,
   MultiplayerDraft,
+  MultiplayerDraftMessage,
   MultiplayerKeeper,
   MultiplayerParticipant,
   MultiplayerPick,
@@ -333,6 +334,33 @@ export async function fetchMpResults(draftId: string): Promise<MultiplayerResult
     .eq('draft_id', draftId);
   if (error) throw rpcError(error);
   return (data || []) as MultiplayerResult[];
+}
+
+const MP_CHAT_PAGE_SIZE = 150;
+
+export async function fetchMpMessages(draftId: string): Promise<MultiplayerDraftMessage[]> {
+  const { data, error } = await (supabase as any)
+    .from('multiplayer_draft_messages')
+    .select('*')
+    .eq('draft_id', draftId)
+    .order('created_at', { ascending: false })
+    .limit(MP_CHAT_PAGE_SIZE);
+  if (error) throw rpcError(error);
+  return ((data || []) as MultiplayerDraftMessage[]).reverse();
+}
+
+export async function mpSendMessage(
+  draftId: string,
+  body: string,
+  guestSessionId?: string | null
+): Promise<MultiplayerDraftMessage> {
+  const { data, error } = await supabase.rpc('mp_send_message' as any, {
+    p_draft_id: draftId,
+    p_body: body,
+    p_guest_session_id: guestSessionId ?? null,
+  });
+  if (error) throw rpcError(error);
+  return data as MultiplayerDraftMessage;
 }
 
 export type MpHistoryDraftRow = {

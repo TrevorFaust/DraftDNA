@@ -77,17 +77,20 @@ export type RankingsPosRankCompareProps = {
   position: string;
   communityPosRank?: number | null;
   myPosRank?: number | null;
-  /** Personal position tier (1-based) derived from My RK cuts */
+  /** 1-based tier from the board this badge is on (personal or community) */
   tier?: number | null;
+  /** Whose cuts the tier badge reflects */
+  tierSource?: 'personal' | 'community';
   className?: string;
 };
 
-/** Side-by-side community vs personal positional rank, plus personal tier badge. */
+/** Side-by-side community vs personal positional rank, plus a tier badge. */
 export function RankingsPosRankCompare({
   position,
   communityPosRank,
   myPosRank,
   tier,
+  tierSource = 'personal',
   className,
 }: RankingsPosRankCompareProps) {
   if (!showsPositionalListRank(position)) return null;
@@ -126,7 +129,8 @@ export function RankingsPosRankCompare({
             </span>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-xs text-xs">
-            Your tier {tone.tier} at {position.trim().toUpperCase()}
+            {tierSource === 'community' ? 'Community' : 'Your'} tier {tone.tier} at{' '}
+            {position.trim().toUpperCase()}
           </TooltipContent>
         </Tooltip>
       )}

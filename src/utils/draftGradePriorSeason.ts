@@ -441,6 +441,17 @@ export function posRankTag(pos: string, rank: number): string {
   return `${label}${rank}`;
 }
 
+/** e.g. 2025 → 25' */
+export function shortSeasonLabel(season: number): string {
+  const yy = String(Math.floor(season)).slice(-2);
+  return `${yy}'`;
+}
+
+/** Compact prior-season tag for writeups: 25' RB7 */
+export function priorPosRankLabel(pos: string, rank: number, season: number): string {
+  return `${shortSeasonLabel(season)} ${posRankTag(pos, rank)}`;
+}
+
 function positionLabel(pos: string): string {
   switch (pos) {
     case 'QB':
@@ -649,21 +660,22 @@ function rbWrProductionSentence(profile: PriorSeasonDraftProfile, y: number): st
 
 function kickerDefTopFiveBeat(profile: PriorSeasonDraftProfile, y: number): string | null {
   if (profile.top5DefCount === 0 && profile.top5KickerCount === 0) return null;
+  const yy = shortSeasonLabel(y);
 
   if (profile.top5DefCount > 0) {
     const def = profile.rankedDefFinishers[0];
     if (def) {
-      return `You also rostered ${def.name}, the ${y} ${posRankTag('D/ST', def.rank)} — a nice snag even though defenses matter less week to week than skill positions.`;
+      return `Drafting ${def.name}, the ${yy} ${posRankTag('D/ST', def.rank)}, was a nice snag even though defenses matter less week to week than skill positions.`;
     }
     const who = formatNameList(profile.top5DefNames, profile.top5DefCount);
     return who
-      ? `You also rostered ${who}, a ${y} top-five defense that rounds out the roster.`
-      : `You also rostered a ${y} top-five defense that rounds out the roster.`;
+      ? `Drafting ${who}, a ${yy} top-five defense, was a nice snag that rounds out the roster.`
+      : `Drafting a ${yy} top-five defense was a nice snag that rounds out the roster.`;
   }
 
   const who = formatNameList(profile.top5KickerNames, profile.top5KickerCount);
   return who
-    ? `You also have ${who}, a ${y} top-five kicker.`
+    ? `Drafting ${who}, a ${yy} top-five kicker, was a solid late add.`
     : null;
 }
 

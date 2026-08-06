@@ -17,7 +17,13 @@ export type RankingsPlayerCardMeta = {
   myPosRank: number | null;
   communityTrend: CommunityRankTrend | null;
   tier?: number | null;
-  hasTierBreakAfter?: boolean;
+  communityTier?: number | null;
+  /** Scissors: cut stored after this player */
+  hasTierCutAfter?: boolean;
+  /** Visual bar above first player of a new personal tier */
+  hasTierBreakBefore?: boolean;
+  /** Visual bar above first player of a new community tier */
+  hasCommunityTierBreakBefore?: boolean;
 };
 
 type PlainRowProps = {
@@ -28,7 +34,8 @@ type PlainRowProps = {
   communityTrend?: CommunityRankTrend | null;
   tier?: number | null;
   canEditTierBreak?: boolean;
-  hasTierBreakAfter?: boolean;
+  hasTierCutAfter?: boolean;
+  hasTierBreakBefore?: boolean;
   onToggleTierBreak?: (playerId: string) => void;
   stats2025?: Player2025StatsEntry;
   onPlayerClick: (player: RankedPlayer) => void;
@@ -43,7 +50,8 @@ const PlainRow = memo(function PlainRow({
   communityTrend,
   tier,
   canEditTierBreak = false,
-  hasTierBreakAfter = false,
+  hasTierCutAfter = false,
+  hasTierBreakBefore = false,
   onToggleTierBreak,
   stats2025,
   onPlayerClick,
@@ -59,7 +67,8 @@ const PlainRow = memo(function PlainRow({
       communityTrend={communityTrend}
       tier={tier}
       canEditTierBreak={canEditTierBreak}
-      hasTierBreakAfter={hasTierBreakAfter}
+      hasTierCutAfter={hasTierCutAfter}
+      hasTierBreakBefore={hasTierBreakBefore}
       onToggleTierBreak={
         onToggleTierBreak ? () => onToggleTierBreak(player.id) : undefined
       }

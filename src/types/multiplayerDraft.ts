@@ -85,3 +85,14 @@ export interface MpKeeperInput {
   player_id: string;
   round_number: number;
 }
+
+export interface MultiplayerDraftMessage {
+  id: string;
+  draft_id: string;
+  participant_id: string | null;
+  user_id: string | null;
+  guest_session_id: string | null;
+  display_name: string;
+  body: string;
+  created_at: string;
+}
