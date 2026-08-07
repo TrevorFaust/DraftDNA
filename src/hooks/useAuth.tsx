@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, FunctionsHttpError } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { getSiteOriginForAuth } from '@/lib/siteOrigin';
@@ -11,6 +11,7 @@ import {
 } from '@/lib/passwordRecoveryToken';
 import { migrateAllTemporaryData } from '@/utils/migrateTempData';
 import { wipeLocalSupabaseAuthTokens } from '@/lib/supabaseAuthStorage';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 
 const PASSWORD_RECOVERY_STORAGE_KEY = 'draftdna_password_recovery';
 
@@ -42,7 +43,7 @@ function consumeSupabaseAuthFragmentError(): void {
   } catch {
     message = spaced;
   }
-  toast.error(message);
+  toast.error(userFacingErrorMessage(message, 'Sign-in link failed. Request a new one and try again.'));
   window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
 }
 
@@ -358,16 +359,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, options?: { username?: string }) => {
-    const redirectUrl = `${getSiteOriginForAuth()}/`;
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: options?.username ? { username: options.username.trim() } : undefined,
+    const username = options?.username?.trim();
+    if (!username) {
+      return { error: new Error('Username is required') };
+    }
+
+    // Bypass GoTrue /signup + SMTP (Gmail SMTP was timing out at ~10s with 504s).
+    // create-account uses admin.createUser with email_confirm so no verification email is sent.
+    const { data, error: invokeError, response } = await supabase.functions.invoke('create-account', {
+      body: {
+        email: email.trim().toLowerCase(),
+        password,
+        username,
       },
     });
-    return { error };
+
+    let invokeMessage =
+      data && typeof data === 'object' && 'error' in data && typeof (data as { error: unknown }).error === 'string'
+        ? (data as { error: string }).error
+        : null;
+
+    if (!invokeMessage && invokeError) {
+      invokeMessage = invokeError.message;
+      if (invokeError instanceof FunctionsHttpError && response) {
+        try {
+          const body: unknown = await response.json();
+          if (
+            body &&
+            typeof body === 'object' &&
+            'error' in body &&
+            typeof (body as { error: unknown }).error === 'string'
+          ) {
+            invokeMessage = (body as { error: string }).error;
+          }
+        } catch {
+          /* keep invokeError.message */
+        }
+      }
+    }
+
+    if (invokeMessage) {
+      return { error: new Error(invokeMessage) };
+    }
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    return { error: signInError };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -392,7 +431,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(false);
     if (error) {
       console.error('Sign out:', error);
-      toast.error(error.message || 'Signed out here; if issues persist, refresh the page.');
+      toast.error(
+        userFacingErrorMessage(error, 'Signed out here. If issues persist, refresh the page.')
+      );
     }
   };
 

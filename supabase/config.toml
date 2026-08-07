@@ -8,6 +8,10 @@ verify_jwt = false
 [functions.delete-user]
 verify_jwt = false
 
+# Public signup bypass when SMTP hangs; validates email/password/username inside the function.
+[functions.create-account]
+verify_jwt = false
+
 # Pick Six first-time rules flow (and any caller): verification uses Google siteverify + RECAPTCHA_SECRET_KEY.
 [functions.verify-recaptcha]
 verify_jwt = false

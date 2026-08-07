@@ -12,6 +12,7 @@ import { PasswordRecoveryForm } from '@/components/PasswordRecoveryForm';
 import { validatePassword } from '@/lib/passwordPolicy';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { z } from 'zod';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address'),
@@ -121,7 +122,9 @@ const Auth = () => {
           setResendCooldown(60);
           setResendError('Too many requests. Wait about a minute and try again.');
         } else {
-          setResendError(error.message || 'Could not send email. Please try again.');
+          setResendError(
+            userFacingErrorMessage(error, 'Could not send email. Please try again.')
+          );
         }
       } else {
         setResendCooldown(60);
@@ -178,10 +181,10 @@ const Auth = () => {
             msg.includes('522')
           ) {
             toast.error(
-              'Cannot reach the server (Supabase timed out). This is usually a temporary outage — wait a minute and try again. Guest mode still works for browsing.'
+              "Can't reach the server right now. Wait a minute and try again. Guest mode still works for browsing."
             );
           } else {
-            toast.error(error.message);
+            toast.error(userFacingErrorMessage(error, 'Something went wrong. Please try again.'));
           }
           setLoading(false);
           return;
@@ -201,34 +204,38 @@ const Auth = () => {
 
       const { error } = await signUp(email, password, { username: username.trim() });
       if (error) {
-        const msg = error.message ?? '';
-        if (msg.includes('User already registered') || msg.includes('already registered') || msg.includes('already exists')) {
+        const msg = (error.message ?? '').toLowerCase();
+        const status = (error as { status?: number }).status;
+        if (
+          msg.includes('already have an account') ||
+          msg.includes('user already registered') ||
+          msg.includes('already registered') ||
+          msg.includes('already exists')
+        ) {
           toast.error('You already have an account with this email. Sign in instead, or reset your password if you\'ve forgotten it.');
-        } else if (usernameTaken === true) {
+        } else if (
+          status === 504 ||
+          status === 522 ||
+          msg.includes('504') ||
+          msg.includes('timeout') ||
+          msg.includes('timed out') ||
+          msg.includes('gateway') ||
+          msg.includes('context deadline') ||
+          msg === '{}'
+        ) {
+          toast.error(
+            'Account creation timed out. Wait a minute and try again. If it keeps failing, email support.'
+          );
+        } else if (usernameTaken === true || msg.includes('username is already taken')) {
           toast.error('That username is already taken. Please choose another.');
         } else {
-          toast.error(msg || 'Something went wrong. Please try again.');
+          toast.error(userFacingErrorMessage(error, 'Something went wrong. Please try again.'));
         }
         setLoading(false);
         return;
       }
-      const emailLower = email.trim().toLowerCase();
-      setPendingVerificationEmail(emailLower);
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: emailLower,
-        options: { shouldCreateUser: false },
-      });
-      if (otpError) {
-        const is429 = (otpError as { status?: number }).status === 429 || otpError.message?.toLowerCase().includes('429') || otpError.message?.toLowerCase().includes('rate limit');
-        if (is429) {
-          setResendCooldown(60);
-          setResendError('Too many requests. Wait about a minute and click Resend below.');
-        } else {
-          setResendError(otpError.message || 'Could not send email. Click Resend to try again.');
-        }
-      } else {
-        toast.success('Check your email for a verification link.');
-      }
+      // create-account confirms the email server-side and signUp signs the user in.
+      toast.success('Account created.');
     } catch (err) {
       toast.error('An unexpected error occurred. Please try again.');
     } finally {
@@ -271,7 +278,7 @@ const Auth = () => {
 
       const { error } = await resetPassword(email);
       if (error) {
-        toast.error(error.message || 'Failed to send reset email');
+        toast.error(userFacingErrorMessage(error, "Couldn't send reset email. Please try again."));
       } else {
         setResetEmailSent(true);
         toast.success('Password reset email sent! Check your inbox.');
