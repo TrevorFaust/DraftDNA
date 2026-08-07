@@ -54,6 +54,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Tables } from '@/integrations/supabase/types';
 import { useRampUpAutoScroll } from '@/hooks/useRampUpAutoScroll';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
+import { SUPPORT_EMAIL, supportMailto } from '@/constants/contest';
 
 type League = Tables<'leagues'>;
 
@@ -241,7 +243,11 @@ const Settings = () => {
         if (error.code === '23505') {
           toast({ title: 'Username taken', description: 'That username is already in use.', variant: 'destructive' });
         } else {
-          toast({ title: 'Error', description: error.message, variant: 'destructive' });
+          toast({
+            title: 'Error',
+            description: userFacingErrorMessage(error, "Couldn't update username. Please try again."),
+            variant: 'destructive',
+          });
         }
         return;
       }
@@ -261,9 +267,10 @@ const Settings = () => {
       if (!accessToken) {
         toast({
           title: 'Error',
-          description:
-            refreshError?.message ??
-            'Your session expired. Sign in again, then try deleting your account.',
+          description: userFacingErrorMessage(
+            refreshError,
+            'Your session expired. Sign in again, then try deleting your account.'
+          ),
           variant: 'destructive',
         });
         return;
@@ -303,7 +310,7 @@ const Settings = () => {
         }
         toast({
           title: 'Error',
-          description: msg || 'Could not delete account. Please try again.',
+          description: userFacingErrorMessage(msg, 'Could not delete account. Please try again.'),
           variant: 'destructive',
         });
         return;
@@ -312,8 +319,11 @@ const Settings = () => {
       navigate('/auth', { replace: true });
       toast({ title: 'Account deleted', description: 'Your account has been permanently deleted.' });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not delete account. Please try again.';
-      toast({ title: 'Error', description: msg, variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: userFacingErrorMessage(err, 'Could not delete account. Please try again.'),
+        variant: 'destructive',
+      });
     } finally {
       setDeleteAccountLoading(false);
     }
@@ -333,14 +343,11 @@ const Settings = () => {
   };
 
   const handleSendFeedback = () => {
-    window.location.href = 'mailto:feedback@draftboard.app?subject=Draft Board Feedback';
+    window.location.href = supportMailto('Draft DNA feedback');
   };
 
   const handleGetHelp = () => {
-    toast({
-      title: 'Help Center',
-      description: 'Our help center is coming soon. For now, please use the feedback option to contact us.',
-    });
+    window.location.href = supportMailto('Draft DNA support');
   };
 
   const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
@@ -424,7 +431,7 @@ const Settings = () => {
       if (error) {
         toast({
           title: 'Error',
-          description: `Failed to change password: ${error.message}`,
+          description: userFacingErrorMessage(error, "Couldn't change password. Please try again."),
           variant: 'destructive',
         });
         setIsChangingPassword(false);
@@ -444,7 +451,7 @@ const Settings = () => {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: `Failed to change password: ${error?.message || 'Unknown error'}`,
+        description: userFacingErrorMessage(error, "Couldn't change password. Please try again."),
         variant: 'destructive',
       });
     } finally {
@@ -546,7 +553,7 @@ const Settings = () => {
       console.error('Error creating league:', error);
       toast({
         title: 'Error',
-        description: `Failed to create league: ${error?.message || 'Unknown error'}`,
+        description: userFacingErrorMessage(error, "Couldn't create league. Please try again."),
         variant: 'destructive',
       });
     } finally {
@@ -608,8 +615,8 @@ const Settings = () => {
         if (!hasDisplayOrder) {
           // Column doesn't exist yet - show helpful message
           toast({
-            title: 'Migration Required',
-            description: 'Please apply the database migration to enable league reordering. Check the migration file: supabase/migrations/20260115000000_add_league_display_order.sql',
+            title: 'Error',
+            description: "Couldn't reorder leagues right now. Please try again later.",
             variant: 'destructive',
           });
           // Revert to original order
@@ -639,9 +646,7 @@ const Settings = () => {
         console.error('Error saving league order:', error);
         toast({
           title: 'Error',
-          description: error?.message?.includes('display_order') 
-            ? 'Please apply the database migration first. Check: supabase/migrations/20260115000000_add_league_display_order.sql'
-            : 'Failed to save league order',
+          description: userFacingErrorMessage(error, "Couldn't save league order. Please try again."),
           variant: 'destructive',
         });
         // Revert to original order on error
@@ -1252,7 +1257,9 @@ const Settings = () => {
                 <HelpCircle className="w-5 h-5 text-primary" />
                 Help & Support
               </CardTitle>
-              <CardDescription>Get assistance or share your thoughts</CardDescription>
+              <CardDescription>
+                Email {SUPPORT_EMAIL} for support, errors, or feedback
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <Button
@@ -1261,7 +1268,8 @@ const Settings = () => {
                 onClick={handleGetHelp}
               >
                 <HelpCircle className="w-4 h-4" />
-                Get Help
+                Contact support
+                <Mail className="w-4 h-4 ml-auto text-muted-foreground" />
               </Button>
               <Button
                 variant="outline"
@@ -1269,7 +1277,7 @@ const Settings = () => {
                 onClick={handleSendFeedback}
               >
                 <MessageSquare className="w-4 h-4" />
-                Send Feedback
+                Send feedback
                 <Mail className="w-4 h-4 ml-auto text-muted-foreground" />
               </Button>
             </CardContent>

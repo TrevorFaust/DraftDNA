@@ -31,7 +31,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           error:
-            'Account deletion is temporarily unavailable (server configuration). If this persists, contact support.',
+            'Account deletion is temporarily unavailable (server configuration). If this persists, email draftdnafootball@gmail.com.',
         }),
         { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

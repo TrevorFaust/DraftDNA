@@ -61,10 +61,6 @@ import { getSiteOriginForAuth } from '@/lib/siteOrigin';
 import { cn } from '@/lib/utils';
 
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY?.trim() || undefined;
-/** v2 “normal” iframe is ~304×78px; slight headroom on height to avoid clipping when scaled. */
-const RECAPTCHA_BASE_W = 304;
-const RECAPTCHA_BASE_H = 80;
-const RECAPTCHA_SCALE = 0.88;
 
 const TOP_N = 6;
 const SUBMISSIONS_LOCKED = new Date() >= PICK_SIX_KICKOFF_ET;
@@ -526,12 +522,7 @@ ${shareUrl}`;
       setShareDialogOpen(true);
     } catch (err) {
       console.error('Failed to save predictions:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('42P01')) {
-        toast.error('Predictions are not available yet. Please run the database migration and try again.');
-      } else {
-        toast.error('Failed to save. Please try again.');
-      }
+      toast.error("Couldn't save predictions. Please try again.");
     } finally {
       setSavingPosition(null);
     }
@@ -930,8 +921,9 @@ ${shareUrl}`;
           </div>
         </div>
 
-        {/* Legal / Terms Dialog - First-time only */}
+        {/* Terms: modal={false} so reCAPTCHA’s body-level challenge stays clickable (Firefox). */}
         <Dialog
+          modal={false}
           open={termsDialogOpen}
           onOpenChange={(open) => {
             if (!open && termsAccepted !== true) {
@@ -939,7 +931,19 @@ ${shareUrl}`;
             }
           }}
         >
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent
+            className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+            onPointerDownOutside={(e) => {
+              // Challenge iframe lives outside the dialog; X still dismisses.
+              e.preventDefault();
+            }}
+            onInteractOutside={(e) => {
+              e.preventDefault();
+            }}
+            onFocusOutside={(e) => {
+              e.preventDefault();
+            }}
+          >
             <DialogHeader>
               <DialogTitle className="text-xl font-display">
                 Pick Six Challenge: Official Rules
@@ -977,36 +981,22 @@ ${shareUrl}`;
                     </p>
                   )}
                   <div className="flex flex-nowrap justify-start items-center overflow-x-auto py-0.5 min-w-0">
-                    {/* Normal = horizontal checkbox row in iframe; scale() mimics ~2px smaller type (cannot style inside iframe). */}
                     <div
                       className={cn(
-                        'shrink-0 rounded-md border p-1 shadow-none overflow-hidden',
+                        'shrink-0 rounded-md border p-1 shadow-none',
                         htmlIsLight
                           ? 'border-border/60 bg-card'
                           : 'border-border/35 bg-background/50 backdrop-blur-sm'
                       )}
-                      style={{
-                        width: `${RECAPTCHA_BASE_W * RECAPTCHA_SCALE}px`,
-                        height: `${RECAPTCHA_BASE_H * RECAPTCHA_SCALE}px`,
-                      }}
                     >
-                      <div
-                        className="origin-top-left"
-                        style={{
-                          transform: `scale(${RECAPTCHA_SCALE})`,
-                          width: `${RECAPTCHA_BASE_W}px`,
-                          height: `${RECAPTCHA_BASE_H}px`,
-                        }}
-                      >
-                        <ReCAPTCHA
-                          key={htmlIsLight ? 'captcha-light' : 'captcha-dark'}
-                          ref={recaptchaRef}
-                          sitekey={RECAPTCHA_SITE_KEY}
-                          size="normal"
-                          theme={htmlIsLight ? 'light' : 'dark'}
-                          onChange={(t) => setCaptchaToken(t ?? null)}
-                        />
-                      </div>
+                      <ReCAPTCHA
+                        key={htmlIsLight ? 'captcha-light' : 'captcha-dark'}
+                        ref={recaptchaRef}
+                        sitekey={RECAPTCHA_SITE_KEY}
+                        size="normal"
+                        theme={htmlIsLight ? 'light' : 'dark'}
+                        onChange={(t) => setCaptchaToken(t ?? null)}
+                      />
                     </div>
                   </div>
                 </div>

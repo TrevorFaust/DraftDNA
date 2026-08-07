@@ -23,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Check, Copy, Link2, Play, UserMinus, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 
 const MultiplayerLobby = () => {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -130,7 +131,7 @@ const MultiplayerLobby = () => {
         setLoading(true);
         await refresh();
       } catch (e: any) {
-        toast.error(e?.message || 'Failed to load lobby');
+        toast.error(userFacingErrorMessage(e, "Couldn't load lobby"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -192,7 +193,7 @@ const MultiplayerLobby = () => {
       await refresh();
       toast.success('Joined lobby');
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to join');
+      toast.error(userFacingErrorMessage(e, "Couldn't join lobby"));
     } finally {
       setBusy(false);
     }
@@ -205,7 +206,7 @@ const MultiplayerLobby = () => {
       await mpClaimSlot(draft.id, teamNumber, guestSessionId);
       await refresh();
     } catch (e: any) {
-      toast.error(e?.message || 'Seat taken');
+      toast.error(userFacingErrorMessage(e, 'Seat taken'));
     } finally {
       setBusy(false);
     }
@@ -218,7 +219,7 @@ const MultiplayerLobby = () => {
       await mpSetReady(draft.id, !me.is_ready, guestSessionId);
       await refresh();
     } catch (e: any) {
-      toast.error(e?.message || 'Could not update ready');
+      toast.error(userFacingErrorMessage(e, 'Could not update ready'));
     } finally {
       setBusy(false);
     }
@@ -231,7 +232,7 @@ const MultiplayerLobby = () => {
       await mpStartDraft(draft.id);
       navigate(`/multiplayer-draft/${draft.id}`);
     } catch (e: any) {
-      toast.error(e?.message || 'Cannot start yet');
+      toast.error(userFacingErrorMessage(e, 'Cannot start yet'));
     } finally {
       setBusy(false);
     }
@@ -270,7 +271,7 @@ const MultiplayerLobby = () => {
         return copy;
       });
     } catch (e: any) {
-      toast.error(e?.message || 'Could not update team name');
+      toast.error(userFacingErrorMessage(e, 'Could not update team name'));
     } finally {
       setBusy(false);
     }
@@ -449,7 +450,7 @@ const MultiplayerLobby = () => {
                                   await mpReleaseSlot(draft.id, guestSessionId);
                                   await refresh();
                                 } catch (e: any) {
-                                  toast.error(e?.message || 'Could not release');
+                                  toast.error(userFacingErrorMessage(e, 'Could not release seat'));
                                 } finally {
                                   setBusy(false);
                                 }
@@ -474,7 +475,7 @@ const MultiplayerLobby = () => {
                                   });
                                   await refresh();
                                 } catch (e: any) {
-                                  toast.error(e?.message || 'Kick failed');
+                                  toast.error(userFacingErrorMessage(e, "Couldn't kick player"));
                                 } finally {
                                   setBusy(false);
                                 }
@@ -501,7 +502,7 @@ const MultiplayerLobby = () => {
                                   });
                                   await refresh();
                                 } catch (err: any) {
-                                  toast.error(err?.message || 'Move failed');
+                                  toast.error(userFacingErrorMessage(err, "Couldn't move player"));
                                 } finally {
                                   setBusy(false);
                                 }

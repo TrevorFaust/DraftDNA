@@ -9,6 +9,7 @@ import { Lock, Eye, EyeOff } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
 import { validatePassword } from '@/lib/passwordPolicy';
 import { BrandedLoader } from '@/components/BrandedLoader';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 
 export function PasswordRecoveryForm() {
   const { user, completePasswordRecovery } = useAuth();
@@ -34,7 +35,7 @@ export function PasswordRecoveryForm() {
     try {
       const { error } = await completePasswordRecovery(recoveryPassword);
       if (error) {
-        toast.error(error.message || 'Could not update password');
+        toast.error(userFacingErrorMessage(error, 'Could not update password'));
         return;
       }
       toast.success('Password updated. You are signed in.');

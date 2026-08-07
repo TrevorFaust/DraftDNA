@@ -34,6 +34,7 @@ import {
 } from '@/utils/multiplayerDraftApi';
 import { getOrCreateGuestSessionId, resetGuestSessionId } from '@/utils/temporaryStorage';
 import { resolveNextMockDraftName } from '@/utils/mockDraftDefaultName';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 
 const MockDraft = () => {
   const { user, loading: authLoading } = useAuth();
@@ -571,7 +572,7 @@ const MockDraft = () => {
       navigate(`/draft/${data.id}`);
     } catch (error: any) {
       console.error('Error creating draft:', error);
-      toast.error(`Failed to create draft: ${error?.message || 'Unknown error'}`);
+      toast.error(userFacingErrorMessage(error, "Couldn't create draft. Please try again."));
     } finally {
       setLoading(false);
     }

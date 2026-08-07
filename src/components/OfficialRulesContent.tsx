@@ -3,6 +3,8 @@ import {
   formatPickSixKickoffDisplay,
   PICK_SIX_CATEGORY_PRIZE_USD,
   PICK_SIX_TOTAL_PRIZE_POOL_USD,
+  SUPPORT_EMAIL,
+  supportMailto,
 } from '@/constants/contest';
 
 type Props = { siteName: string; season: number };
@@ -80,6 +82,19 @@ export function OfficialRulesContent({ siteName, season }: Props) {
       <section>
         <h3 className="font-semibold text-foreground mb-1">9. RELEASE OF LIABILITY</h3>
         <p>By participating, entrants agree to release and hold harmless {siteName}, the NFL, its member clubs, the NFLPA, and ESPN from any and all liability. This contest is an independent fan promotion and is not sponsored or endorsed by the NFL or ESPN.</p>
+      </section>
+      <section>
+        <h3 className="font-semibold text-foreground mb-1">10. CONTACT</h3>
+        <p>
+          For contest questions, winner verification, or support related to the Pick Six Challenge, contact Sponsor at{' '}
+          <a
+            href={supportMailto('Pick Six Challenge')}
+            className="text-foreground underline hover:text-primary"
+          >
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </p>
       </section>
     </div>
   );

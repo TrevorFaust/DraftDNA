@@ -1,6 +1,14 @@
 /** Shared contest constants for Pick Six Challenge (terms, footer, etc.) */
-export const SITE_NAME = '[Site Name]';
+export const SITE_NAME = 'Draft DNA';
 export const SEASON = 2026;
+
+/** Public support / policy contact (not for collecting user emails in forms). */
+export const SUPPORT_EMAIL = 'draftdnafootball@gmail.com';
+
+export function supportMailto(subject?: string): string {
+  const q = subject ? `?subject=${encodeURIComponent(subject)}` : '';
+  return `mailto:${SUPPORT_EMAIL}${q}`;
+}
 
 /** Public `public/pick_six_icon.png` — used wherever Pick Six Challenge is branded in the UI. */
 export const PICK_SIX_ICON_PATH = '/pick_six_icon.png' as const;

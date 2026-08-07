@@ -7,6 +7,7 @@ import { fetchMpMessages, mpSendMessage } from '@/utils/multiplayerDraftApi';
 import type { MultiplayerDraftMessage } from '@/types/multiplayerDraft';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 
 const MAX_BODY = 500;
 const POLL_MS = 2500;
@@ -138,7 +139,7 @@ export function MultiplayerDraftChat({
       .catch((err: Error) => {
         if (cancelled) return;
         setLoading(false);
-        toast.error(err.message || 'Could not load chat');
+        toast.error(userFacingErrorMessage(err, 'Could not load chat'));
       });
     return () => {
       cancelled = true;
@@ -206,7 +207,7 @@ export function MultiplayerDraftChat({
       setDraft('');
       setNowMs(Date.now());
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not send message');
+      toast.error(userFacingErrorMessage(err, 'Could not send message'));
     } finally {
       setSending(false);
     }

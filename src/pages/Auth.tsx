@@ -13,6 +13,7 @@ import { validatePassword } from '@/lib/passwordPolicy';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { z } from 'zod';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
+import { SUPPORT_EMAIL } from '@/constants/contest';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address'),
@@ -224,7 +225,7 @@ const Auth = () => {
           msg === '{}'
         ) {
           toast.error(
-            'Account creation timed out. Wait a minute and try again. If it keeps failing, email support.'
+            `Account creation timed out. Wait a minute and try again. If it keeps failing, email ${SUPPORT_EMAIL}.`
           );
         } else if (usernameTaken === true || msg.includes('username is already taken')) {
           toast.error('That username is already taken. Please choose another.');

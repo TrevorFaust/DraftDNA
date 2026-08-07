@@ -6,11 +6,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { OfficialRulesContent } from '@/components/OfficialRulesContent';
-import { SITE_NAME, SEASON } from '@/constants/contest';
+import { Button } from '@/components/ui/button';
+import { SITE_NAME, SEASON, SUPPORT_EMAIL, supportMailto } from '@/constants/contest';
 
 export const Footer = () => {
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   return (
     <>
@@ -35,6 +37,14 @@ export const Footer = () => {
             >
               Official Pick Six Rules
             </button>
+            {' · '}
+            <button
+              type="button"
+              onClick={() => setContactOpen(true)}
+              className="underline hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring rounded"
+            >
+              Contact Us
+            </button>
           </p>
         </div>
       </footer>
@@ -46,7 +56,11 @@ export const Footer = () => {
           </DialogHeader>
           <div className="overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin text-sm text-muted-foreground space-y-4 flex-1 min-h-0">
             <p>Last Updated: February 26, 2026</p>
-            <p>This Privacy Policy describes how Pick Six Challenge (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) collects, uses, and protects your information when you participate in our contest.</p>
+            <p>
+              This Privacy Policy describes how {SITE_NAME} (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;)
+              collects, uses, and protects your information when you use the site and participate in the Pick Six
+              Challenge.
+            </p>
             <section>
               <h3 className="font-semibold text-foreground mb-1">1. Information We Collect</h3>
               <p><strong>Participant Data:</strong> When you enter, we collect your name, email address, and state of residence to manage your entry and verify eligibility.</p>
@@ -75,11 +89,34 @@ export const Footer = () => {
             </section>
             <section>
               <h3 className="font-semibold text-foreground mb-1">5. Your Rights</h3>
-              <p>You may request to have your account and data deleted at any time by contacting us at [Insert Your Support Email]. Note that deleting your data prior to the conclusion of the contest will result in the forfeiture of your entry.</p>
+              <p>
+                You may request to have your account and data deleted at any time by contacting us at{' '}
+                <a
+                  href={supportMailto('Account deletion request')}
+                  className="text-foreground underline hover:text-primary"
+                >
+                  {SUPPORT_EMAIL}
+                </a>
+                . Note that deleting your data prior to the conclusion of the contest will result in the forfeiture of
+                your entry.
+              </p>
             </section>
             <section>
               <h3 className="font-semibold text-foreground mb-1">6. Children&apos;s Privacy</h3>
               <p>The Pick Six Challenge is strictly for individuals aged 18 and older. We do not knowingly collect information from children under the age of 13.</p>
+            </section>
+            <section>
+              <h3 className="font-semibold text-foreground mb-1">7. Contact</h3>
+              <p>
+                For privacy questions, account deletion requests, or support, email{' '}
+                <a
+                  href={supportMailto('Privacy / support')}
+                  className="text-foreground underline hover:text-primary"
+                >
+                  {SUPPORT_EMAIL}
+                </a>
+                .
+              </p>
             </section>
           </div>
         </DialogContent>
@@ -91,6 +128,29 @@ export const Footer = () => {
             <DialogTitle className="text-xl font-display">Pick Six Challenge: Official Rules</DialogTitle>
           </DialogHeader>
           <OfficialRulesContent siteName={SITE_NAME} season={SEASON} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={contactOpen} onOpenChange={setContactOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-display">Contact Us</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              For support, contest questions, bug reports, or account issues, email us at{' '}
+              <a
+                href={supportMailto('Draft DNA support')}
+                className="text-foreground underline hover:text-primary break-all"
+              >
+                {SUPPORT_EMAIL}
+              </a>
+              .
+            </p>
+            <Button asChild className="w-full">
+              <a href={supportMailto('Draft DNA support')}>Email support</a>
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

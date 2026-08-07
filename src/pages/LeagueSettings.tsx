@@ -20,6 +20,7 @@ import { PlayerSearchCombobox } from '@/components/PlayerSearchCombobox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Player } from '@/types/database';
 import { BrandedLoader } from '@/components/BrandedLoader';
+import { userFacingErrorMessage } from '@/utils/userFacingError';
 
 interface PositionLimits {
   QB: number;
@@ -495,7 +496,9 @@ export default function LeagueSettings() {
             .eq('id', selectedLeague.id);
           
           if (simpleError) {
-            toast.error(`Failed to update number of teams: ${simpleError.message || 'Unknown error'}`);
+            toast.error(
+              userFacingErrorMessage(simpleError, "Couldn't update number of teams. Please try again.")
+            );
           } else {
             toast.success('Number of teams updated. Please run database migration to enable other settings.');
             setNumTeams(finalNumTeams);
@@ -512,7 +515,7 @@ export default function LeagueSettings() {
             }
           }
         } else {
-          toast.error(`Failed to update settings: ${error.message || 'Unknown error'}`);
+          toast.error(userFacingErrorMessage(error, "Couldn't update settings. Please try again."));
         }
       } else {
         toast.success('Settings updated');
@@ -532,7 +535,7 @@ export default function LeagueSettings() {
       }
     } catch (err: any) {
       console.error('Unexpected error:', err);
-      toast.error(`Failed to update settings: ${err?.message || 'Unknown error'}`);
+      toast.error(userFacingErrorMessage(err, "Couldn't update settings. Please try again."));
     } finally {
       setSaving(false);
     }
