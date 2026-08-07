@@ -29,6 +29,12 @@ import {
   applyMarketScarcityToScores,
   type CpuRealismContext,
 } from '@/utils/cpuDraftRealism';
+import {
+  applyStarterAwarePoolFilter,
+  applyStarterLineupNeedToScores,
+  countTeamPositions,
+} from '@/utils/cpuStarterNeeds';
+import { DEFAULT_STARTERS, type StarterCounts } from '@/utils/rosterSlots';
 
 export interface CpuDraftContext {
   roundNumber: number;
@@ -44,6 +50,11 @@ export interface CpuDraftContext {
   flexSlots?: number;
   /** Bench size for getTotalRounds */
   benchSize?: number;
+  /** Dedicated starter slots excluding flex (default 8) */
+  baseStarters?: number;
+  /** Per-position starter counts from league lineup settings */
+  starters?: StarterCounts;
+  isSuperflex?: boolean;
   /** Rookie-only mock: no DST/kicker round rules; pool is skill positions only */
   rookieFlexDraft?: boolean;
   /** Expert realism gates (early QB/TE frequency, etc.) */
@@ -122,8 +133,11 @@ export function selectCpuPick(
 
   const flexSlots = context.flexSlots ?? 1;
   const benchSize = context.benchSize ?? 6;
-  const config = buildDraftConfig(flexSlots, benchSize, context.numTeams);
+  const starters = context.starters ?? context.realism?.starters ?? DEFAULT_STARTERS;
+  const baseStarters = context.baseStarters ?? 8;
+  const config = buildDraftConfig(flexSlots, benchSize, context.numTeams, baseStarters);
   const constraints = getHardConstraints(config);
+  const teamCounts = countTeamPositions(context.teamDraftedPlayers ?? []);
 
   const strategies = resolveStrategies(archetypeIdOrIds);
   const phase = getPhaseIndex(context.roundNumber, config);
@@ -142,8 +156,19 @@ export function selectCpuPick(
       });
   let pool = filtered.length > 0 ? filtered : available;
 
+  if (!context.rookieFlexDraft) {
+    const starterFiltered = applyStarterAwarePoolFilter(pool, {
+      starters,
+      roundNumber: context.roundNumber,
+      numRounds: context.numRounds,
+      teamCounts,
+    });
+    if (starterFiltered.length > 0) pool = starterFiltered;
+  }
+
   if (context.realism && !context.rookieFlexDraft) {
-    const realistic = applyCpuExpertFilters(pool, context.realism);
+    const realismCtx = { ...context.realism, starters };
+    const realistic = applyCpuExpertFilters(pool, realismCtx);
     if (realistic.length > 0) pool = realistic;
   }
 
@@ -159,14 +184,12 @@ export function selectCpuPick(
   const nearSlot = byAdpProximity.filter((p) => Math.abs(getEffectiveAdp(p) - pickSlot) <= adpWindow);
   if (nearSlot.length > 0) pool = nearSlot;
 
-  if (!weights) return selectBpaStyle(pool, DEFAULT_TOP_N);
-
   const bpaByRank = [...pool].sort((a, b) => a.rank - b.rank)[0];
 
   const scored = pool.map((p) => {
     const posKey = getWeightPosition(p);
-    const mult = weights[posKey]?.[phase] ?? 1.0;
-    const archetypeNudge = 1 + (mult - 1) * ARCHETYPE_NUDGE_STRENGTH;
+    const mult = weights?.[posKey]?.[phase] ?? 1.0;
+    const archetypeNudge = weights ? 1 + (mult - 1) * ARCHETYPE_NUDGE_STRENGTH : 1;
     const adpDelta = Math.abs(getEffectiveAdp(p) - pickSlot);
     const adpScore = Math.max(0, 800 - adpDelta * 6);
     const adjustedScore = adpScore * archetypeNudge;
@@ -175,8 +198,21 @@ export function selectCpuPick(
 
   let adjustedPool =
     context.realism && !context.rookieFlexDraft
-      ? applyMarketScarcityToScores(scored, context.realism)
+      ? applyMarketScarcityToScores(scored, { ...context.realism, starters })
       : scored;
+
+  if (!context.rookieFlexDraft) {
+    adjustedPool = applyStarterLineupNeedToScores(adjustedPool, {
+      starters,
+      teamCounts,
+      flexSlots,
+      roundNumber: context.roundNumber,
+      numRounds: context.numRounds,
+      numTeams: context.numTeams,
+      rosterSize: context.teamDraftedPlayers?.length ?? 0,
+      isSuperflex: context.isSuperflex,
+    });
+  }
 
   adjustedPool = adjustedPool.map((row) => {
     const reachVsBpa = row.player.rank - (bpaByRank?.rank ?? row.player.rank);
@@ -194,6 +230,11 @@ export function selectCpuPick(
     if (b.adjustedScore !== a.adjustedScore) return b.adjustedScore - a.adjustedScore;
     return a.adpDelta - b.adpDelta;
   });
+
+  // No archetype: still honor lineup-adjusted scores (not pure random BPA).
+  if (!weights) {
+    return byAdjusted[0]?.player ?? selectBpaStyle(pool, DEFAULT_TOP_N);
+  }
 
   const best = byAdjusted[0]?.player;
   if (!best) return pool[0];

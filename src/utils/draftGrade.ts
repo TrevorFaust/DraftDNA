@@ -25,6 +25,15 @@ import {
   buildInsightTagline,
   type RosterQualityPick,
 } from '@/utils/draftGradeRosterQuality';
+import {
+  countPositions,
+  countRelevantEarlySkill,
+  hasFilledGradeFloorStarters,
+  missingRequiredStarters,
+  resolveGradeStarters,
+  skillCoreReadyForSpecialTeams as skillCoreReady,
+} from '@/utils/draftGradeStarters';
+import type { StarterCounts } from '@/utils/rosterSlots';
 
 export type LetterGrade =
   | 'A+'
@@ -63,6 +72,10 @@ export interface DraftGradeOptions {
   numTeams: number;
   numRounds?: number;
   isSuperflex?: boolean;
+  /** League starting lineup; defaults to classic 1QB/2RB/2WR/1TE/1DEF/1K. */
+  starters?: StarterCounts | null;
+  /** Flex starter slots (for synergy / narrative context). */
+  flexCount?: number;
   chaosArchetype?: string | null;
   /** Full player pool for ADP-based team depth (WR1 vs WR2 on same NFL team). */
   playerPool?: { position?: string | null; team?: string | null; adp?: number | null }[];
@@ -177,33 +190,32 @@ function isSpecialTeams(pos: string): boolean {
 }
 
 /**
- * Enough skill core that K/DEF is a bench/streaming pick, not a reach past holes.
- * 2RB/2WR required. QB or TE can wait individually; missing both is a flag.
- */
-function skillCoreReadyForSpecialTeams(prior: ParsedPick[]): boolean {
-  let rb = 0;
-  let wr = 0;
-  let qb = 0;
-  let te = 0;
-  for (const p of prior) {
-    if (p.pos === 'RB') rb += 1;
-    else if (p.pos === 'WR') wr += 1;
-    else if (p.pos === 'QB') qb += 1;
-    else if (p.pos === 'TE') te += 1;
-  }
-  return rb >= 2 && wr >= 2 && (qb >= 1 || te >= 1);
-}
-
-/**
  * K/DEF is "early" only when it actually costs skill capital.
- * R1–7 always early; R8–9 only without a ready skill core; R10+ never.
+ * Filling a required ST starter in an ST-only (or ST-heavy) league is not a sin.
+ * R1–7 usually early; R8–9 only without a ready skill core; R10+ never.
  */
-function isEarlySpecialTeamsPick(pick: ParsedPick, allPicks: ParsedPick[]): boolean {
+function isEarlySpecialTeamsPick(
+  pick: ParsedPick,
+  allPicks: ParsedPick[],
+  starters: StarterCounts
+): boolean {
   if (!isSpecialTeams(pick.pos)) return false;
+  const prior = allPicks.filter((p) => p.pick_number < pick.pick_number);
+  const priorCounts = countPositions(prior);
+  const skillNeed = starters.QB + starters.RB + starters.WR + starters.TE;
+  const fillingRequiredSt =
+    (pick.pos === 'K' && (priorCounts.K ?? 0) < starters.K) ||
+    (pick.pos === 'DEF' && (priorCounts.DEF ?? 0) < starters.DEF);
+
+  // Leagues that only start K/DEF (no skill starters): required ST picks are never "early".
+  if (skillNeed === 0 && fillingRequiredSt) return false;
+
+  // Extra ST beyond the league's starter need is always early if taken before R10.
+  if (!fillingRequiredSt && pick.round_number <= 9) return true;
+
   if (pick.round_number <= 7) return true;
   if (pick.round_number >= 10) return false;
-  const prior = allPicks.filter((p) => p.pick_number < pick.pick_number);
-  return !skillCoreReadyForSpecialTeams(prior);
+  return !skillCoreReady(priorCounts, starters);
 }
 
 function nflTeamTag(team?: string | null): string | null {
@@ -259,10 +271,12 @@ function isReachHeavyBoard(opts: {
   earlyTeamWr2Count: number;
 }): boolean {
   // A few projection reaches (Love / Waddle-type bets) are normal — not board-breaking.
+  // Mild chalk (ADP a spot later all draft) can rack up negativeValuePickCount without
+  // being a true reach-heavy board — require bad average too.
   return (
     opts.reachCount >= 6 ||
     opts.avgValueSpots < -10 ||
-    opts.negativeValuePickCount >= 7 ||
+    (opts.negativeValuePickCount >= 7 && opts.avgValueSpots < -6) ||
     (opts.premiumSlotMiss && opts.reachCount >= 3) ||
     opts.earlyTeamWr2Count >= 4
   );
@@ -281,48 +295,84 @@ function computeSynergyScore(
     rosterPenalty: number;
     hasEliteWrKeeper?: boolean;
     hasEliteRbKeeper?: boolean;
+    starters: StarterCounts;
   }
 ): { score: number; modifier: number; rb2Round: number | null; wr2Round: number | null } {
   const { numTeams, numRounds, chaosArchetype, realStealCount, reachCount, avgValueSpots, consensusPickRate, rosterPenalty } =
     opts;
+  const starters = opts.starters;
   const skillPicks = picks.filter((p) => isSkillPosition(p.pos));
   let score = 74;
   const chaos = isChaosDraft(chaosArchetype);
 
   // Drafted-only rounds for "when did you pick X"; keepers fill the hole for balance.
   const drafted = picks.filter((p) => !p.is_keeper);
+  const needRb = starters.RB;
+  const needWr = starters.WR;
+  const lastRbN = Math.max(1, needRb);
+  const lastWrN = Math.max(1, needWr);
   const rb1Drafted = firstPositionRound(drafted, 'RB');
-  const rb2Drafted = nthPositionRound(drafted, 'RB', 2);
+  const rbLastDrafted = needRb >= 2 ? nthPositionRound(drafted, 'RB', lastRbN) : null;
   const wr1Drafted = firstPositionRound(drafted, 'WR');
-  const wr2Drafted = nthPositionRound(drafted, 'WR', 2);
+  const wrLastDrafted = needWr >= 2 ? nthPositionRound(drafted, 'WR', lastWrN) : null;
 
   const rb1Round = opts.hasEliteRbKeeper ? 1 : rb1Drafted;
   const wr1Round = opts.hasEliteWrKeeper ? 1 : wr1Drafted;
-  // Second starter: keeper counts as one, so first drafted at pos is effectively RB2/WR2.
-  const rb2Round = opts.hasEliteRbKeeper
-    ? rb1Drafted ?? rb2Drafted
-    : rb2Drafted;
-  const wr2Round = opts.hasEliteWrKeeper
-    ? wr1Drafted ?? wr2Drafted
-    : wr2Drafted;
+  // Last required starter: keeper counts as one slot toward the need.
+  const rb2Round =
+    needRb < 2
+      ? null
+      : opts.hasEliteRbKeeper
+        ? rb1Drafted ?? rbLastDrafted
+        : rbLastDrafted;
+  const wr2Round =
+    needWr < 2
+      ? null
+      : opts.hasEliteWrKeeper
+        ? wr1Drafted ?? wrLastDrafted
+        : wrLastDrafted;
 
   const rb2LateThreshold = Math.max(9, Math.ceil(numRounds * 0.52));
   const wr2LateThreshold = Math.max(10, Math.ceil(numRounds * 0.58));
 
-  if (rb2Round != null && rb2Round > rb2LateThreshold) score -= 6;
-  if (wr2Round != null && wr2Round > wr2LateThreshold) score -= 6;
-  if (wr1Round != null && wr1Round > 8) score -= 4;
-  if (rb1Round != null && rb1Round > 9) score -= 4;
+  // Only ding late "RB2/WR2" when the league actually starts 2+ at that position.
+  if (needRb >= 2 && rb2Round != null && rb2Round > rb2LateThreshold) score -= 6;
+  if (needWr >= 2 && wr2Round != null && wr2Round > wr2LateThreshold) score -= 6;
+  if (needWr >= 1 && wr1Round != null && wr1Round > 8) score -= 4;
+  if (needRb >= 1 && rb1Round != null && rb1Round > 9) score -= 4;
 
-  if (rb1Round != null && rb1Round <= 5 && wr1Round != null && wr1Round <= 6) score += 3;
-  if (rb2Round != null && rb2Round <= 8 && wr2Round != null && wr2Round <= 9) score += 4;
+  if (
+    needRb >= 1 &&
+    needWr >= 1 &&
+    rb1Round != null &&
+    rb1Round <= 5 &&
+    wr1Round != null &&
+    wr1Round <= 6
+  ) {
+    score += 3;
+  }
+  if (
+    needRb >= 2 &&
+    needWr >= 2 &&
+    rb2Round != null &&
+    rb2Round <= 8 &&
+    wr2Round != null &&
+    wr2Round <= 9
+  ) {
+    score += 4;
+  }
 
-  const zeroRb = rb1Round == null || rb1Round >= 6;
-  const heroRb = rb1Round != null && rb1Round <= 2 && (rb2Round == null || rb2Round >= 6);
+  const zeroRb = needRb > 0 && (rb1Round == null || rb1Round >= 6);
+  const intentionalZeroRb = needRb === 0;
+  const heroRb =
+    needRb >= 1 &&
+    rb1Round != null &&
+    rb1Round <= 2 &&
+    (needRb < 2 || rb2Round == null || rb2Round >= 6);
   const earlyDraftedWr = drafted.filter((p) => p.pos === 'WR' && p.round_number <= 5).length;
   const earlyDraftedRb = drafted.filter((p) => p.pos === 'RB' && p.round_number <= 5).length;
-  const wrHeavyEarly = earlyDraftedWr >= 3;
-  if (zeroRb && wrHeavyEarly) score += 3;
+  const wrHeavyEarly = earlyDraftedWr >= Math.max(2, Math.min(3, needWr || 3));
+  if ((zeroRb || intentionalZeroRb) && wrHeavyEarly) score += 3;
   if (heroRb && wr1Round != null && wr1Round <= 5) score += 2;
 
   // Known elite WR keeper → RB-heavy early is the plan, not a WR hole.
@@ -360,6 +410,8 @@ export function computeDraftGrade(
 ): DraftGradeResult | null {
   const numTeams = Math.max(options.numTeams, 2);
   const numRounds = options.numRounds ?? 16;
+  const starters = resolveGradeStarters(options.starters);
+  const multiQb = starters.QB >= 2 || !!options.isSuperflex;
   const poolSize = numTeams * numRounds;
   const withPlayer = picks
     .filter((p) => p.player)
@@ -428,6 +480,13 @@ export function computeDraftGrade(
   const chaos = isChaosDraft(options.chaosArchetype);
   const stealNames: string[] = [];
   const reachNames: string[] = [];
+  const skillNeedTotal =
+    starters.QB + starters.RB + starters.WR + starters.TE;
+  // ST-only leagues have no skill starters — grade value on K/DEF (and any skill bench).
+  const countsForValue = (pos: string) =>
+    skillNeedTotal === 0
+      ? isSkillPosition(pos) || isSpecialTeams(pos)
+      : isSkillPosition(pos);
 
   const skillStealThreshold = stealThreshold;
   const skillReachThreshold = reachThreshold;
@@ -446,18 +505,19 @@ export function computeDraftGrade(
     const rawValue = pick.pick_number - pick.adp;
     const hasMarket = pick.rawAdp > 0 && pick.rawAdp <= poolSize + 12;
     const skill = isSkillPosition(pick.pos);
+    const valueEligible = countsForValue(pick.pos);
     const autodraftWeight = pick.is_autodraft ? 0.8 : 1;
     // Late bench darts barely move the grade — starters/mid rounds matter most.
     const roundWeight =
       pick.round_number >= 10 ? 0.12 : pick.round_number >= 8 ? 0.4 : 1;
 
-    if (skill && hasMarket) {
+    if (valueEligible && hasMarket) {
       const w = autodraftWeight * roundWeight;
       weightedValueSum += rawValue * w;
       weightTotal += w;
     }
 
-    if (!hasMarket && skill && pick.round_number <= 9) {
+    if (!hasMarket && valueEligible && pick.round_number <= 9) {
       fakeValuePickCount += 1;
     }
 
@@ -476,21 +536,21 @@ export function computeDraftGrade(
     );
 
     // Steals still count late (nice finds), but reaches in R10+ are bench noise.
-    if (skill && hasMarket && rawValue >= skillStealThreshold && !falseEarlySteal) {
+    if (valueEligible && hasMarket && rawValue >= skillStealThreshold && !falseEarlySteal) {
       stealCount += 1;
       realStealCount += 1;
       if (pick.name) stealNames.push(pick.name);
-    } else if (!hasMarket && skill && rawValue >= skillStealThreshold) {
+    } else if (!hasMarket && valueEligible && rawValue >= skillStealThreshold) {
       stealCount += 1;
     }
 
-    if (skill && hasMarket && rawValue < 0 && pick.round_number <= 7) {
+    if (valueEligible && hasMarket && rawValue < 0 && pick.round_number <= 7) {
       negativeValuePickCount += 1;
     }
 
     // Reaches matter through the middle of the draft. R8+ bench darts barely count.
     if (
-      skill &&
+      valueEligible &&
       hasMarket &&
       rawValue <= skillReachThreshold &&
       pick.round_number <= 7
@@ -499,7 +559,7 @@ export function computeDraftGrade(
       if (pick.name) reachNames.push(pick.name);
     }
     if (
-      skill &&
+      valueEligible &&
       hasMarket &&
       rawValue <= severeReachThreshold &&
       pick.round_number <= 7
@@ -507,7 +567,7 @@ export function computeDraftGrade(
       severeReachCount += 1;
     }
 
-    if (!chaos && isEarlySpecialTeamsPick(pick, parsed)) {
+    if (!chaos && isEarlySpecialTeamsPick(pick, parsed, starters)) {
       earlySpecialTeams += 1;
       if (pick.pos === 'K' && pick.name) earlyKickerName = pick.name;
       if (pick.pos === 'DEF' && pick.name) earlyDefenseName = pick.name;
@@ -563,7 +623,8 @@ export function computeDraftGrade(
     numTeams,
     numRounds,
     poolForDepth,
-    options.isSuperflex
+    options.isSuperflex || multiQb,
+    starters
   );
 
   const synergy = computeSynergyScore(parsed, {
@@ -577,6 +638,7 @@ export function computeDraftGrade(
     rosterPenalty: rosterQuality.sameTeamWrPenalty + (rosterQuality.consecutiveTeamWr ? 4 : 0),
     hasEliteWrKeeper: keeperCtx.hasEliteWrKeeper,
     hasEliteRbKeeper: keeperCtx.hasEliteRbKeeper,
+    starters,
   });
 
   let numericScore = Math.round(
@@ -602,7 +664,10 @@ export function computeDraftGrade(
     numericScore -= 3;
   }
 
-  const positionalValue = analyzePositionalDraftValue(parsed);
+  const positionalValue = analyzePositionalDraftValue(parsed, {
+    starters,
+    isSuperflex: options.isSuperflex || multiQb,
+  });
   if (positionalValue.penalty > 0) {
     numericScore -= positionalValue.penalty;
   }
@@ -688,10 +753,16 @@ export function computeDraftGrade(
     !boardReachHeavy &&
     reachCount <= 1;
 
+  // No RB/WR starters → QB/TE elites. ST-only leagues have no skill elites — value-only floors.
+  const eliteForA =
+    skillNeedTotal === 0 ? 0 : starters.RB + starters.WR === 0 ? 1 : 2;
+  const eliteForB =
+    skillNeedTotal === 0 ? 0 : 1;
+
   // Human-good boards enter a letter family; natural score keeps + / plain / - room.
   if (
     cleanProcess &&
-    draftedElite >= 2 &&
+    draftedElite >= eliteForA &&
     avgValueSpots >= 2 &&
     reachCount === 0 &&
     (realStealCount >= 1 || avgValueSpots >= 3)
@@ -703,21 +774,21 @@ export function computeDraftGrade(
     }
   } else if (
     cleanProcess &&
-    draftedElite >= 2 &&
+    draftedElite >= eliteForA &&
     avgValueSpots >= 1 &&
     reachCount <= 1
   ) {
     numericScore = Math.max(numericScore, 86); // A
   } else if (
     cleanProcess &&
-    draftedElite >= 2 &&
+    draftedElite >= eliteForA &&
     avgValueSpots >= -0.5 &&
     reachCount <= 2
   ) {
     numericScore = Math.max(numericScore, 80); // A-
   } else if (
     cleanProcess &&
-    draftedElite >= 2 &&
+    draftedElite >= eliteForA &&
     avgValueSpots >= -1.5 &&
     reachCount <= 1 &&
     numericScore >= 66 &&
@@ -726,7 +797,7 @@ export function computeDraftGrade(
     numericScore = Math.max(numericScore, 75); // B+
   } else if (
     cleanProcess &&
-    draftedElite >= 1 &&
+    draftedElite >= eliteForB &&
     avgValueSpots >= -3 &&
     reachCount <= 2 &&
     earlySpecialTeams === 0 &&
@@ -739,7 +810,7 @@ export function computeDraftGrade(
     !earlyStructure.premiumSlotMiss &&
     !boardReachHeavy &&
     realStealCount >= 2 &&
-    draftedElite >= 2 &&
+    draftedElite >= eliteForA &&
     avgValueSpots >= 5 &&
     reachCount <= 1
   ) {
@@ -793,104 +864,172 @@ export function computeDraftGrade(
     numericScore = Math.min(84, numericScore + 4);
   }
 
-  // After late penalties, solid chalk stays in B family.
+  // After late penalties, solid chalk stays in B family (B- floor; + / plain set later).
   if (
     earlySpecialTeams === 0 &&
     !earlyStructure.premiumSlotMiss &&
     !boardReachHeavy &&
-    draftedElite >= 1 &&
+    draftedElite >= eliteForB &&
     avgValueSpots >= -3 &&
     reachCount <= 3 &&
     numericScore >= 56 &&
     numericScore < 70
   ) {
-    numericScore = Math.max(numericScore, 68);
+    numericScore = Math.max(numericScore, 66);
   }
 
-  // Trying-their-best: filled starters → A–C (early K/DEF alone is a cost, not an auto-F).
-  // F when early K/DEF pairs with a thin/bad skill draft. D for extreme pet-player boards.
-  const rbCount = parsed.filter((p) => p.pos === 'RB').length;
-  const wrCount = parsed.filter((p) => p.pos === 'WR').length;
-  const qbCount = parsed.filter((p) => p.pos === 'QB').length;
-  const teCount = parsed.filter((p) => p.pos === 'TE').length;
-  const skillEarly = parsed.filter(
-    (p) => (p.pos === 'RB' || p.pos === 'WR') && p.round_number <= 6
-  ).length;
-  // Real lineup shape: 2RB/2WR/1QB is enough; flex TE is fine. Early K/DEF allowed.
-  const filledStarters =
-    rbCount >= 2 &&
-    wrCount >= 2 &&
-    qbCount >= 1 &&
-    (teCount >= 1 || wrCount + rbCount >= 5);
+  // Trying-their-best: filled starters (per league lineup) → A–C floors.
+  // F when early K/DEF pairs with a thin/bad skill draft vs that lineup.
+  const posCounts = countPositions(parsed);
+  const skillEarly = countRelevantEarlySkill(parsed, starters, 6);
+  const filledStarters = hasFilledGradeFloorStarters(posCounts, starters);
   const notStructuralMeltdown =
     positionalValue.maxNumericScore == null || positionalValue.maxNumericScore >= 84;
   // Ordinary mocks with a few projection reaches stay in C. D needs a real pet-player board.
+  // Short drafts (flex/ST novelty) can't stack 7 reaches — scale the bar to roster length.
+  const reachFaithBar = Math.min(7, Math.max(4, numRounds - 1));
   const blindFaithReaches =
     severeReachCount >= 3 ||
-    (reachCount >= 7 && avgValueSpots < -9) ||
-    (reachCount >= 8 && avgValueSpots < -8);
-  // Early K/DEF + weak skill core / rotten board → F. Early K/DEF + real starters → just a ding.
+    (reachCount >= reachFaithBar && avgValueSpots < -9) ||
+    (reachCount >= reachFaithBar + 1 && avgValueSpots < -8);
+  // Early K/DEF + missing required starters / thin early skill → F.
+  const flexOnlyLineup =
+    skillNeedTotal === 0 && starters.DEF === 0 && starters.K === 0;
+  const stOnlySkillSpam =
+    skillNeedTotal === 0 &&
+    starters.DEF + starters.K > 0 &&
+    missingRequiredStarters(posCounts, starters) &&
+    skillEarly >= 2;
+  const missingStarters = missingRequiredStarters(posCounts, starters);
   const earlySpecialMeltdown =
-    earlySpecialTeams >= 1 &&
-    (skillEarly <= 1 ||
-      rbCount < 2 ||
-      wrCount < 2 ||
-      qbCount < 1 ||
-      (earlySpecialTeams >= 2 && skillEarly <= 2) ||
-      (skillEarly <= 2 && reachCount >= 5 && avgValueSpots < -8));
+    stOnlySkillSpam ||
+    earlySpecialTeams >= 3 ||
+    (earlySpecialTeams >= 1 &&
+      (skillEarly <= 1 ||
+        missingStarters ||
+        // Flex-only leagues have no ST starters — early K/DEF is always a meltdown.
+        (flexOnlyLineup && earlySpecialTeams >= 1) ||
+        (earlySpecialTeams >= 2 && skillEarly <= 2) ||
+        (skillEarly <= 2 && reachCount >= 5 && avgValueSpots < -8)));
 
   if (earlySpecialMeltdown) {
     // Spread F+/F/F- — one early K with zero early skill is F, not always F-.
-    if (earlySpecialTeams >= 3 || (earlySpecialTeams >= 2 && skillEarly === 0)) {
+    if (stOnlySkillSpam && earlySpecialTeams === 0) {
+      // ST-only: skill spam, never filled required K/DEF.
+      numericScore = skillEarly >= 5 ? 8 : skillEarly >= 3 ? 18 : 30;
+    } else if (
+      earlySpecialTeams >= 3 ||
+      (earlySpecialTeams >= 2 && skillEarly === 0 && !missingStarters)
+    ) {
       numericScore = 8; // F-
+    } else if (earlySpecialTeams >= 2) {
+      // Includes earlyST=2 with a starter hole even when skillEarly is 0.
+      numericScore = 18; // F
+    } else if (missingStarters && earlySpecialTeams === 1) {
+      // One early ST + a starter hole (skillEarly may be 0 when alts don't count).
+      numericScore = 30; // F+
     } else if (skillEarly === 0) {
       numericScore = 20; // F
-    } else if (skillEarly === 1 || earlySpecialTeams >= 2) {
+    } else if (skillEarly === 1) {
       numericScore = 18; // F
     } else {
       numericScore = 30; // F+
     }
   } else if (filledStarters && notStructuralMeltdown && blindFaithReaches) {
     // D family spread: D+ / D / D- by how far past ADP — still a real roster.
-    const reachSeverity =
-      (reachCount >= 10 ? 2 : reachCount >= 8 ? 1 : 0) +
-      (severeReachCount >= 5 ? 2 : severeReachCount >= 3 ? 1 : 0) +
-      (avgValueSpots < -14 ? 2 : avgValueSpots < -10 ? 1 : 0);
-    if (reachSeverity >= 3) numericScore = 36; // D-
-    else if (reachSeverity >= 1) numericScore = 43; // D
-    else numericScore = 48; // D+
-  } else if (filledStarters && notStructuralMeltdown) {
-    // One early K/DEF with a real roster: paid a price (process/positional), not a meltdown.
-    // Soft ceiling — hard to be A-band when you burned early capital on ST.
-    if (earlySpecialTeams >= 1 && skillEarly >= 3) {
-      numericScore = Math.min(numericScore, 78); // B ceiling
-    }
-    // Solid starter core + only light early/mid reaches → at least B-.
-    // Late bench darts already ignored in reachCount, so this won't punish dart throws.
-    if (
-      earlySpecialTeams === 0 &&
-      positionalValue.penalty <= 8 &&
-      draftedElite >= 2 &&
-      reachCount <= 2 &&
-      severeReachCount <= 1 &&
-      avgValueSpots >= -4
-    ) {
-      numericScore = Math.max(numericScore, 72); // B-
-    } else if (
-      positionalValue.penalty <= 10 &&
-      reachCount <= 4 &&
-      severeReachCount <= 2 &&
-      avgValueSpots >= -6
-    ) {
-      numericScore = Math.max(numericScore, earlySpecialTeams >= 1 ? 56 : 61); // C / C+
-    } else if (
-      positionalValue.penalty <= 14 &&
-      reachCount <= 6 &&
-      avgValueSpots >= -10
-    ) {
-      numericScore = Math.max(numericScore, 56); // C
+    // Prefer severe-reach count so "many mild reaches" can still land D+ (not only D/D-).
+    if (severeReachCount >= 5 || (severeReachCount >= 3 && avgValueSpots < -16)) {
+      numericScore = 36; // D-
+    } else if (severeReachCount >= 3 || avgValueSpots < -14) {
+      numericScore = 43; // D
     } else {
-      numericScore = Math.max(numericScore, 52); // C-
+      numericScore = 48; // D+
+    }
+  } else if (filledStarters && notStructuralMeltdown) {
+    // Filled lineup, not a meltdown/D board: assign A–C from non-overlapping archetypes
+    // so every letter stays reachable across starter configs (including ST-only / flex-only).
+    if (earlySpecialTeams >= 1 && skillEarly >= 3) {
+      numericScore = Math.min(numericScore, 78); // B ceiling when early ST
+    }
+    const clean =
+      earlySpecialTeams === 0 &&
+      !earlyStructure.premiumSlotMiss &&
+      !boardReachHeavy;
+    const eliteOkA = draftedElite >= eliteForA;
+    const eliteOkB = draftedElite >= eliteForB;
+    if (
+      clean &&
+      eliteOkA &&
+      reachCount === 0 &&
+      realStealCount >= 2 &&
+      avgValueSpots >= 3
+    ) {
+      numericScore = 94; // A+
+    } else if (
+      clean &&
+      eliteOkA &&
+      reachCount === 0 &&
+      realStealCount >= 1 &&
+      avgValueSpots >= 1.5
+    ) {
+      numericScore = 88; // A
+    } else if (
+      clean &&
+      eliteOkA &&
+      reachCount === 0 &&
+      realStealCount === 0 &&
+      avgValueSpots >= -0.5
+    ) {
+      numericScore = 82; // A-
+    } else if (
+      clean &&
+      eliteOkB &&
+      reachCount === 0 &&
+      realStealCount >= 1 &&
+      avgValueSpots >= -1.5 &&
+      avgValueSpots < 1.5
+    ) {
+      numericScore = 76; // B+
+    } else if (
+      clean &&
+      eliteOkB &&
+      reachCount === 0 &&
+      realStealCount === 0 &&
+      avgValueSpots >= -3.5 &&
+      avgValueSpots < -0.5
+    ) {
+      numericScore = 71; // B
+    } else if (
+      clean &&
+      eliteOkB &&
+      reachCount <= 1 &&
+      avgValueSpots >= -6 &&
+      avgValueSpots < -0.5
+    ) {
+      numericScore = 67; // B-
+    } else if (
+      severeReachCount <= 1 &&
+      reachCount >= 2 &&
+      reachCount <= 3 &&
+      avgValueSpots >= -7.5
+    ) {
+      numericScore = earlySpecialTeams >= 1 ? 56 : 62; // C / C+
+    } else if (
+      severeReachCount <= 2 &&
+      reachCount >= 3 &&
+      reachCount <= 5 &&
+      avgValueSpots >= -11
+    ) {
+      numericScore = 57; // C
+    } else if (
+      // Short drafts: 6 mild reaches with avg still above blind-faith → C-
+      (reachCount >= 6 && avgValueSpots >= -9) ||
+      (reachCount >= 4 && avgValueSpots < -11) ||
+      (reachCount <= 1 && avgValueSpots < -6)
+    ) {
+      numericScore = 53; // C-
+    } else {
+      numericScore = 53; // C-
     }
   }
 

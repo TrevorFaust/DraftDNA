@@ -3,17 +3,13 @@ import { fillDraftTeamLineup } from '@/components/DraftTeamResultDialog';
 import type { RankedPlayer, DraftPick } from '@/types/database';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import { cn } from '@/lib/utils';
+import {
+  buildStartingSlots,
+  getBenchCount,
+  type PositionLimitsLike,
+} from '@/utils/rosterSlots';
 
-interface PositionLimits {
-  QB?: number;
-  RB?: number;
-  WR?: number;
-  TE?: number;
-  FLEX?: number;
-  K?: number;
-  DEF?: number;
-  BENCH?: number;
-}
+type PositionLimits = PositionLimitsLike;
 
 interface UserKeeper {
   player_id: string;
@@ -150,21 +146,8 @@ export const MyRoster = ({
   // Combined roster: drafted + future keepers. Keepers claim starter slots first.
   const combinedRoster = [...draftedPlayers, ...keeperPlayersNotYetDrafted.map((e) => e.player)];
 
-  const benchCount = positionLimits?.BENCH ?? 6;
-  const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
-
-  const flexPositions = isSuperflex ? ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'D/ST'] : ['RB', 'WR', 'TE'];
-  const startingSlots: { label: string; positions: string[] }[] = [
-    { label: 'QB', positions: ['QB'] },
-    { label: 'RB1', positions: ['RB'] },
-    { label: 'RB2', positions: ['RB'] },
-    { label: 'WR1', positions: ['WR'] },
-    { label: 'WR2', positions: ['WR'] },
-    { label: 'TE', positions: ['TE'] },
-    ...Array.from({ length: flexCount }, () => ({ label: 'FLEX' as const, positions: flexPositions as string[] })),
-    { label: 'DEF', positions: ['DEF', 'D/ST'] },
-    { label: 'K', positions: ['K'] },
-  ];
+  const benchCount = getBenchCount(positionLimits);
+  const startingSlots = buildStartingSlots(positionLimits, isSuperflex);
 
   const { filledSlots, benchPlayers } = fillDraftTeamLineup(
     combinedRoster,

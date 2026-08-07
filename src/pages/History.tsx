@@ -46,6 +46,12 @@ import {
 } from '@/utils/communityRankingsMerge';
 import { fetchMyCompletedMpHistory } from '@/utils/multiplayerDraftApi';
 import { isAutoMockDraftName, repairAutoMockDraftNames } from '@/utils/mockDraftDefaultName';
+import {
+  buildStartingSlots,
+  getBenchCount,
+  getFlexCount,
+  parseStarters,
+} from '@/utils/rosterSlots';
 
 interface DraftWithPicks extends MockDraft {
   picks: (DraftPick & { player: Player })[];
@@ -76,7 +82,17 @@ const History = () => {
   const [selectedDraft, setSelectedDraft] = useState<DraftWithPicks | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [draftLeagueSettings, setDraftLeagueSettings] = useState<{
-    positionLimits?: { QB?: number; RB?: number; WR?: number; TE?: number; K?: number; DEF?: number; BENCH?: number };
+    positionLimits?: {
+      QB?: number;
+      RB?: number;
+      WR?: number;
+      TE?: number;
+      FLEX?: number;
+      K?: number;
+      DEF?: number;
+      BENCH?: number;
+      starters?: { QB?: number; RB?: number; WR?: number; TE?: number; DEF?: number; K?: number };
+    };
     isSuperflex?: boolean;
   } | null>(null);
   const [yourTeamView, setYourTeamView] = useState<'lineup' | 'draft-order'>('lineup');
@@ -620,6 +636,13 @@ const History = () => {
         numRounds: draft.num_rounds,
         chaosArchetype: chaos,
         isSuperflex,
+        starters: parseStarters(
+          draft.id === selectedDraft?.id ? draftLeagueSettings?.positionLimits : undefined
+        ),
+        flexCount: getFlexCount(
+          draft.id === selectedDraft?.id ? draftLeagueSettings?.positionLimits : undefined,
+          isSuperflex
+        ),
         playerPool: poolForGrade,
         priorSeasonRankByPlayerId,
         archetypeName: replaceChaos ? chaos : archetypeName || undefined,
@@ -1777,22 +1800,12 @@ const History = () => {
                         ) : (
                           <div className="glass-card p-4 space-y-3">
                             {(() => {
-                              const flexCount = draftLeagueSettings?.positionLimits?.FLEX ?? (draftLeagueSettings?.isSuperflex ? 2 : 1);
                               const isSuperflex = !!draftLeagueSettings?.isSuperflex;
-                              const flexPositions = isSuperflex ? ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'D/ST'] : ['RB', 'WR', 'TE'];
-                              const startingSlots: { label: string; positions: string[] }[] = [
-                                { label: 'QB', positions: ['QB'] },
-                                { label: 'RB1', positions: ['RB'] },
-                                { label: 'RB2', positions: ['RB'] },
-                                { label: 'WR1', positions: ['WR'] },
-                                { label: 'WR2', positions: ['WR'] },
-                                { label: 'TE', positions: ['TE'] },
-                                ...Array.from({ length: flexCount }, () => ({ label: 'FLEX', positions: flexPositions })),
-                                { label: 'DEF', positions: ['DEF', 'D/ST'] },
-                                { label: 'K', positions: ['K'] },
-                              ];
-                              
-                              const benchCount = draftLeagueSettings?.positionLimits?.BENCH ?? 6;
+                              const startingSlots = buildStartingSlots(
+                                draftLeagueSettings?.positionLimits,
+                                isSuperflex
+                              );
+                              const benchCount = getBenchCount(draftLeagueSettings?.positionLimits);
                               const assignedPlayerIds = new Set<string>();
                               const filledSlots: (Player | null)[] = [];
                               let qbPlacedInFlex = false;

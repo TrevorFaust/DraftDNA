@@ -36,6 +36,7 @@ import {
   verdictPositiveClause,
 } from '@/utils/draftGradeReportVerdict';
 import { placeKeeperNoteInSegments } from '@/utils/draftGradeKeepers';
+import { DEFAULT_STARTERS, type StarterCounts } from '@/utils/rosterSlots';
 
 export interface RosterQualityPick {
   pick_number: number;
@@ -95,6 +96,11 @@ function isEliteQbTiming(p: RosterQualityPick, numTeams: number): boolean {
   if (p.pos !== 'QB') return false;
   const roundCap = Math.ceil(numTeams * 2.2);
   return p.round_number <= 3 && p.adp <= roundCap * numTeams * 0.9;
+}
+
+function isEliteTeTiming(p: RosterQualityPick, numTeams: number): boolean {
+  if (p.pos !== 'TE') return false;
+  return p.round_number <= 3 && p.adp <= numTeams * 2.5;
 }
 
 /** Non-superflex: QB taken ahead of market (reach), not a round-2 value QB. */
@@ -157,8 +163,11 @@ export function analyzeRosterQuality(
   numTeams: number,
   numRounds: number,
   playerPool?: PlayerAdpOnTeam[],
-  isSuperflex?: boolean
+  isSuperflex?: boolean,
+  startersInput?: StarterCounts | null
 ): RosterQualityResult {
+  const starters = startersInput ?? DEFAULT_STARTERS;
+  const multiQb = starters.QB >= 2 || !!isSuperflex;
   const poolSize = numTeams * numRounds;
   const notes: string[] = [];
   let score = 72;
@@ -178,10 +187,16 @@ export function analyzeRosterQuality(
 
   const round1Picks = picks.filter((p) => p.round_number === 1);
   const hasRound1RbWr = round1Picks.some((p) => isRound1Anchor(p, numTeams));
-  if (!hasRound1RbWr && round1Picks.some((p) => ['RB', 'WR'].includes(p.pos))) {
+  const hasRound1QbElite =
+    multiQb && round1Picks.some((p) => isEliteQbTiming(p, numTeams));
+  if (
+    starters.RB + starters.WR > 0 &&
+    !hasRound1RbWr &&
+    round1Picks.some((p) => ['RB', 'WR'].includes(p.pos))
+  ) {
     score -= 4;
     notes.push('round 1 lacked a true RB/WR anchor');
-  } else if (hasRound1RbWr) {
+  } else if (hasRound1RbWr || hasRound1QbElite) {
     score += 4;
   }
 
@@ -215,6 +230,11 @@ export function analyzeRosterQuality(
       if (!p.is_keeper) draftedEliteTierCount += 1;
       if (p.name && !anchorNames.includes(p.name)) anchorNames.push(p.name);
     }
+    if (starters.TE > 0 && isEliteTeTiming(p, numTeams)) {
+      eliteTierCount += 1;
+      if (!p.is_keeper) draftedEliteTierCount += 1;
+      if (p.name && !anchorNames.includes(p.name)) anchorNames.push(p.name);
+    }
     if (p.pos === 'RB' && firstRbRound == null) firstRbRound = p.round_number;
     if (p.pos === 'WR') {
       const wrRole = getDepthRole(depthCtx, p.nflTeam, 'WR', p.adp);
@@ -226,7 +246,7 @@ export function analyzeRosterQuality(
         qualityWrCount += 1;
       }
     }
-    if (isEarlyQbReach(p, numTeams, isSuperflex)) {
+    if (isEarlyQbReach(p, numTeams, multiQb)) {
       score -= 5;
       notes.push('QB reached ahead of where they usually go');
     }
@@ -365,7 +385,11 @@ export function analyzeRosterQuality(
       score += 4;
       notes.push('found a startable RB2 in the mid rounds');
     }
-  } else if (rbsByPick.length === 1 && picks.length >= 10) {
+  } else if (
+    starters.RB >= 2 &&
+    rbsByPick.length === 1 &&
+    picks.length >= 10
+  ) {
     const only = rbsByPick[0];
     if (only.round_number <= 6) {
       score -= 3;

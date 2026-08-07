@@ -1,5 +1,12 @@
 /** Shared snake-draft math for multiplayer drafts (mirrors SQL helpers). */
 
+import {
+  parseStarters,
+  starterNeedsFromCounts,
+  type PositionLimitsLike,
+  type StarterCounts,
+} from '@/utils/rosterSlots';
+
 export function mpTeamForPick(
   pickNumber: number,
   numTeams: number,
@@ -24,29 +31,29 @@ export function mpNormalizePos(pos: string | null | undefined): string {
   return p;
 }
 
+function resolveStarters(
+  startersOrLimits?: StarterCounts | PositionLimitsLike | null
+): StarterCounts {
+  if (!startersOrLimits) return parseStarters(null);
+  if ('starters' in startersOrLimits || 'FLEX' in startersOrLimits || 'BENCH' in startersOrLimits) {
+    return parseStarters(startersOrLimits as PositionLimitsLike);
+  }
+  return {
+    QB: (startersOrLimits as StarterCounts).QB ?? 1,
+    RB: (startersOrLimits as StarterCounts).RB ?? 2,
+    WR: (startersOrLimits as StarterCounts).WR ?? 2,
+    TE: (startersOrLimits as StarterCounts).TE ?? 1,
+    DEF: (startersOrLimits as StarterCounts).DEF ?? 1,
+    K: (startersOrLimits as StarterCounts).K ?? 1,
+  };
+}
+
 /** Unfilled starter holes (multiplicity preserved — e.g. two RB slots). */
-export function mpStarterNeeds(positionCounts: Record<string, number>): string[] {
-  const c = positionCounts;
-  const qb = c.QB ?? 0;
-  const rb = c.RB ?? 0;
-  const wr = c.WR ?? 0;
-  const te = c.TE ?? 0;
-  const def = c.DEF ?? 0;
-  const k = c.K ?? 0;
-  const needed: string[] = [];
-  if (qb < 1) needed.push('QB');
-  if (rb < 2) {
-    needed.push('RB');
-    if (rb < 1) needed.push('RB');
-  }
-  if (wr < 2) {
-    needed.push('WR');
-    if (wr < 1) needed.push('WR');
-  }
-  if (te < 1) needed.push('TE');
-  if (def < 1) needed.push('DEF');
-  if (k < 1) needed.push('K');
-  return needed;
+export function mpStarterNeeds(
+  positionCounts: Record<string, number>,
+  startersOrLimits?: StarterCounts | PositionLimitsLike | null
+): string[] {
+  return starterNeedsFromCounts(positionCounts, resolveStarters(startersOrLimits));
 }
 
 /**
@@ -69,7 +76,7 @@ export function mpCanDraftPosition(opts: {
   if (typeof limit === 'number' && count >= limit) return false;
 
   const remaining = Math.max(0, opts.numRounds - opts.rosterSize);
-  const needed = mpStarterNeeds(opts.positionCounts);
+  const needed = mpStarterNeeds(opts.positionCounts, opts.positionLimits as PositionLimitsLike);
   if (needed.length > 0 && remaining <= needed.length && !needed.includes(pos)) {
     return false;
   }

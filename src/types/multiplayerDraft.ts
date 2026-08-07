@@ -1,4 +1,5 @@
 export type MultiplayerDraftStatus = 'lobby' | 'drafting' | 'completed' | 'cancelled';
+export type MultiplayerDraftVisibility = 'invite' | 'open';
 
 export interface MultiplayerDraft {
   id: string;
@@ -6,6 +7,8 @@ export interface MultiplayerDraft {
   invite_code: string;
   name: string;
   status: MultiplayerDraftStatus;
+  /** invite = friends-only via code; open = listed on Mock Draft for anyone. */
+  visibility?: MultiplayerDraftVisibility;
   num_teams: number;
   num_rounds: number;
   draft_order: string;
@@ -26,6 +29,12 @@ export interface MultiplayerDraft {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  /** Last join/leave/seat/ready/chat/rename in lobby (open lobbies idle-timeout from this). */
+  lobby_last_activity_at?: string | null;
+  /** Set when the host leaves the lobby page; open lobbies cancel 10m later even with activity. */
+  host_absent_since?: string | null;
+  /** Why a lobby/draft was cancelled: idle | host_absent | host_closed */
+  cancel_reason?: string | null;
 }
 
 export interface MultiplayerParticipant {
@@ -95,4 +104,22 @@ export interface MultiplayerDraftMessage {
   display_name: string;
   body: string;
   created_at: string;
+}
+
+/** Row from mp_list_open_lobbies for the live open-lobby browser. */
+export interface OpenMpLobby {
+  draft_id: string;
+  invite_code: string;
+  name: string;
+  num_teams: number;
+  seats_filled: number;
+  scoring_format: string | null;
+  league_type: string | null;
+  is_superflex: boolean;
+  pick_timer: number;
+  position_limits: Record<string, unknown> | null;
+  host_display_name: string;
+  created_at: string;
+  lobby_last_activity_at?: string | null;
+  host_absent_since?: string | null;
 }

@@ -221,9 +221,19 @@ export const tempSettingsStorage = {
       RB?: number;
       WR?: number;
       TE?: number;
+      FLEX?: number;
       K?: number;
       DEF?: number;
       BENCH?: number;
+      KEEPERS?: number;
+      starters?: {
+        QB?: number;
+        RB?: number;
+        WR?: number;
+        TE?: number;
+        DEF?: number;
+        K?: number;
+      };
     };
     isSuperflex?: boolean;
     rookiesOnly?: boolean;

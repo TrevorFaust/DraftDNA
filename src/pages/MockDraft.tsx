@@ -32,9 +32,12 @@ import {
   fetchMyActiveMpDrafts,
   mpCreateDraft,
 } from '@/utils/multiplayerDraftApi';
+import { OpenMpLobbiesPanel } from '@/components/OpenMpLobbiesPanel';
 import { getOrCreateGuestSessionId, resetGuestSessionId } from '@/utils/temporaryStorage';
 import { resolveNextMockDraftName } from '@/utils/mockDraftDefaultName';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
+import { getRosterRounds, type PositionLimitsLike } from '@/utils/rosterSlots';
+import type { MultiplayerDraftVisibility } from '@/types/multiplayerDraft';
 
 const MockDraft = () => {
   const { user, loading: authLoading } = useAuth();
@@ -42,6 +45,8 @@ const MockDraft = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [draftMode, setDraftMode] = useState<'solo' | 'multiplayer'>('solo');
+  const [lobbyVisibility, setLobbyVisibility] =
+    useState<MultiplayerDraftVisibility>('invite');
   const [draftName, setDraftName] = useState('');
   const [numTeams, setNumTeams] = useState('12');
   const [userPickPosition, setUserPickPosition] = useState('1');
@@ -81,29 +86,17 @@ const MockDraft = () => {
   const isDynasty = (selectedLeague as any)?.league_type === 'dynasty' || tempSettings?.leagueType === 'dynasty';
   const isRookiesOnlyFromLeague = (selectedLeague as any)?.rookies_only || tempSettings?.rookiesOnly;
   
-  // Calculate number of rounds based on roster size
-  // Starters: QB(1) + RB(2) + WR(2) + TE(1) + FLEX(N) + DEF(1) + K(1) = 8 + N. Plus bench.
+  // Rounds = dedicated starters + flex + bench (from league lineup settings).
   const calculateRounds = (): number => {
-    let isSuperflex = false;
-    let flexCount = 1;
-    let bench = 6;
     if (user && selectedLeague?.position_limits) {
-      const limits = selectedLeague.position_limits as { BENCH?: number; FLEX?: number };
-      isSuperflex = (selectedLeague as any)?.is_superflex as boolean || false;
-      flexCount = limits.FLEX ?? (isSuperflex ? 2 : 1);
-      bench = limits.BENCH ?? 6;
-    } else if (!user) {
-      const tempSettings = tempSettingsStorage.get();
-      isSuperflex = tempSettings?.isSuperflex || false;
-      flexCount = (tempSettings?.positionLimits as { FLEX?: number })?.FLEX ?? (isSuperflex ? 2 : 1);
-      if (tempSettings?.positionLimits?.BENCH !== undefined) {
-        bench = typeof tempSettings.positionLimits.BENCH === 'number'
-          ? tempSettings.positionLimits.BENCH
-          : parseInt(String(tempSettings.positionLimits.BENCH)) || 6;
-      }
+      const isSuperflex = (selectedLeague as any)?.is_superflex as boolean || false;
+      return getRosterRounds(selectedLeague.position_limits as PositionLimitsLike, isSuperflex);
     }
-    const rosterSize = 8 + flexCount + bench;
-    return rosterSize;
+    if (!user) {
+      const tempSettings = tempSettingsStorage.get();
+      return getRosterRounds(tempSettings?.positionLimits as PositionLimitsLike, !!tempSettings?.isSuperflex);
+    }
+    return getRosterRounds(null, false);
   };
   
   // Prefill settings from selected league or localStorage
@@ -402,6 +395,7 @@ const MockDraft = () => {
           boardPlayerIds: boardPlayers.map((p) => p.id),
           boardPlayerPositions: boardPlayers.map((p) => p.position),
           keepers,
+          visibility: lobbyVisibility,
           displayName: (
             await supabase
               .from('profiles')
@@ -411,10 +405,15 @@ const MockDraft = () => {
           ).data?.username?.trim() || user.email?.split('@')[0] || 'Host',
         });
         const keeperN = created.keeper_count ?? keepers.length;
+        const openLobby = lobbyVisibility === 'open';
         toast.success(
           keeperN > 0
-            ? `Lobby created — ${keeperN} keeper${keeperN === 1 ? '' : 's'} locked in. Share the invite link.`
-            : 'Lobby created — share the invite link'
+            ? openLobby
+              ? `Open lobby ready — ${keeperN} keeper${keeperN === 1 ? '' : 's'} locked in. Others can join from Live open lobbies.`
+              : `Lobby created — ${keeperN} keeper${keeperN === 1 ? '' : 's'} locked in. Share the invite link.`
+            : openLobby
+              ? 'Open lobby listed — others can join from Live open lobbies'
+              : 'Lobby created — share the invite link'
         );
         navigate(`/lobby/${created.invite_code}`);
         return;
@@ -631,11 +630,39 @@ const MockDraft = () => {
             </div>
             {draftMode === 'multiplayer' && (
               <p className="text-xs text-muted-foreground">
-                Host creates a lobby, invites up to {Math.max(0, (parseInt(numTeams) || 12) - 1)} friends,
-                then starts when everyone is ready. Empty seats stay CPU.
+                Host a friends-only lobby with an invite code, or list an open lobby so anyone
+                on the site can join. Up to {Math.max(0, (parseInt(numTeams) || 12) - 1)} other
+                humans; empty seats stay CPU when you start.
                 {!user ? ' Sign in required to host.' : ''}
               </p>
             )}
+            {draftMode === 'multiplayer' && (
+              <div className="space-y-2">
+                <Label>Lobby visibility</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={lobbyVisibility === 'invite' ? 'default' : 'secondary'}
+                    onClick={() => setLobbyVisibility('invite')}
+                  >
+                    Invite only
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={lobbyVisibility === 'open' ? 'default' : 'secondary'}
+                    onClick={() => setLobbyVisibility('open')}
+                  >
+                    Open to site
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {lobbyVisibility === 'open'
+                    ? 'Your lobby appears under Live open lobbies for anyone to join. It closes after 10 minutes of inactivity.'
+                    : 'Only people with your invite code can find this lobby.'}
+                </p>
+              </div>
+            )}
+            {draftMode === 'multiplayer' && <OpenMpLobbiesPanel />}
             {draftMode === 'multiplayer' && (
               <div className="rounded-lg border border-border/50 bg-secondary/30 p-3 space-y-2">
                 <p className="text-sm font-medium">Rejoin a draft</p>
@@ -917,7 +944,11 @@ const MockDraft = () => {
               ) : (
                 <>
                   <ClipboardList className="w-5 h-5" />
-                  {draftMode === 'multiplayer' ? 'Create lobby' : 'Start Draft'}
+                  {draftMode === 'multiplayer'
+                    ? lobbyVisibility === 'open'
+                      ? 'Create open lobby'
+                      : 'Create lobby'
+                    : 'Start Draft'}
                 </>
               )}
             </Button>

@@ -3,10 +3,12 @@ import type {
   MpKeeperInput,
   MultiplayerDraft,
   MultiplayerDraftMessage,
+  MultiplayerDraftVisibility,
   MultiplayerKeeper,
   MultiplayerParticipant,
   MultiplayerPick,
   MultiplayerResult,
+  OpenMpLobby,
 } from '@/types/multiplayerDraft';
 
 function rpcError(error: { message?: string } | null): Error {
@@ -32,7 +34,13 @@ export async function mpCreateDraft(params: {
   boardPlayerPositions: string[];
   keepers?: MpKeeperInput[];
   displayName?: string;
-}): Promise<{ draft_id: string; invite_code: string; keeper_count?: number }> {
+  visibility?: MultiplayerDraftVisibility;
+}): Promise<{
+  draft_id: string;
+  invite_code: string;
+  keeper_count?: number;
+  visibility?: MultiplayerDraftVisibility;
+}> {
   const { data, error } = await supabase.rpc('mp_create_draft' as any, {
     p_name: params.name,
     p_num_teams: params.numTeams,
@@ -52,9 +60,62 @@ export async function mpCreateDraft(params: {
     p_board_player_positions: params.boardPlayerPositions,
     p_keepers: params.keepers ?? [],
     p_display_name: params.displayName ?? 'Host',
+    p_visibility: params.visibility ?? 'invite',
   });
   if (error) throw rpcError(error);
-  return data as { draft_id: string; invite_code: string; keeper_count?: number };
+  return data as {
+    draft_id: string;
+    invite_code: string;
+    keeper_count?: number;
+    visibility?: MultiplayerDraftVisibility;
+  };
+}
+
+export async function fetchOpenMpLobbies(limit = 40): Promise<OpenMpLobby[]> {
+  const { data, error } = await supabase.rpc('mp_list_open_lobbies' as any, {
+    p_limit: limit,
+  });
+  if (error) throw rpcError(error);
+  return (data || []) as OpenMpLobby[];
+}
+
+export type MpExpireStaleOpenLobbiesResult = {
+  expiredCount: number;
+  /** Postgres clock — use to align the idle countdown with the server. */
+  serverNow: string | null;
+};
+
+/** Cancel open lobbies idle / host-absent for 10+ minutes. Safe to call often from lobby/list polls. */
+export async function mpExpireStaleOpenLobbies(): Promise<MpExpireStaleOpenLobbiesResult> {
+  const { data, error } = await supabase.rpc('mp_expire_stale_open_lobbies' as any);
+  if (error) throw rpcError(error);
+  if (typeof data === 'number') {
+    return { expiredCount: data, serverNow: null };
+  }
+  const row = (data || {}) as { expired_count?: number; server_now?: string };
+  return {
+    expiredCount: typeof row.expired_count === 'number' ? row.expired_count : 0,
+    serverNow: typeof row.server_now === 'string' ? row.server_now : null,
+  };
+}
+
+/** Host heartbeat / leave signal for open-lobby host-absence timeout. */
+export async function mpSetHostPresence(draftId: string, present: boolean) {
+  const { data, error } = await supabase.rpc('mp_set_host_presence' as any, {
+    p_draft_id: draftId,
+    p_present: present,
+  });
+  if (error) throw rpcError(error);
+  return data as { ok: boolean; present: boolean; host_absent_since: string | null };
+}
+
+/** Host ends the lobby immediately — kicks everyone and removes open listing. */
+export async function mpCloseLobby(draftId: string) {
+  const { data, error } = await supabase.rpc('mp_close_lobby' as any, {
+    p_draft_id: draftId,
+  });
+  if (error) throw rpcError(error);
+  return data as { ok: boolean; draft_id: string; status: string; cancel_reason: string };
 }
 
 export async function mpJoinDraft(params: {

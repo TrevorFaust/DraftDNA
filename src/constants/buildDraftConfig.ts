@@ -1,6 +1,6 @@
 /**
  * buildDraftConfig — Tab 7 JS Config Reference implementation.
- * Total rounds = 8 base starters + flex + bench. Phases and windows scale with roster.
+ * Total rounds = base starters (default 8) + flex + bench. Phases and windows scale with roster.
  * Value override threshold from Tab 5 (scarcity by league size).
  */
 
@@ -16,9 +16,16 @@ export function pctToRound(
   return Math.min(Math.max(1, Math.round(raw)), totalRounds);
 }
 
-/** Total rounds = 8 base (QB+2RB+2WR+TE+DST+K) + flex slots + bench size. Max: 8+6+15=29 */
-export function getTotalRounds(flexSlots: number, benchSize: number): number {
-  return 8 + flexSlots + benchSize;
+/**
+ * Total rounds = base dedicated starters + flex + bench.
+ * Default base is 8 (1QB+2RB+2WR+1TE+1DEF+1K). Custom lineups pass countBaseStarters().
+ */
+export function getTotalRounds(
+  flexSlots: number,
+  benchSize: number,
+  baseStarters = 8
+): number {
+  return baseStarters + flexSlots + benchSize;
 }
 
 /** Value override threshold: rounds of ADP value above archetype preference to override. Tab 5. */
@@ -49,8 +56,13 @@ export interface DraftConfig {
   };
 }
 
-export function buildDraftConfig(flexSlots: number, benchSize: number, leagueSize: number): DraftConfig {
-  const totalRounds = getTotalRounds(flexSlots, benchSize);
+export function buildDraftConfig(
+  flexSlots: number,
+  benchSize: number,
+  leagueSize: number,
+  baseStarters = 8
+): DraftConfig {
+  const totalRounds = getTotalRounds(flexSlots, benchSize, baseStarters);
   const w = (pct: number, dir: 'ceil' | 'floor' | 'round' = 'ceil') => pctToRound(pct, totalRounds, dir);
 
   return {

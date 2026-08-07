@@ -64,6 +64,13 @@ import {
 } from '@/utils/archetypeDetection';
 import { detectChaosArchetype, type ChaosPick } from '@/utils/chaosDetection';
 import { buildDraftConfig } from '@/constants/buildDraftConfig';
+import {
+  buildStartingSlots,
+  countBaseStarters,
+  getBenchCount,
+  getFlexCount,
+  parseStarters,
+} from '@/utils/rosterSlots';
 import { getArchetypeByNameOrImproviser } from '@/constants/archetypeListWithImproviser';
 import { getChaosArchetypeByName, isChaosReplace } from '@/constants/chaosArchetypes';
 import {
@@ -363,29 +370,8 @@ const MultiplayerDraftRoom = () => {
   );
 
   const getStartingSlots = useCallback((): { label: string; positions: string[] }[] => {
-    const flexCount = positionLimits?.FLEX ?? (draft?.is_superflex ? 2 : 1);
-    const base = [
-      { label: 'QB', positions: ['QB'] },
-      { label: 'RB1', positions: ['RB'] },
-      { label: 'RB2', positions: ['RB'] },
-      { label: 'WR1', positions: ['WR'] },
-      { label: 'WR2', positions: ['WR'] },
-      { label: 'TE', positions: ['TE'] },
-    ];
-    const flexPositions = draft?.is_superflex
-      ? ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'D/ST']
-      : ['RB', 'WR', 'TE'];
-    const flexSlots = Array.from({ length: flexCount }, () => ({
-      label: 'FLEX',
-      positions: flexPositions,
-    }));
-    return [
-      ...base,
-      ...flexSlots,
-      { label: 'DEF', positions: ['DEF', 'D/ST'] },
-      { label: 'K', positions: ['K'] },
-    ];
-  }, [positionLimits?.FLEX, draft?.is_superflex]);
+    return buildStartingSlots(positionLimits, !!draft?.is_superflex);
+  }, [positionLimits, draft?.is_superflex]);
 
   const loadPlayersFromBoard = useCallback(async (d: MultiplayerDraft) => {
     const ids = d.board_player_ids || [];
@@ -797,9 +783,10 @@ const MultiplayerDraftRoom = () => {
     (async () => {
       const humans = participants.filter((p) => p.team_number != null);
       const limits = draft.position_limits || {};
-      const flexCount = limits.FLEX ?? (draft.is_superflex ? 2 : 1);
-      const benchCount = limits.BENCH ?? 6;
-      const config = buildDraftConfig(flexCount, benchCount, draft.num_teams);
+      const flexCount = getFlexCount(limits, draft.is_superflex);
+      const benchCount = getBenchCount(limits);
+      const baseStarters = countBaseStarters(parseStarters(limits));
+      const config = buildDraftConfig(flexCount, benchCount, draft.num_teams, baseStarters);
       const payload: Array<Record<string, unknown>> = [];
 
       for (const human of humans) {
@@ -828,6 +815,9 @@ const MultiplayerDraftRoom = () => {
         const grade = computeDraftGrade(gradePicks, {
           numTeams: draft.num_teams,
           numRounds: draft.num_rounds,
+          isSuperflex: draft.is_superflex,
+          starters: parseStarters(limits),
+          flexCount: getFlexCount(limits, draft.is_superflex),
         });
 
         const detectionPicks: DraftPickWithPlayer[] = teamRows.map((p) => {
@@ -910,7 +900,7 @@ const MultiplayerDraftRoom = () => {
       .map((pick) => players.find((p) => p.id === pick.player_id))
       .filter((p): p is RankedPlayer => !!p);
     const startingSlots = getStartingSlots();
-    const benchCount = positionLimits?.BENCH ?? 6;
+    const benchCount = getBenchCount(positionLimits);
     const myKeeperIds = keepers
       .filter((k) => k.team_number === myTeam)
       .map((k) => k.player_id);
@@ -936,9 +926,10 @@ const MultiplayerDraftRoom = () => {
               };
             }),
             buildDraftConfig(
-              positionLimits.FLEX ?? (draft.is_superflex ? 2 : 1),
-              positionLimits.BENCH ?? 6,
-              draft.num_teams
+              getFlexCount(positionLimits, draft.is_superflex),
+              getBenchCount(positionLimits),
+              draft.num_teams,
+              countBaseStarters(parseStarters(positionLimits))
             )
           )
         : '');
@@ -1197,7 +1188,7 @@ const MultiplayerDraftRoom = () => {
               .map((pick) => players.find((p) => p.id === pick.player_id))
               .filter((p): p is RankedPlayer => !!p);
             const slots = getStartingSlots();
-            const bench = positionLimits?.BENCH ?? 6;
+            const bench = getBenchCount(positionLimits);
             const teamKeeperIds = keepers
               .filter((k) => k.team_number === viewingResultTeam)
               .map((k) => k.player_id);

@@ -509,9 +509,11 @@ const Settings = () => {
           RB: 8,
           WR: 8,
           TE: 3,
+          FLEX: newLeagueSuperflex ? 2 : 1,
           K: 3,
           DEF: calculatedDefLimit,
           BENCH: 7,
+          starters: { QB: 1, RB: 2, WR: 2, TE: 1, DEF: 1, K: 1 },
         },
       };
 

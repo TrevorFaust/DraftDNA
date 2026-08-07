@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Save, Users, Settings2, ArrowLeft, Layers, BookmarkPlus, Plus, Trash2, HelpCircle, ListOrdered, Info } from 'lucide-react';
+import { Save, Users, Settings2, ArrowLeft, Layers, BookmarkPlus, Plus, Trash2, HelpCircle, ListOrdered, Info, LayoutList } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { tempSettingsStorage } from '@/utils/temporaryStorage';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,20 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import type { Player } from '@/types/database';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
+import {
+  DEFAULT_STARTERS,
+  STARTER_MAX,
+  STARTER_MIN,
+  STARTER_POSITION_ORDER,
+  countBaseStarters,
+  ensureLimitsCoverStarters,
+  formatLineupSummary,
+  getRosterRounds,
+  parseStarters,
+  type PositionLimitsLike,
+  type StarterCounts,
+  type StarterPosition,
+} from '@/utils/rosterSlots';
 
 interface PositionLimits {
   QB: number;
@@ -32,6 +46,7 @@ interface PositionLimits {
   DEF: number;
   BENCH: number;
   KEEPERS: number;
+  starters?: StarterCounts;
 }
 
 interface TeamName {
@@ -70,16 +85,29 @@ export default function LeagueSettings() {
     }
   }, [user, selectedLeague, leaguesLoading, leagues, setSelectedLeague]);
   
-  const [positionLimits, setPositionLimits] = useState<Record<keyof PositionLimits, number | string>>({
+  const [positionLimits, setPositionLimits] = useState<Record<keyof Omit<PositionLimits, 'starters'>, number | string>>({
     QB: 4, RB: 8, WR: 8, TE: 6, FLEX: 1, K: 3, DEF: 3, BENCH: 5, KEEPERS: 1
   });
+  const [starterCounts, setStarterCounts] = useState<Record<StarterPosition, number | string>>({
+    ...DEFAULT_STARTERS,
+  });
   
-  const defaultMinimums: PositionLimits = {
-    QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, K: 1, DEF: 1, BENCH: 0, KEEPERS: 0
-  };
-  
-  const defaultMaximums: PositionLimits = {
+  const defaultMaximums: Record<keyof Omit<PositionLimits, 'starters'>, number> = {
     QB: 15, RB: 15, WR: 15, TE: 15, FLEX: 6, K: 15, DEF: 15, BENCH: 15, KEEPERS: 20
+  };
+
+  const resolvedStarters = (): StarterCounts => ({
+    QB: starterCounts.QB === '' ? DEFAULT_STARTERS.QB : Math.max(STARTER_MIN.QB, Math.min(STARTER_MAX.QB, Number(starterCounts.QB) || 0)),
+    RB: starterCounts.RB === '' ? DEFAULT_STARTERS.RB : Math.max(STARTER_MIN.RB, Math.min(STARTER_MAX.RB, Number(starterCounts.RB) || 0)),
+    WR: starterCounts.WR === '' ? DEFAULT_STARTERS.WR : Math.max(STARTER_MIN.WR, Math.min(STARTER_MAX.WR, Number(starterCounts.WR) || 0)),
+    TE: starterCounts.TE === '' ? DEFAULT_STARTERS.TE : Math.max(STARTER_MIN.TE, Math.min(STARTER_MAX.TE, Number(starterCounts.TE) || 0)),
+    DEF: starterCounts.DEF === '' ? DEFAULT_STARTERS.DEF : Math.max(STARTER_MIN.DEF, Math.min(STARTER_MAX.DEF, Number(starterCounts.DEF) || 0)),
+    K: starterCounts.K === '' ? DEFAULT_STARTERS.K : Math.max(STARTER_MIN.K, Math.min(STARTER_MAX.K, Number(starterCounts.K) || 0)),
+  });
+
+  const resolvedFlex = (): number => {
+    if (positionLimits.FLEX === '') return isSuperflex ? 2 : 1;
+    return Math.max(0, Math.min(6, Number(positionLimits.FLEX) || 0));
   };
   const [teamNames, setTeamNames] = useState<TeamName[]>([]);
   const [leagueName, setLeagueName] = useState('');
@@ -127,18 +155,20 @@ export default function LeagueSettings() {
           // Calculate DEF limit based on numTeams if not already calculated
           const numTeamsValue = tempSettings.numTeams || 12;
           const calculatedDefLimit = Math.floor(32 / numTeamsValue);
+          const guestLimits = tempSettings.positionLimits as PositionLimitsLike;
           
           setPositionLimits({
             QB: tempSettings.positionLimits.QB ?? 4,
             RB: tempSettings.positionLimits.RB ?? 8,
             WR: tempSettings.positionLimits.WR ?? 8,
             TE: tempSettings.positionLimits.TE ?? 6, // Default to 6 for guests
-            FLEX: (tempSettings.positionLimits as { FLEX?: number }).FLEX ?? (tempSettings.isSuperflex ? 2 : 1),
+            FLEX: guestLimits.FLEX ?? (tempSettings.isSuperflex ? 2 : 1),
             K: tempSettings.positionLimits.K ?? 3,
             DEF: tempSettings.positionLimits.DEF ?? calculatedDefLimit, // Use calculated if not set
             BENCH: tempSettings.positionLimits.BENCH ?? 5, // Default to 5 for guests
-            KEEPERS: (tempSettings.positionLimits as { KEEPERS?: number }).KEEPERS ?? 1,
+            KEEPERS: guestLimits.KEEPERS ?? 1,
           });
+          setStarterCounts(parseStarters(guestLimits));
         }
       }
     }
@@ -204,10 +234,10 @@ export default function LeagueSettings() {
         round: row.round_number,
       });
     });
-    const limits = selectedLeague?.position_limits as { KEEPERS?: number; BENCH?: number; FLEX?: number } | undefined;
-    const flexCount = limits?.FLEX ?? (selectedLeague?.is_superflex ? 2 : 1);
-    const bench = limits?.BENCH ?? 6;
-    const keeperLimit = limits ? Math.min(Math.max(0, limits.KEEPERS ?? 1), 8 + flexCount + bench) : 1;
+    const limits = selectedLeague?.position_limits as PositionLimitsLike | undefined;
+    const keeperLimit = limits
+      ? Math.min(Math.max(0, limits.KEEPERS ?? 1), getRosterRounds(limits, !!selectedLeague?.is_superflex))
+      : 1;
     for (let i = 1; i <= count; i++) {
       const arr = byTeam[i] || [];
       if (arr.length === 0) arr.push({ player: null, round: 1 });
@@ -221,7 +251,7 @@ export default function LeagueSettings() {
       // Load league name
       setLeagueName(selectedLeague.name);
 
-      // Load position limits
+      // Load position limits + starter lineup
       const limits = selectedLeague.position_limits as unknown as PositionLimits | null;
       if (limits && typeof limits === 'object') {
         const isSflex = (selectedLeague.is_superflex as boolean) || false;
@@ -230,12 +260,13 @@ export default function LeagueSettings() {
           RB: limits.RB ?? 8,
           WR: limits.WR ?? 8,
           TE: limits.TE ?? 3,
-          FLEX: (limits as PositionLimits).FLEX ?? (isSflex ? 2 : 1),
+          FLEX: limits.FLEX ?? (isSflex ? 2 : 1),
           K: limits.K ?? 3,
           DEF: limits.DEF ?? 3,
-          BENCH: (limits as PositionLimits).BENCH ?? 7,
-          KEEPERS: (limits as PositionLimits).KEEPERS ?? 1,
+          BENCH: limits.BENCH ?? 7,
+          KEEPERS: limits.KEEPERS ?? 1,
         });
+        setStarterCounts(parseStarters(limits));
       }
 
       // Load num teams
@@ -300,22 +331,22 @@ export default function LeagueSettings() {
     
   }, [numTeams, userPickPosition, user, selectedLeague]);
 
-  // Max keepers = number of draft rounds (starters + bench from current limits)
+  // Max keepers = number of draft rounds (starters + flex + bench from current form)
   const getMaxKeepers = (): number => {
-    const flexCount = typeof positionLimits.FLEX === 'number' ? positionLimits.FLEX : parseInt(String(positionLimits.FLEX)) || (isSuperflex ? 2 : 1);
-    const minStarters = 8 + flexCount; // QB, RB, RB, WR, WR, TE, FLEX×N, DEF, K
+    const starters = resolvedStarters();
+    const flexCount = resolvedFlex();
     const bench = typeof positionLimits.BENCH === 'number' ? positionLimits.BENCH : parseInt(String(positionLimits.BENCH)) || 6;
-    return minStarters + bench;
+    return countBaseStarters(starters) + flexCount + Math.max(0, bench);
   };
 
-  const handlePositionLimitChange = (position: keyof PositionLimits, value: string) => {
+  const handlePositionLimitChange = (position: keyof Omit<PositionLimits, 'starters'>, value: string) => {
     const cleaned = value.replace(/-/g, '');
     if (cleaned === '') {
       setPositionLimits(prev => ({ ...prev, [position]: '' }));
       return;
     }
     if (/^0+$/.test(cleaned)) {
-      if (position === 'BENCH') {
+      if (position === 'BENCH' || position === 'FLEX') {
         setPositionLimits(prev => ({ ...prev, [position]: 0 }));
       } else {
         setPositionLimits(prev => ({ ...prev, [position]: '' }));
@@ -325,11 +356,26 @@ export default function LeagueSettings() {
     const limited = cleaned.length > 3 ? cleaned.slice(0, 3) : cleaned;
     const numValue = parseInt(limited, 10);
     if (isNaN(numValue)) return;
-    const currentNumTeams = typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || selectedLeague?.num_teams || 12;
     const maxDefLimit = position === 'DEF' ? 29 : 15;
     const max = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : defaultMaximums[position];
     const clamped = Math.min(max, Math.max(0, numValue));
     setPositionLimits(prev => ({ ...prev, [position]: clamped }));
+  };
+
+  const handleStarterChange = (position: StarterPosition, value: string) => {
+    const cleaned = value.replace(/-/g, '');
+    if (cleaned === '') {
+      setStarterCounts(prev => ({ ...prev, [position]: '' }));
+      return;
+    }
+    if (/^0+$/.test(cleaned)) {
+      setStarterCounts(prev => ({ ...prev, [position]: 0 }));
+      return;
+    }
+    const numValue = parseInt(cleaned.slice(0, 2), 10);
+    if (isNaN(numValue)) return;
+    const clamped = Math.min(STARTER_MAX[position], Math.max(STARTER_MIN[position], numValue));
+    setStarterCounts(prev => ({ ...prev, [position]: clamped }));
   };
 
   const handleNumTeamsChange = (value: string) => {
@@ -564,185 +610,162 @@ export default function LeagueSettings() {
     }
   };
 
-  // Validate that position limits allow for a valid roster
-  const validatePositionLimits = (limits: PositionLimits, isSuperflex: boolean, numTeams: number): { valid: boolean; error?: string } => {
-    // Starting lineup: QB(1), RB(2), WR(2), TE(1), FLEX(N), DEF(1), K(1) = 8 + N starters
-    const flexCount = limits.FLEX ?? (isSuperflex ? 2 : 1);
-    
-    if (flexCount < 1 || flexCount > 6) {
-      return {
-        valid: false,
-        error: `Flex count must be between 1 and 6. Currently: ${flexCount}`
-      };
+  // Validate that position limits allow for a valid roster given the starter lineup
+  const validatePositionLimits = (
+    limits: PositionLimits,
+    isSuperflexLeague: boolean,
+    numTeamsValue: number
+  ): { valid: boolean; error?: string } => {
+    const starters = parseStarters(limits);
+    const flexCount = Math.max(0, Math.min(6, limits.FLEX ?? (isSuperflexLeague ? 2 : 1)));
+    const baseStarters = countBaseStarters(starters);
+
+    if (baseStarters + flexCount < 1) {
+      return { valid: false, error: 'Starting lineup must include at least one starter or flex slot.' };
     }
-    
-    // RB + WR + TE must cover 2 RB + 2 WR + 1 TE + flexCount FLEX slots = 5 + flexCount
-    const minFlexRequirement = limits.RB + limits.WR + limits.TE;
-    if (minFlexRequirement < 5 + flexCount) {
-      return {
-        valid: false,
-        error: `Position limits are too low. You need at least ${5 + flexCount} total players from RB, WR, and TE combined to fill your starting lineup (2 RB + 2 WR + 1 TE + ${flexCount} FLEX). Currently: ${limits.RB} RB + ${limits.WR} WR + ${limits.TE} TE = ${minFlexRequirement}`
-      };
+
+    if (flexCount > 6) {
+      return { valid: false, error: `Flex count must be between 0 and 6. Currently: ${flexCount}` };
     }
-    
-    // Check individual minimums
-    if (limits.QB < 1) {
-      return { valid: false, error: 'QB limit must be at least 1' };
-    }
-    if (limits.RB < 2) {
-      return { valid: false, error: 'RB limit must be at least 2 (for RB1 and RB2)' };
-    }
-    if (limits.WR < 2) {
-      return { valid: false, error: 'WR limit must be at least 2 (for WR1 and WR2)' };
-    }
-    if (limits.TE < 1) {
-      return { valid: false, error: 'TE limit must be at least 1' };
-    }
-    if (limits.K < 1) {
-      return { valid: false, error: 'K limit must be at least 1' };
-    }
-    if (limits.DEF < 1) {
-      return { valid: false, error: 'DEF limit must be at least 1' };
-    }
-    if (limits.DEF > 29) {
-      return { valid: false, error: 'DEF limit cannot exceed 29 (smallest league is 4; 29+3=32 defenses)' };
-    }
-    
-    // Check defense availability - there are only 32 NFL defenses
-    // Each team needs at least 1 defense, so we need: numTeams <= 32
-    if (numTeams > 32) {
-      return {
-        valid: false,
-        error: `Cannot have more than 32 teams. There are only 32 NFL defenses available, and each team needs at least 1 defense.`
-      };
-    }
-    
-    // DEF limit is 1–29 (smallest league is 4, so 29+3=32); at draft time the app enforces the 32-defense pool so other teams can fill their DEF slots.
-    
-    if (limits.BENCH < 0) {
-      return { valid: false, error: 'BENCH limit cannot be negative' };
-    }
-    
-    // Calculate minimum roster size
-    // Starters: QB(1) + RB(2) + WR(2) + TE(1) + FLEX(N) + DEF(1) + K(1) = 8 + N
-    const minStarters = 8 + flexCount;
-    const minRosterSize = minStarters + limits.BENCH;
-    
-    // Calculate maximum possible roster size from position limits (KEEPERS and FLEX are not separate draft limits)
-    const maxRosterSize = limits.QB + limits.RB + limits.WR + limits.TE + limits.K + limits.DEF + limits.BENCH;
-    
-    // The maximum roster size must be at least the minimum roster size
-    if (maxRosterSize < minRosterSize) {
-      return {
-        valid: false,
-        error: `Position limits are too low. Your roster needs at least ${minRosterSize} players (${minStarters} starters + ${limits.BENCH} bench), but your limits only allow ${maxRosterSize} players total.`
-      };
-    }
-    
-    // Check if bench slots can be filled without exceeding position limits
-    // Starters: QB(1 or 2 with superflex), RB(2), WR(2), TE(1), FLEX(N from RB/WR/TE or one from QB in superflex), DEF(1), K(1)
-    const qbUsed = isSuperflex ? 2 : 1;
-    const defUsed = 1;
-    const kUsed = 1;
-    
-    // Worst-case remaining capacity: all FLEX slots take from one position
-    // Scenario 1: all FLEX from RB
-    const scenario1Remaining = 
-      Math.max(0, limits.QB - qbUsed) +
-      Math.max(0, limits.RB - (2 + flexCount)) +
-      Math.max(0, limits.WR - 2) +
-      Math.max(0, limits.TE - 1) +
-      Math.max(0, limits.DEF - defUsed) +
-      Math.max(0, limits.K - kUsed);
-    
-    const scenario2Remaining = 
-      Math.max(0, limits.QB - qbUsed) +
-      Math.max(0, limits.RB - 2) +
-      Math.max(0, limits.WR - (2 + flexCount)) +
-      Math.max(0, limits.TE - 1) +
-      Math.max(0, limits.DEF - defUsed) +
-      Math.max(0, limits.K - kUsed);
-    
-    const scenario3Remaining = 
-      Math.max(0, limits.QB - qbUsed) +
-      Math.max(0, limits.RB - 2) +
-      Math.max(0, limits.WR - 2) +
-      Math.max(0, limits.TE - (1 + flexCount)) +
-      Math.max(0, limits.DEF - defUsed) +
-      Math.max(0, limits.K - kUsed);
-    
-    // Use the minimum remaining capacity (worst case scenario)
-    const minRemainingCapacity = Math.min(scenario1Remaining, scenario2Remaining, scenario3Remaining);
-    
-    // Bench slots can be filled by any position, but total must not exceed remaining capacity
-    if (limits.BENCH > minRemainingCapacity) {
-      let worstScenario = 'FLEX slots using RB';
-      if (scenario2Remaining < scenario1Remaining && scenario2Remaining < scenario3Remaining) {
-        worstScenario = 'FLEX slots using WR';
-      } else if (scenario3Remaining < scenario1Remaining && scenario3Remaining < scenario2Remaining) {
-        worstScenario = 'FLEX slots using TE';
+
+    for (const pos of STARTER_POSITION_ORDER) {
+      if (limits[pos] < starters[pos]) {
+        return {
+          valid: false,
+          error: `${pos} limit (${limits[pos]}) cannot be below starting ${pos} slots (${starters[pos]}).`,
+        };
       }
-      
+    }
+
+    const flexFromSkill = isSuperflexLeague ? Math.max(0, flexCount - 1) : flexCount;
+    const skillNeed = starters.RB + starters.WR + starters.TE + flexFromSkill;
+    const skillHave = limits.RB + limits.WR + limits.TE;
+    if (skillHave < skillNeed) {
       return {
         valid: false,
-        error: `Bench slots (${limits.BENCH}) exceed available player capacity. After filling starting positions (worst case: ${worstScenario}), you only have ${minRemainingCapacity} total player slots remaining across all positions. Bench slots must not exceed this total.`
+        error: `Position limits are too low. You need at least ${skillNeed} combined RB/WR/TE to cover starters${flexFromSkill ? ` + ${flexFromSkill} flex` : ''}. Currently: ${limits.RB} RB + ${limits.WR} WR + ${limits.TE} TE = ${skillHave}.`,
       };
     }
 
-    // Keepers limit: 0 <= KEEPERS <= number of draft rounds (starters + bench)
+    if (limits.DEF > 29) {
+      return { valid: false, error: 'DEF limit cannot exceed 29 (smallest league is 4; 29+3=32 defenses)' };
+    }
+
+    if (numTeamsValue > 32) {
+      return {
+        valid: false,
+        error: `Cannot have more than 32 teams. There are only 32 NFL defenses available.`,
+      };
+    }
+
+    if (limits.BENCH < 0) {
+      return { valid: false, error: 'BENCH limit cannot be negative' };
+    }
+
+    const minStarters = baseStarters + flexCount;
+    const minRosterSize = minStarters + limits.BENCH;
+    const maxRosterSize = limits.QB + limits.RB + limits.WR + limits.TE + limits.K + limits.DEF + limits.BENCH;
+
+    if (maxRosterSize < minRosterSize) {
+      return {
+        valid: false,
+        error: `Position limits are too low. Your roster needs at least ${minRosterSize} players (${minStarters} starters + ${limits.BENCH} bench), but your limits only allow ${maxRosterSize} players total.`,
+      };
+    }
+
+    const qbUsed = starters.QB + (isSuperflexLeague && flexCount > 0 ? 1 : 0);
+    const defUsed = starters.DEF;
+    const kUsed = starters.K;
+
+    const scenario1Remaining =
+      Math.max(0, limits.QB - qbUsed) +
+      Math.max(0, limits.RB - (starters.RB + flexCount)) +
+      Math.max(0, limits.WR - starters.WR) +
+      Math.max(0, limits.TE - starters.TE) +
+      Math.max(0, limits.DEF - defUsed) +
+      Math.max(0, limits.K - kUsed);
+
+    const scenario2Remaining =
+      Math.max(0, limits.QB - qbUsed) +
+      Math.max(0, limits.RB - starters.RB) +
+      Math.max(0, limits.WR - (starters.WR + flexCount)) +
+      Math.max(0, limits.TE - starters.TE) +
+      Math.max(0, limits.DEF - defUsed) +
+      Math.max(0, limits.K - kUsed);
+
+    const scenario3Remaining =
+      Math.max(0, limits.QB - qbUsed) +
+      Math.max(0, limits.RB - starters.RB) +
+      Math.max(0, limits.WR - starters.WR) +
+      Math.max(0, limits.TE - (starters.TE + flexCount)) +
+      Math.max(0, limits.DEF - defUsed) +
+      Math.max(0, limits.K - kUsed);
+
+    const minRemainingCapacity = Math.min(scenario1Remaining, scenario2Remaining, scenario3Remaining);
+
+    if (limits.BENCH > minRemainingCapacity) {
+      let worstScenario = 'FLEX slots using RB';
+      if (scenario2Remaining <= scenario1Remaining && scenario2Remaining <= scenario3Remaining) {
+        worstScenario = 'FLEX slots using WR';
+      } else if (scenario3Remaining <= scenario1Remaining && scenario3Remaining <= scenario2Remaining) {
+        worstScenario = 'FLEX slots using TE';
+      }
+
+      return {
+        valid: false,
+        error: `Bench slots (${limits.BENCH}) exceed available player capacity. After filling starting positions (worst case: ${worstScenario}), you only have ${minRemainingCapacity} total player slots remaining across all positions. Bench slots must not exceed this total.`,
+      };
+    }
+
     if (limits.KEEPERS !== undefined && typeof limits.KEEPERS === 'number') {
       const numRounds = minStarters + limits.BENCH;
       if (limits.KEEPERS < 0 || limits.KEEPERS > numRounds) {
         return {
           valid: false,
-          error: `Keepers limit must be between 0 and ${numRounds} (number of draft rounds).`
+          error: `Keepers limit must be between 0 and ${numRounds} (number of draft rounds).`,
         };
       }
     }
-    
+
     return { valid: true };
   };
 
-  const savePositionLimits = async () => {
-    if (!user) {
-      toast.error('Please sign in to save position limits');
-      return;
-    }
-    
-    if (!selectedLeague) return;
+  const buildFinalPositionLimits = (): PositionLimits => {
+    const starters = resolvedStarters();
+    const flexCount = resolvedFlex();
+    const bench = positionLimits.BENCH === '' ? 0 : Math.max(0, Number(positionLimits.BENCH));
+    const maxKeepersForSave = countBaseStarters(starters) + flexCount + bench;
 
-    setSaving(true);
-    
-    const maxKeepersForSave = (() => {
-      const flexCount = positionLimits.FLEX === '' ? (isSuperflex ? 2 : 1) : Math.max(1, Math.min(6, Number(positionLimits.FLEX) || 1));
-      const bench = positionLimits.BENCH === '' ? 6 : Math.max(0, Number(positionLimits.BENCH));
-      return 8 + flexCount + bench;
-    })();
-    const defaultFlex = isSuperflex ? 2 : 1;
-    // Apply default minimums for empty values or values below minimum
-    const finalLimits: PositionLimits = {
-      QB: positionLimits.QB === '' ? defaultMinimums.QB : Math.max(defaultMinimums.QB, Number(positionLimits.QB)),
-      RB: positionLimits.RB === '' ? defaultMinimums.RB : Math.max(defaultMinimums.RB, Number(positionLimits.RB)),
-      WR: positionLimits.WR === '' ? defaultMinimums.WR : Math.max(defaultMinimums.WR, Number(positionLimits.WR)),
-      TE: positionLimits.TE === '' ? defaultMinimums.TE : Math.max(defaultMinimums.TE, Number(positionLimits.TE)),
-      FLEX: positionLimits.FLEX === '' ? defaultFlex : Math.max(1, Math.min(6, Number(positionLimits.FLEX) || 1)),
-      K: positionLimits.K === '' ? defaultMinimums.K : Math.max(defaultMinimums.K, Number(positionLimits.K)),
-      DEF: positionLimits.DEF === '' ? defaultMinimums.DEF : Math.max(1, Math.min(29, Math.max(defaultMinimums.DEF, Number(positionLimits.DEF)))),
-      BENCH: positionLimits.BENCH === '' ? defaultMinimums.BENCH : Math.max(defaultMinimums.BENCH, Number(positionLimits.BENCH)),
+    let limits: PositionLimits = {
+      QB: positionLimits.QB === '' ? Math.max(4, starters.QB) : Math.max(starters.QB, Number(positionLimits.QB) || 0),
+      RB: positionLimits.RB === '' ? Math.max(8, starters.RB) : Math.max(starters.RB, Number(positionLimits.RB) || 0),
+      WR: positionLimits.WR === '' ? Math.max(8, starters.WR) : Math.max(starters.WR, Number(positionLimits.WR) || 0),
+      TE: positionLimits.TE === '' ? Math.max(6, starters.TE) : Math.max(starters.TE, Number(positionLimits.TE) || 0),
+      FLEX: flexCount,
+      K: positionLimits.K === '' ? Math.max(3, starters.K) : Math.max(starters.K, Number(positionLimits.K) || 0),
+      DEF: positionLimits.DEF === ''
+        ? Math.max(3, starters.DEF)
+        : Math.max(starters.DEF, Math.min(29, Number(positionLimits.DEF) || 0)),
+      BENCH: bench,
       KEEPERS: positionLimits.KEEPERS === '' ? 1 : Math.max(0, Math.min(maxKeepersForSave, Number(positionLimits.KEEPERS) || 0)),
+      starters,
     };
-    
-    // Get current number of teams for validation
-    const currentNumTeams = typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || selectedLeague?.num_teams || 12;
-    
-    // Validate position limits before saving
-    const validation = validatePositionLimits(finalLimits, isSuperflex, currentNumTeams);
-    if (!validation.valid) {
-      toast.error(validation.error || 'Invalid position limits');
-      setSaving(false);
-      return;
-    }
-    
+
+    const covered = ensureLimitsCoverStarters(limits, starters, flexCount, isSuperflex);
+    limits = {
+      ...limits,
+      QB: typeof covered.QB === 'number' ? covered.QB : limits.QB,
+      RB: typeof covered.RB === 'number' ? covered.RB : limits.RB,
+      WR: typeof covered.WR === 'number' ? covered.WR : limits.WR,
+      TE: typeof covered.TE === 'number' ? covered.TE : limits.TE,
+      DEF: typeof covered.DEF === 'number' ? covered.DEF : limits.DEF,
+      K: typeof covered.K === 'number' ? covered.K : limits.K,
+    };
+    return limits;
+  };
+
+  const persistPositionLimits = async (finalLimits: PositionLimits, successMessage: string) => {
+    if (!selectedLeague) return false;
     const limitsJson = JSON.parse(JSON.stringify(finalLimits));
     const { error } = await supabase
       .from('leagues')
@@ -750,30 +773,114 @@ export default function LeagueSettings() {
       .eq('id', selectedLeague.id);
 
     if (error) {
-      toast.error('Failed to save position limits');
+      toast.error('Failed to save roster settings');
       console.error(error);
-    } else {
-      toast.success('Position limits saved');
-      setPositionLimits(finalLimits);
-      await refreshLeagues();
-      // Update selectedLeague after refresh to ensure UI reflects saved changes
-      const { data: updatedLeague } = await supabase
-        .from('leagues')
-        .select('*')
-        .eq('id', selectedLeague.id)
-        .single();
-      if (updatedLeague) {
-        setSelectedLeague(updatedLeague);
-      }
+      return false;
     }
+
+    toast.success(successMessage);
+    setPositionLimits({
+      QB: finalLimits.QB,
+      RB: finalLimits.RB,
+      WR: finalLimits.WR,
+      TE: finalLimits.TE,
+      FLEX: finalLimits.FLEX,
+      K: finalLimits.K,
+      DEF: finalLimits.DEF,
+      BENCH: finalLimits.BENCH,
+      KEEPERS: finalLimits.KEEPERS,
+    });
+    if (finalLimits.starters) setStarterCounts(finalLimits.starters);
+    await refreshLeagues();
+    const { data: updatedLeague } = await supabase
+      .from('leagues')
+      .select('*')
+      .eq('id', selectedLeague.id)
+      .single();
+    if (updatedLeague) {
+      setSelectedLeague(updatedLeague);
+    }
+    return true;
+  };
+
+  const savePositionLimits = async () => {
+    if (!user) {
+      toast.error('Please sign in to save position limits');
+      return;
+    }
+    if (!selectedLeague) return;
+
+    setSaving(true);
+    const finalLimits = buildFinalPositionLimits();
+    const currentNumTeams = typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || selectedLeague?.num_teams || 12;
+    const validation = validatePositionLimits(finalLimits, isSuperflex, currentNumTeams);
+    if (!validation.valid) {
+      toast.error(validation.error || 'Invalid position limits');
+      setSaving(false);
+      return;
+    }
+    await persistPositionLimits(finalLimits, 'Position limits saved');
+    setSaving(false);
+  };
+
+  const saveStartingLineup = async () => {
+    setSaving(true);
+    const finalLimits = buildFinalPositionLimits();
+    const currentNumTeams =
+      typeof numTeams === 'number'
+        ? numTeams
+        : parseInt(String(numTeams)) || selectedLeague?.num_teams || 12;
+    const validation = validatePositionLimits(finalLimits, isSuperflex, currentNumTeams);
+    if (!validation.valid) {
+      toast.error(validation.error || 'Invalid starting lineup');
+      setSaving(false);
+      return;
+    }
+
+    if (!user) {
+      const cur = tempSettingsStorage.get() || {};
+      tempSettingsStorage.save({
+        ...cur,
+        isSuperflex,
+        positionLimits: {
+          ...(cur.positionLimits || {}),
+          ...finalLimits,
+        },
+      });
+      setPositionLimits({
+        QB: finalLimits.QB,
+        RB: finalLimits.RB,
+        WR: finalLimits.WR,
+        TE: finalLimits.TE,
+        FLEX: finalLimits.FLEX,
+        K: finalLimits.K,
+        DEF: finalLimits.DEF,
+        BENCH: finalLimits.BENCH,
+        KEEPERS: finalLimits.KEEPERS,
+      });
+      setStarterCounts(finalLimits.starters || DEFAULT_STARTERS);
+      toast.success('Starting lineup saved for your mock drafts');
+      setSaving(false);
+      return;
+    }
+
+    if (!selectedLeague) {
+      toast.error('Select a league to save starting lineup');
+      setSaving(false);
+      return;
+    }
+
+    await persistPositionLimits(finalLimits, 'Starting lineup saved');
     setSaving(false);
   };
 
   const calculateNumRounds = (): number => {
-    const limits = selectedLeague?.position_limits as { BENCH?: number; FLEX?: number } | undefined;
-    const flexCount = limits?.FLEX ?? (isSuperflex ? 2 : 1);
-    const bench = limits?.BENCH ?? 6;
-    return 8 + flexCount + bench;
+    if (selectedLeague?.position_limits) {
+      return getRosterRounds(selectedLeague.position_limits as PositionLimitsLike, isSuperflex);
+    }
+    return countBaseStarters(resolvedStarters()) + resolvedFlex() + (
+      typeof positionLimits.BENCH === 'number' ? positionLimits.BENCH : parseInt(String(positionLimits.BENCH)) || 6
+    );
   };
 
   /** Max keepers per team from live Position Limits form (falls back to saved league). */
@@ -1106,10 +1213,14 @@ export default function LeagueSettings() {
         )}
 
         <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-secondary/50">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 bg-secondary/50 h-auto gap-1">
             <TabsTrigger value="general" className="gap-2">
               <Settings2 className="w-4 h-4" />
               General
+            </TabsTrigger>
+            <TabsTrigger value="lineup" className="gap-2">
+              <LayoutList className="w-4 h-4" />
+              Lineup
             </TabsTrigger>
             <TabsTrigger value="positions" className="gap-2">
               <Layers className="w-4 h-4" />
@@ -1273,13 +1384,7 @@ export default function LeagueSettings() {
                       Number of Rounds
                     </Label>
                     <div className="flex h-10 w-full rounded-md border border-input bg-secondary/50 px-3 py-2 text-sm items-center">
-                      {(() => {
-                        const limits = selectedLeague?.position_limits as { BENCH?: number; FLEX?: number } | undefined;
-                        const flexCount = limits?.FLEX ?? (isSuperflex ? 2 : 1);
-                        const bench = limits?.BENCH ?? 6;
-                        const rosterSize = 8 + flexCount + bench; // QB, RB, RB, WR, WR, TE, FLEX×N, DEF, K + bench
-                        return `${rosterSize} rounds`;
-                      })()}
+                      {calculateNumRounds()} rounds
                     </div>
                   </div>
                 </div>
@@ -1345,6 +1450,113 @@ export default function LeagueSettings() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="lineup" className="relative">
+            <Card className="glass-card">
+              <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    Starting Lineup
+                    {!user && (
+                      <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Local</span>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    {isRookieOnlyLeague ? (
+                      <>
+                        Rookie-only drafts use open pick slots. Lineup settings apply when Rookies only is off.
+                      </>
+                    ) : (
+                      <>
+                        Set how many of each position start (and how many flex slots). Extra drafted players go to the bench.
+                      </>
+                    )}
+                  </CardDescription>
+                </div>
+                <Button onClick={saveStartingLineup} disabled={saving || isRookieOnlyLeague} className="shrink-0">
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Lineup
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {isRookieOnlyLeague && (
+                  <Alert className="border-muted-foreground/25 bg-muted/30">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      Rookie-only leagues ignore starter slots in mock drafts. Uncheck Rookies only on General to use this lineup.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <div
+                  className={cn(
+                    'grid grid-cols-2 sm:grid-cols-4 gap-4',
+                    isRookieOnlyLeague && 'pointer-events-none opacity-50'
+                  )}
+                >
+                  {STARTER_POSITION_ORDER.map((position) => (
+                    <div key={position} className="space-y-2">
+                      <Label htmlFor={`starter-${position}`} className="text-sm font-medium">
+                        {position === 'DEF' ? 'Defense' : position}
+                        <span className="text-xs text-muted-foreground ml-1">
+                          (0–{STARTER_MAX[position]})
+                        </span>
+                      </Label>
+                      <Input
+                        id={`starter-${position}`}
+                        type="number"
+                        min={STARTER_MIN[position]}
+                        max={STARTER_MAX[position]}
+                        value={starterCounts[position]}
+                        onChange={(e) => handleStarterChange(position, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                        }}
+                        className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        disabled={isRookieOnlyLeague}
+                      />
+                    </div>
+                  ))}
+                  <div className="space-y-2">
+                    <Label htmlFor="starter-FLEX" className="text-sm font-medium">
+                      Flex
+                      <span className="text-xs text-muted-foreground ml-1">(0–6)</span>
+                    </Label>
+                    <Input
+                      id="starter-FLEX"
+                      type="number"
+                      min={0}
+                      max={6}
+                      value={positionLimits.FLEX}
+                      onChange={(e) => handlePositionLimitChange('FLEX', e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                      }}
+                      className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      disabled={isRookieOnlyLeague}
+                    />
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm space-y-2">
+                  <p className="font-medium text-foreground">
+                    {formatLineupSummary(resolvedStarters(), resolvedFlex())}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Draft rounds: {countBaseStarters(resolvedStarters()) + resolvedFlex() + (
+                      typeof positionLimits.BENCH === 'number'
+                        ? positionLimits.BENCH
+                        : parseInt(String(positionLimits.BENCH)) || 0
+                    )}{' '}
+                    (starters + flex + bench). Second RB with 1 RB starter goes to flex or bench.
+                  </p>
+                  {!user && (
+                    <p className="text-muted-foreground">
+                      Saved locally for guest mock drafts. Sign in to store this on a league.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="positions" className="relative">
             <Card className={cn("glass-card", !user && "opacity-90")}>
               <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4">
@@ -1361,7 +1573,7 @@ export default function LeagueSettings() {
                         With <strong>Rookies only</strong> enabled, mock rookie drafts use a limited rookie pool and open pick slots (any position)—these per-position limits are not used there. Values stay saved if you turn off rookies only later.
                       </>
                     ) : (
-                      <>Set the maximum number of players that can be drafted per position</>
+                      <>Set the maximum number of players that can be drafted per position. Flex slots are set on the Lineup tab.</>
                     )}
                   </CardDescription>
                 </div>
@@ -1409,10 +1621,12 @@ export default function LeagueSettings() {
                         </p>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {(Object.keys(positionLimits) as Array<keyof PositionLimits>).map((position) => {
+                        {(Object.keys(positionLimits) as Array<keyof Omit<PositionLimits, 'starters'>>)
+                          .filter((position) => position !== 'FLEX')
+                          .map((position) => {
                           const maxDefLimit = position === 'DEF' ? 29 : 15;
-                          const maxValue = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : 15;
-                          const label = position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position === 'KEEPERS' ? 'Keepers' : position === 'FLEX' ? 'Flex' : position;
+                          const maxValue = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : 15;
+                          const label = position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position === 'KEEPERS' ? 'Keepers' : position;
                           return (
                             <div key={position} className="space-y-2">
                               <Label htmlFor={position} className="text-sm font-medium">
@@ -1420,11 +1634,6 @@ export default function LeagueSettings() {
                                 {position === 'KEEPERS' && (
                                   <span className="text-xs text-muted-foreground ml-1">
                                     (max: {getMaxKeepers()} rounds)
-                                  </span>
-                                )}
-                                {position === 'FLEX' && (
-                                  <span className="text-xs text-muted-foreground ml-1">
-                                    (max: 6)
                                   </span>
                                 )}
                               </Label>
@@ -1455,10 +1664,12 @@ export default function LeagueSettings() {
                         isRookieOnlyLeague && 'pointer-events-none opacity-50'
                       )}
                     >
-                      {(Object.keys(positionLimits) as Array<keyof PositionLimits>).map((position) => {
+                      {(Object.keys(positionLimits) as Array<keyof Omit<PositionLimits, 'starters'>>)
+                        .filter((position) => position !== 'FLEX')
+                        .map((position) => {
                         const maxDefLimit = position === 'DEF' ? 29 : 15;
-                        const maxValue = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : 15;
-                        const label = position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position === 'KEEPERS' ? 'Keepers' : position === 'FLEX' ? 'Flex' : position;
+                        const maxValue = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : 15;
+                        const label = position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position === 'KEEPERS' ? 'Keepers' : position;
                         return (
                           <div key={position} className="space-y-2">
                             <Label htmlFor={position} className="text-sm font-medium">
@@ -1466,11 +1677,6 @@ export default function LeagueSettings() {
                               {position === 'KEEPERS' && (
                                 <span className="text-xs text-muted-foreground ml-1">
                                   (max: {getMaxKeepers()} rounds)
-                                </span>
-                              )}
-                              {position === 'FLEX' && (
-                                <span className="text-xs text-muted-foreground ml-1">
-                                  (max: 6)
                                 </span>
                               )}
                             </Label>
@@ -1503,12 +1709,12 @@ export default function LeagueSettings() {
                   <div className="bg-muted/50 border border-border rounded-lg p-4 text-sm">
                     <p className="font-medium mb-2">Minimum Requirements:</p>
                     <ul className="space-y-1 text-muted-foreground list-disc list-outside pl-5">
-                      <li>QB: 1, RB: 2, WR: 2, TE: 1, Flex: 1 (default 2 in superflex), K: 1, DEF: 1, Bench: 0</li>
-                      <li>RB + WR + TE must total at least 5 + Flex count (to fill RB1, RB2, WR1, WR2, TE, and all FLEX positions)</li>
+                      <li>Each position max must be at least its starting-lineup count (set on the Lineup tab)</li>
+                      <li>RB + WR + TE must cover dedicated starters plus flex (one flex may be QB in superflex)</li>
                       <li>Total roster size must accommodate all starting positions plus bench</li>
-                      <li>Keepers: max per team (0 to number of draft rounds). When selecting keepers, each team may use up to this many keeper slots; keeper picks count toward position limits during the draft.</li>
-                      <li className="text-primary/50">Note: Bench slots can be filled by any position, but must still respect position limits. Bench count cannot exceed the total remaining player capacity after filling starting positions.</li>
-                      <li className="text-primary/50">Defense: There are 32 NFL defenses; at draft time you can take a defense only if enough remain for every other team to fill their DEF slots.</li>
+                      <li>Keepers: max per team (0 to number of draft rounds). Keeper picks count toward position limits during the draft.</li>
+                      <li className="text-primary/50">Bench slots can be filled by any position within the maxes, and cannot exceed remaining capacity after starters.</li>
+                      <li className="text-primary/50">Defense: 32 NFL defenses; you can take a DEF only if enough remain for other teams to fill their DEF starter slots.</li>
                     </ul>
                   </div>
                 )}

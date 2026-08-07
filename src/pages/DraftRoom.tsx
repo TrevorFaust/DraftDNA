@@ -68,6 +68,15 @@ import {
   draftIdToSeed,
 } from '@/utils/cpuDraftRealism';
 import { buildDraftConfig, type DraftConfig } from '@/constants/buildDraftConfig';
+import {
+  buildStartingSlots,
+  countBaseStarters,
+  getBenchCount,
+  getFlexCount,
+  getPositionMax,
+  parseStarters,
+  toNumericPositionLimits,
+} from '@/utils/rosterSlots';
 import { detectChaosArchetype, type ChaosPick } from '@/utils/chaosDetection';
 import { getAgeFromBirthDate } from '@/utils/playerAge';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
@@ -143,6 +152,14 @@ const DraftRoom = () => {
     K?: number;
     DEF?: number;
     BENCH?: number;
+    starters?: {
+      QB?: number;
+      RB?: number;
+      WR?: number;
+      TE?: number;
+      DEF?: number;
+      K?: number;
+    };
   }>({ BENCH: 6 });
   const [isSuperflex, setIsSuperflex] = useState(false);
   const { teamNames: defenseTeamNames, teams: nflTeams } = useNflTeams();
@@ -701,21 +718,9 @@ const DraftRoom = () => {
     return `Team ${teamNumber}`;
   };
 
-  // Build starting roster slots. In superflex every FLEX can accept a QB, but we only allow one QB total across FLEX slots (enforced in slot-filling logic). So 2nd QB can go in any open FLEX; 3rd+ QB → bench.
-  const getStartingSlots = (): { label: string; positions: string[] }[] => {
-    const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
-    const base = [
-      { label: 'QB', positions: ['QB'] },
-      { label: 'RB1', positions: ['RB'] },
-      { label: 'RB2', positions: ['RB'] },
-      { label: 'WR1', positions: ['WR'] },
-      { label: 'WR2', positions: ['WR'] },
-      { label: 'TE', positions: ['TE'] },
-    ];
-    const flexPositions = isSuperflex ? ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'D/ST'] : ['RB', 'WR', 'TE'];
-    const flexSlots = Array.from({ length: flexCount }, () => ({ label: 'FLEX', positions: flexPositions }));
-    return [...base, ...flexSlots, { label: 'DEF', positions: ['DEF', 'D/ST'] }, { label: 'K', positions: ['K'] }];
-  };
+  // Build starting roster slots from league starter config. Superflex: one QB across all FLEX slots.
+  const getStartingSlots = (): { label: string; positions: string[] }[] =>
+    buildStartingSlots(positionLimits, isSuperflex);
 
   // Check if there's an available roster spot for a given position
   // opts: when provided, counts future keepers at this position toward the limit (position limits still apply)
@@ -736,7 +741,7 @@ const DraftRoom = () => {
     }
 
     // Check position limit first - this applies to both starters and bench
-    const positionLimit = positionLimits[pos as keyof typeof positionLimits];
+    const positionLimit = getPositionMax(positionLimits, pos);
     let currentCount = draftedPlayers.filter((p) => {
       let pPos = p.position.toUpperCase();
       if (pPos === 'D/ST') pPos = 'DEF';
@@ -762,7 +767,7 @@ const DraftRoom = () => {
     }
 
     const startingSlots = getStartingSlots();
-    const benchCount = positionLimits?.BENCH ?? 6;
+    const benchCount = getBenchCount(positionLimits);
 
     // Simulate roster assignment. In superflex, at most one QB is allowed in FLEX slots (2nd QB can go in any open FLEX).
     const assignedPlayerIds = new Set<string>();
@@ -937,7 +942,7 @@ const DraftRoom = () => {
       if (playerPos === 'D/ST') {
         playerPos = 'DEF';
       }
-      const limit = positionLimits[playerPos as keyof typeof positionLimits];
+      const limit = getPositionMax(positionLimits, playerPos);
       const currentCount = userPositionCounts[playerPos] || 0;
       
       if (limit !== undefined && currentCount >= limit) {
@@ -1120,8 +1125,10 @@ const DraftRoom = () => {
         
         // Pick using archetype-aware logic (combo of 2–3 archetypes per CPU; fallback: BPA-style random from top 5)
         const archetypeIdOrIds = draft?.cpu_archetypes?.[currentTeam];
-        const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
-        const benchCount = positionLimits?.BENCH ?? 6;
+        const flexCount = getFlexCount(positionLimits, isSuperflex);
+        const benchCount = getBenchCount(positionLimits);
+        const starters = parseStarters(positionLimits);
+        const baseStarters = countBaseStarters(starters);
         const picksWithPlayer = picks.map((p) => ({
           pick_number: p.pick_number,
           round_number: p.round_number,
@@ -1132,12 +1139,15 @@ const DraftRoom = () => {
           numRounds: draft.num_rounds,
           numTeams: draft.num_teams,
           teamDraftedPlayers,
-          positionLimits: positionLimits ?? undefined,
+          positionLimits: toNumericPositionLimits(positionLimits),
           scoringFormat: (draft as any).scoring_format,
           pickNumber: currentPick,
           draftOrder: draft.draft_order,
           flexSlots: flexCount,
           benchSize: benchCount,
+          baseStarters,
+          starters,
+          isSuperflex,
           rookieFlexDraft: isRookiesOnlyDraft,
           realism: {
             roundNumber: getCurrentRound(),
@@ -1152,6 +1162,7 @@ const DraftRoom = () => {
             teamRbCount: teamDraftedPlayers.filter(
               (p) => (p.position || '').toUpperCase() === 'RB'
             ).length,
+            starters,
             draftSeed: draftIdToSeed(draftId),
           },
         };
@@ -1903,21 +1914,24 @@ const DraftRoom = () => {
           numRounds: draftVal.num_rounds,
           chaosArchetype: chaosArchetype ?? null,
           isSuperflex,
+          starters: parseStarters(positionLimits),
+          flexCount: getFlexCount(positionLimits, isSuperflex),
           playerPool: playersVal,
           priorSeasonRankByPlayerId,
           archetypeName: archetypeName || null,
         }
       );
     },
-    [keepers, isSuperflex, priorSeasonRankByPlayerId]
+    [keepers, isSuperflex, priorSeasonRankByPlayerId, positionLimits]
   );
 
   // Handle showing completion screen when draft was already completed
   useEffect(() => {
     if (!draft || picks.length < totalPicks || totalPicks <= 0 || draft.status === 'completed') return;
-    const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
-    const benchCount = positionLimits?.BENCH ?? 6;
-    const config = buildDraftConfig(flexCount, benchCount, draft.num_teams);
+    const flexCount = getFlexCount(positionLimits, isSuperflex);
+    const benchCount = getBenchCount(positionLimits);
+    const baseStarters = countBaseStarters(parseStarters(positionLimits));
+    const config = buildDraftConfig(flexCount, benchCount, draft.num_teams, baseStarters);
     let cancelled = false;
     (async () => {
       const { userDetectedArchetype, userDetectedArchetypeIndex, userDetectedChaosArchetype } = await resolveArchetypeForCompletion(draft, picks, players, config, isSuperflex);
@@ -2059,7 +2073,7 @@ const DraftRoom = () => {
       .filter((p): p is RankedPlayer => !!p);
 
     const startingSlots = getStartingSlots();
-    const benchCount = positionLimits?.BENCH ?? 6;
+    const benchCount = getBenchCount(positionLimits);
     const userTeam = draft?.user_pick_position || 1;
     const userKeeperIds = keepers
       .filter((k) => k.team_number === userTeam)
@@ -2074,8 +2088,9 @@ const DraftRoom = () => {
     const sortedCompletionPicks = [...userPicks].sort((a, b) => a.pick_number - b.pick_number);
 
     // Detect archetype from user's picks
-    const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
-    const config = buildDraftConfig(flexCount, benchCount, draft?.num_teams ?? 12);
+    const flexCount = getFlexCount(positionLimits, isSuperflex);
+    const baseStarters = countBaseStarters(parseStarters(positionLimits));
+    const config = buildDraftConfig(flexCount, benchCount, draft?.num_teams ?? 12, baseStarters);
     const teamPicksForDetection = userPicks
       .map((pick) => {
         const pl = players.find((p) => p.id === pick.player_id);
@@ -2457,9 +2472,10 @@ const DraftRoom = () => {
                 className="h-8"
                 onClick={async () => {
                   if (!draft) return;
-                  const flexCount = positionLimits?.FLEX ?? (isSuperflex ? 2 : 1);
-                  const benchCount = positionLimits?.BENCH ?? 6;
-                  const config = buildDraftConfig(flexCount, benchCount, draft.num_teams);
+                  const flexCount = getFlexCount(positionLimits, isSuperflex);
+                  const benchCount = getBenchCount(positionLimits);
+                  const baseStarters = countBaseStarters(parseStarters(positionLimits));
+                  const config = buildDraftConfig(flexCount, benchCount, draft.num_teams, baseStarters);
                   const userPicks = picks.filter((p) => p.team_number === draft.user_pick_position);
                   const teamPicksForDetection = userPicks
                     .map((pick) => {
