@@ -958,63 +958,6 @@ const DraftRoom = () => {
     setIsDrafting(true);
 
     try {
-      // Track passed players before making the pick
-      const pickNumber = currentPick;
-      const roundNumber = getCurrentRound();
-      const maxRounds = draft.num_rounds;
-      const roundsToTrack = Math.floor(maxRounds * 0.8); // Only track first 80% of rounds
-      
-      if (roundNumber <= roundsToTrack) {
-        // Get available players (not yet drafted) sorted by ADP
-        const draftedIds = new Set(picks.map((p) => p.player_id));
-        const available = players
-          .filter((p) => p && p.id && !draftedIds.has(p.id))
-          .filter((p) => {
-            // Only consider players available at this pick (ADP <= pick + 5 buffer)
-            return p.adp <= pickNumber + 5;
-          })
-          .sort((a, b) => a.adp - b.adp) // Sort by ADP ascending
-          .slice(0, 5) // Top 5 by ADP
-          .map((p) => p.id)
-          .filter((id) => id !== player.id); // Exclude the player we're about to draft
-        
-        // Update passed_players in the draft record (if column exists)
-        // This is optional tracking data, so we silently fail if the column doesn't exist
-        if (available.length > 0 && draftId) {
-          try {
-            const { data: draftData, error: selectError } = await supabase
-              .from('mock_drafts')
-              .select('passed_players')
-              .eq('id', draftId)
-              .single();
-            
-            // If column doesn't exist, silently skip this feature
-            if (selectError) {
-              // Check if error is about missing column (400 Bad Request typically means column doesn't exist)
-              // Just skip this optional feature, don't exit the function
-              // Column doesn't exist, that's fine - this is optional tracking
-            } else if (draftData) {
-              const existingPassed = ((draftData as any).passed_players as any[]) || [];
-              const newEntry = {
-                pick_number: pickNumber,
-                passed_players: available,
-              };
-              
-              const { error: updateError } = await supabase
-                .from('mock_drafts')
-                .update({ passed_players: [...existingPassed, newEntry] } as any)
-                .eq('id', draftId);
-              
-              // Silently ignore update errors (column might not exist)
-              // This is optional tracking data
-            }
-          } catch (error) {
-            // Silently ignore errors related to passed_players column
-            // This is optional tracking data and not critical for draft functionality
-          }
-        }
-      }
-
       const data = await draftPlayer(player, currentPick, getCurrentTeam(), getCurrentRound(), isAutodraft);
       if (data) {
         setPicks((prev) => [...prev, data]);

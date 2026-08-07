@@ -184,7 +184,7 @@ interface WeeklyStats {
   def_interceptions: number | null;
   def_fumbles: number | null;
   def_sacks: number | null;
-  /** Opponent `sack_fumble_lost` for that week — credits FR to this defense. */
+  /** Opponent `sack_fumbles_lost` for that week — credits FR to this defense. */
   opponent_sack_fumble_lost: number | null;
   /** Blocked FG/PAT credited to this defense = opponent `fg_blocked` + opponent `pat_blocked` that week (BLKK). */
   def_blocked_kicks: number | null;
@@ -493,7 +493,7 @@ function calculateDefenseFantasyPoints(game: WeeklyStats): number | null {
 
   const sacks = game.def_sacks ?? 0;
   const interceptions = game.def_interceptions ?? 0;
-  /** `fumble_recovery_opp` is pre-merged (own recoveries + opponent `sack_fumble_lost`) when we have a defense row. */
+  /** `fumble_recovery_opp` is pre-merged (own recoveries + opponent `sack_fumbles_lost`) when we have a defense row. */
   const fumbleRecoveries =
     game.fumble_recovery_opp != null
       ? game.fumble_recovery_opp
@@ -745,8 +745,8 @@ export const PlayerDetailDialog = ({
             const isByeWeek = !opponent || opponent === '';
             const s = statsByWeek.get(week);
             const opponentStats = opponent ? opponentStatsByTeamWeek.get(`${opponent}__${week}`) : null;
-            const ownFrRaw = pickNumber(s ?? {}, ['fumble_recovery_opp', 'fumble_recoveries', 'def_fumbles']);
-            const oppSflRaw = pickNumber(opponentStats ?? {}, ['sack_fumble_lost']);
+            const ownFrRaw = pickNumber(s ?? {}, ['fumble_recovery_opp', 'def_fumbles']);
+            const oppSflRaw = pickNumber(opponentStats ?? {}, ['sack_fumbles_lost', 'sack_fumble_lost']);
             const fumbleRecTotal =
               ownFrRaw == null && oppSflRaw == null
                 ? null
@@ -812,11 +812,11 @@ export const PlayerDetailDialog = ({
                 def_fumble_recovery_tds: pickFumbleRecoveryReturnTds(s),
                 def_special_teams_tds: pickSpecialTeamsTds(s),
                 def_interceptions: pickNumber(s, ['def_interceptions', 'def_int', 'interceptions']),
-                def_fumbles: pickNumber(s, ['def_fumbles', 'fumble_recoveries', 'fumble_recovery_opp']),
+                def_fumbles: pickNumber(s, ['def_fumbles', 'fumble_recovery_opp']),
                 def_sacks: pickNumber(s, ['def_sacks', 'defensive_sacks', 'sacks']),
                 opponent_sack_fumble_lost: oppSflRaw,
                 def_blocked_kicks: blockedKicksTotal,
-                def_safeties: pickNumber(s, ['def_safties', 'def_safeties', 'safeties', 'sf']),
+                def_safeties: pickNumber(s, ['def_safeties', 'def_safties', 'safeties', 'sf']),
                 defense_team_abbr: scheduleTeam ?? null,
                 fumbles: null,
                 receiving_fumbles: null,

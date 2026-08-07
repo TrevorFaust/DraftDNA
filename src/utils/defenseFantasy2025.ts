@@ -178,8 +178,8 @@ export function buildDefenseFantasyGameInput(
   if (isByeWeek) return null;
 
   const row = s ?? {};
-  const ownFrRaw = pickNumber(row, ['fumble_recovery_opp', 'fumble_recoveries', 'def_fumbles']);
-  const oppSflRaw = pickNumber(opponentStats ?? {}, ['sack_fumble_lost']);
+  const ownFrRaw = pickNumber(row, ['fumble_recovery_opp', 'def_fumbles']);
+  const oppSflRaw = pickNumber(opponentStats ?? {}, ['sack_fumbles_lost', 'sack_fumble_lost']);
   const fumbleRecTotal =
     ownFrRaw == null && oppSflRaw == null ? null : (ownFrRaw ?? 0) + (oppSflRaw ?? 0);
 
@@ -223,11 +223,11 @@ export function buildDefenseFantasyGameInput(
     def_fumble_recovery_tds: pickFumbleRecoveryReturnTds(row),
     def_special_teams_tds: pickSpecialTeamsTds(row),
     def_interceptions: pickNumber(row, ['def_interceptions', 'def_int', 'interceptions']),
-    def_fumbles: pickNumber(row, ['def_fumbles', 'fumble_recoveries', 'fumble_recovery_opp']),
+    def_fumbles: pickNumber(row, ['def_fumbles', 'fumble_recovery_opp']),
     def_sacks: pickNumber(row, ['def_sacks', 'defensive_sacks', 'sacks']),
     opponent_sack_fumble_lost: oppSflRaw,
     def_blocked_kicks: blockedKicksTotal,
-    def_safeties: pickNumber(row, ['def_safties', 'def_safeties', 'safeties', 'sf']),
+    def_safeties: pickNumber(row, ['def_safeties', 'def_safties', 'safeties', 'sf']),
     fumble_recovery_opp: fumbleRecTotal,
   };
 }

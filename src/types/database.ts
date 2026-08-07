@@ -34,7 +34,6 @@ export interface MockDraft {
   created_at: string;
   completed_at: string | null;
   league_id: string | null;
-  passed_players?: Array<{ pick_number: number; passed_players: string[] }>;
   is_favorite?: boolean;
   cpu_speed?: 'slow' | 'normal' | 'fast' | 'rapid' | 'instant'; // 'instant' kept for backward compatibility
   pick_timer?: number;
