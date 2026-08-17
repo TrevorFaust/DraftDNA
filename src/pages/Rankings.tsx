@@ -25,6 +25,7 @@ import {
 import { mergeLiveCommunity, mergeRankingsWithDraftOrder } from '@/utils/rankingsCommunityMerge';
 import {
   computeStudsDuds,
+  shouldComputeStudsDuds,
   STUDS_DUDS_RANKINGS_WINDOW,
   type StudDudEntry,
 } from '@/utils/studsDuds';
@@ -1569,7 +1570,9 @@ const Rankings = () => {
   );
 
   const studsDudsVsConsensus = useMemo(() => {
-    if (!hasExistingRankings || players.length === 0 || communityConsensusForStuds.length === 0) {
+    if (
+      !shouldComputeStudsDuds(hasExistingRankings, players, communityConsensusForStuds, [])
+    ) {
       return { studsTop10: [] as StudDudEntry[], dudsTop10: [] as StudDudEntry[] };
     }
     const { studs, duds } = computeStudsDuds(players, communityConsensusForStuds, {

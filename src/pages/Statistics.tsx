@@ -12,7 +12,12 @@ import { BarChart3, Lock, HelpCircle } from 'lucide-react';
 import type { RankedPlayer, Player, MockDraft, DraftPick } from '@/types/database';
 import { tempDraftStorage, tempRankingsStorage, getOrCreateGuestSessionId, getRankingsDraftSessionStorageKey, rankingsDraftSessionStorage, allLeaguesBucketStorage } from '@/utils/temporaryStorage';
 import { mergeRankingsWithDraftOrder } from '@/utils/rankingsCommunityMerge';
-import { computeStudsDuds, type StudDudEntry } from '@/utils/studsDuds';
+import {
+  computeStudsDuds,
+  savedRankingCoversPool,
+  shouldComputeStudsDuds,
+  type StudDudEntry,
+} from '@/utils/studsDuds';
 import { fetchRookiesRankings, filterPlayersToRookieIds, type RookieRankRow } from '@/utils/rookiesFilter';
 import { deduplicatePlayersByIdentity } from '@/utils/playerDeduplication';
 import { fetchMergedPlayerPool } from '@/utils/playerPoolFetch';
@@ -106,6 +111,7 @@ const Statistics = () => {
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [communityPlayers, setCommunityPlayers] = useState<RankedPlayer[]>([]);
   const [hasCompletedRankings, setHasCompletedRankings] = useState(false);
+  const [adpSeedIds, setAdpSeedIds] = useState<string[]>([]);
   const positionAdpRankMap = useMemo(() => {
     const byId = new Map<string, RankedPlayer>();
     for (const p of [...players, ...communityPlayers]) {
@@ -115,13 +121,19 @@ const Statistics = () => {
   }, [players, communityPlayers]);
 
   const studsDudsFromRankings = useMemo((): { studs: StudDudEntry[]; duds: StudDudEntry[] } => {
-    if (!hasCompletedRankings || players.length === 0 || communityPlayers.length === 0) {
+    const canCompute = shouldComputeStudsDuds(
+      hasCompletedRankings,
+      players,
+      communityPlayers,
+      adpSeedIds
+    );
+    if (!canCompute) {
       if (
         import.meta.env.DEV &&
         typeof window !== 'undefined' &&
         window.sessionStorage.getItem('debugStudsDuds') === '1'
       ) {
-        console.debug('[Statistics studs/duds] skipped — empty players, community, or no completed ranking', {
+        console.debug('[Statistics studs/duds] skipped — empty players, community, seed board, or no completed ranking', {
           hasCompletedRankings,
           players: players.length,
           communityPlayers: communityPlayers.length,
@@ -151,7 +163,7 @@ const Statistics = () => {
       });
     }
     return out;
-  }, [hasCompletedRankings, players, communityPlayers, selectedLeague?.id]);
+  }, [hasCompletedRankings, players, communityPlayers, adpSeedIds, selectedLeague?.id]);
 
   const [draftStats, setDraftStats] = useState<{
     mostDrafted: { player: Player; count: number } | null;
@@ -340,6 +352,9 @@ const Statistics = () => {
         rookiesOnly: effectiveBucket.rookiesOnly,
       });
 
+      const adpSeedOrder = playerPool.map((p) => p.id);
+      setAdpSeedIds(adpSeedOrder);
+
       if (!user) {
         const guestDraftKey = getRankingsDraftSessionStorageKey({
           userId: null,
@@ -360,8 +375,12 @@ const Statistics = () => {
             : adpPlayers;
 
         const tempRankings = tempRankingsStorage.get(bucketKey);
-        if (tempRankings && tempRankings.length > 0) {
-          // User has finalized rankings, use them for comparison
+        const tempIds = (tempRankings ?? []).map((p) => p.id);
+        const guestSavedOk =
+          Boolean(tempRankings && tempRankings.length > 0) &&
+          savedRankingCoversPool(tempIds, playerPool);
+
+        if (guestSavedOk && tempRankings) {
           const rankingsMap = new Map<string, number>();
           tempRankings.forEach((player) => {
             rankingsMap.set(player.id, player.rank);
@@ -388,13 +407,14 @@ const Statistics = () => {
             displayPlayers = mergeRankingsWithDraftOrder(sortedPlayers, guestSessionDraft.ids);
           }
           setPlayers(displayPlayers);
-
           setCommunityPlayers(guestCommunityStatic);
-          setHasCompletedRankings(true);
+          setHasCompletedRankings(
+            shouldComputeStudsDuds(true, displayPlayers, guestCommunityStatic, playerPool)
+          );
         } else {
-          let list = adpPlayers;
+          let list = guestCommunityStatic;
           if (guestSessionDraft?.ids.length) {
-            list = mergeRankingsWithDraftOrder(adpPlayers, guestSessionDraft.ids);
+            list = mergeRankingsWithDraftOrder(guestCommunityStatic, guestSessionDraft.ids);
           }
           setPlayers(list);
           setCommunityPlayers(guestCommunityStatic);
@@ -439,27 +459,41 @@ const Statistics = () => {
           playerRankingsMap.get(ranking.player_id)!.push(ranking.rank);
         });
 
-        const averageRankingsMap = new Map<string, number>();
-        playerRankingsMap.forEach((ranks, playerId) => {
-          const average = ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length;
-          averageRankingsMap.set(playerId, average);
-        });
+        const allLeaguesCommunity = communityData.length > 0
+          ? buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData))
+          : playerPool.map((p, index) => ({
+              ...p,
+              adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
+              rank: index + 1,
+            }));
 
-        const personalPlayers: RankedPlayer[] = playerPool.map((p, index) => {
-          const avgRank = averageRankingsMap.get(p.id);
-          const fallbackRank = bucketAdpMap.get(p.id) ?? (Number(p.adp) || index + 1);
-          return {
+        const savedOk = savedRankingCoversPool(playerRankingsMap.keys(), playerPool);
+        let sortedPersonal: RankedPlayer[];
+        if (!savedOk) {
+          sortedPersonal = allLeaguesCommunity;
+        } else {
+          const averageRankingsMap = new Map<string, number>();
+          playerRankingsMap.forEach((ranks, playerId) => {
+            const average = ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length;
+            averageRankingsMap.set(playerId, average);
+          });
+
+          const personalPlayers: RankedPlayer[] = playerPool.map((p, index) => {
+            const avgRank = averageRankingsMap.get(p.id);
+            const fallbackRank = bucketAdpMap.get(p.id) ?? (Number(p.adp) || index + 1);
+            return {
+              ...p,
+              adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
+              rank: avgRank !== undefined ? avgRank : fallbackRank,
+            };
+          });
+
+          personalPlayers.sort((a, b) => a.rank - b.rank);
+          sortedPersonal = personalPlayers.map((p, index) => ({
             ...p,
-            adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
-            rank: avgRank !== undefined ? avgRank : fallbackRank,
-          };
-        });
-
-        personalPlayers.sort((a, b) => a.rank - b.rank);
-        const sortedPersonal = personalPlayers.map((p, index) => ({
-          ...p,
-          rank: index + 1,
-        }));
+            rank: index + 1,
+          }));
+        }
 
         const allLeaguesDraftKey = getRankingsDraftSessionStorageKey({
           userId: user.id,
@@ -473,12 +507,10 @@ const Statistics = () => {
           personalForUi = mergeRankingsWithDraftOrder(sortedPersonal, allLeaguesSessionDraft.ids);
         }
         setPlayers(personalForUi);
-        setHasCompletedRankings(allLeagueRankingsData.length > 0);
-
-        const allLeaguesCommunity = communityData.length > 0
-          ? buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData))
-          : playerPool.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
         setCommunityPlayers(allLeaguesCommunity);
+        setHasCompletedRankings(
+          shouldComputeStudsDuds(savedOk, personalForUi, allLeaguesCommunity, playerPool)
+        );
       } else {
         const qLeague = applyUserRankingsBucketMatch(
           supabase
@@ -492,42 +524,28 @@ const Statistics = () => {
 
         if (rankingsError) throw rankingsError;
 
-        const hasRankings = rankingsData && rankingsData.length > 0;
+        const hasRankings = Boolean(rankingsData && rankingsData.length > 0);
+        const rankingsMap = new Map(
+          (rankingsData ?? []).map((r) => [r.player_id, r.rank])
+        );
+        const savedOk = hasRankings && savedRankingCoversPool(rankingsMap.keys(), playerPool);
 
         let rankedPlayers: RankedPlayer[];
 
-        if (hasRankings) {
-          const rankingsMap = new Map(
-            rankingsData.map((r) => [r.player_id, r.rank])
-          );
-
+        if (savedOk) {
           rankedPlayers = playerPool.map((p, index) => ({
             ...p,
             adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
             rank: rankingsMap.get(p.id) ?? bucketAdpMap.get(p.id) ?? Number(p.adp) ?? index + 1,
           }));
+        } else if (communityData.length > 0) {
+          rankedPlayers = buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData));
         } else {
-          if (communityData.length > 0) {
-            rankedPlayers = buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData));
-          } else {
-          const qNullLeague = applyUserRankingsBucketMatch(
-            supabase.from('user_rankings').select('*').eq('user_id', user.id).is('league_id', null),
-            rankingBucketCols
-          );
-          const { data: allLeaguesRankings, error: allLeaguesError } = await qNullLeague;
-
-          if (allLeaguesError) throw allLeaguesError;
-
-          const allLeaguesMap = new Map(
-            allLeaguesRankings?.map((r) => [r.player_id, r.rank]) || []
-          );
-
           rankedPlayers = playerPool.map((p, index) => ({
             ...p,
             adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
-            rank: allLeaguesMap.get(p.id) ?? bucketAdpMap.get(p.id) ?? Number(p.adp) ?? index + 1,
+            rank: bucketAdpMap.get(p.id) ?? (Number(p.adp) || index + 1),
           }));
-          }
         }
 
         rankedPlayers.sort((a, b) => a.rank - b.rank);
@@ -546,13 +564,18 @@ const Statistics = () => {
         const displayPlayers = leagueSessionDraft?.ids.length
           ? mergeRankingsWithDraftOrder(sortedPlayers, leagueSessionDraft.ids)
           : sortedPlayers;
-        setPlayers(displayPlayers);
-        setHasCompletedRankings(hasRankings);
-
         const leagueCommunity = communityData.length > 0
           ? buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData))
-          : playerPool.map((p, index) => ({ ...p, adp: bucketAdpMap.get(p.id) ?? Number(p.adp), rank: index + 1 }));
+          : playerPool.map((p, index) => ({
+              ...p,
+              adp: bucketAdpMap.get(p.id) ?? Number(p.adp),
+              rank: index + 1,
+            }));
+        setPlayers(displayPlayers);
         setCommunityPlayers(leagueCommunity);
+        setHasCompletedRankings(
+          shouldComputeStudsDuds(savedOk, displayPlayers, leagueCommunity, playerPool)
+        );
       }
     } catch (error: any) {
       console.error('Failed to load players:', error);
@@ -571,6 +594,7 @@ const Statistics = () => {
         setPlayers([]);
         setCommunityPlayers([]);
         setHasCompletedRankings(false);
+        setAdpSeedIds([]);
       }
     } finally {
       setLoading(false);
@@ -2077,8 +2101,8 @@ const Statistics = () => {
             })()}
           </div>
 
-          {/* Studs and Duds Breakdown — only after a saved ranking */}
-          {hasCompletedRankings && players.length > 0 && communityPlayers.length > 0 && (
+          {/* Studs and Duds Breakdown — only after a saved ranking that isn't the default seed */}
+          {(studsDudsFromRankings.studs.length > 0 || studsDudsFromRankings.duds.length > 0) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Your Studs */}
               <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-3 sm:p-4">

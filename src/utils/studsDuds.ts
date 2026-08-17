@@ -6,6 +6,89 @@ import type { RankedPlayer } from '@/types/database';
  */
 export const STUDS_DUDS_RANKINGS_WINDOW = 300;
 
+/** Finalize saves the full UUID board; stale/partial leftover rows should not count. */
+export const STUDS_DUDS_MIN_SAVED_POOL_FRACTION = 0.5;
+
+type IdRow = { id: string } | string;
+
+function rowId(row: IdRow): string {
+  return typeof row === 'string' ? row : row.id;
+}
+
+/** True when both lists are the same player ids in the same order. */
+export function playerIdOrderEquals(a: IdRow[], b: IdRow[]): boolean {
+  if (a.length === 0 || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (rowId(a[i]) !== rowId(b[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * True when `myPlayers` is still the default seed (community or ADP), allowing a little
+ * shuffle from D/ST / unmatched ids. A real ranking moves far more than 5% of slots.
+ */
+export function boardMatchesSeedOrder(
+  myPlayers: IdRow[],
+  seed: IdRow[],
+  maxMismatchFraction = 0.05
+): boolean {
+  if (myPlayers.length === 0 || seed.length === 0) return false;
+  if (myPlayers.length < 50 || seed.length < 50) {
+    return playerIdOrderEquals(myPlayers, seed);
+  }
+  const seedIndex = new Map<string, number>();
+  for (let i = 0; i < seed.length; i++) {
+    seedIndex.set(rowId(seed[i]), i);
+  }
+  let compared = 0;
+  let mismatches = 0;
+  for (let i = 0; i < myPlayers.length; i++) {
+    const si = seedIndex.get(rowId(myPlayers[i]));
+    if (si == null) continue;
+    compared++;
+    if (si !== i) mismatches++;
+  }
+  if (compared < myPlayers.length * 0.8) return false;
+  return mismatches / compared <= maxMismatchFraction;
+}
+
+/**
+ * Saved ranking rows that barely overlap the current pool are leftover / other-season data,
+ * not a ranking the user completed for this board.
+ */
+export function savedRankingCoversPool(
+  savedPlayerIds: Iterable<string>,
+  pool: Array<{ id: string }>,
+  minFraction = STUDS_DUDS_MIN_SAVED_POOL_FRACTION
+): boolean {
+  const saved = savedPlayerIds instanceof Set ? savedPlayerIds : new Set(savedPlayerIds);
+  if (saved.size === 0 || pool.length === 0) return false;
+  let matched = 0;
+  for (const p of pool) {
+    if (saved.has(p.id)) matched++;
+  }
+  return matched / pool.length >= minFraction;
+}
+
+/**
+ * Studs/duds need a real saved ranking that is not still the default community or ADP seed.
+ * New users (and leftover ADP dumps) compare those two seeds and produce fake late-board diffs.
+ */
+export function shouldComputeStudsDuds(
+  hasSavedRanking: boolean,
+  myPlayers: RankedPlayer[],
+  communityPlayers: RankedPlayer[],
+  adpSeedOrder: IdRow[]
+): boolean {
+  if (!hasSavedRanking || myPlayers.length === 0 || communityPlayers.length === 0) {
+    return false;
+  }
+  if (boardMatchesSeedOrder(myPlayers, communityPlayers)) return false;
+  if (adpSeedOrder.length > 0 && boardMatchesSeedOrder(myPlayers, adpSeedOrder)) return false;
+  return true;
+}
+
 export type StudsDudsCompareMode = 'window' | 'full';
 
 export type StudDudEntry = {
