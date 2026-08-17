@@ -105,6 +105,7 @@ const Statistics = () => {
   const player2025Stats = usePlayer2025Stats();
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [communityPlayers, setCommunityPlayers] = useState<RankedPlayer[]>([]);
+  const [hasCompletedRankings, setHasCompletedRankings] = useState(false);
   const positionAdpRankMap = useMemo(() => {
     const byId = new Map<string, RankedPlayer>();
     for (const p of [...players, ...communityPlayers]) {
@@ -114,13 +115,14 @@ const Statistics = () => {
   }, [players, communityPlayers]);
 
   const studsDudsFromRankings = useMemo((): { studs: StudDudEntry[]; duds: StudDudEntry[] } => {
-    if (players.length === 0 || communityPlayers.length === 0) {
+    if (!hasCompletedRankings || players.length === 0 || communityPlayers.length === 0) {
       if (
         import.meta.env.DEV &&
         typeof window !== 'undefined' &&
         window.sessionStorage.getItem('debugStudsDuds') === '1'
       ) {
-        console.debug('[Statistics studs/duds] skipped — empty players or community', {
+        console.debug('[Statistics studs/duds] skipped — empty players, community, or no completed ranking', {
+          hasCompletedRankings,
           players: players.length,
           communityPlayers: communityPlayers.length,
           leagueId: selectedLeague?.id ?? null,
@@ -149,7 +151,7 @@ const Statistics = () => {
       });
     }
     return out;
-  }, [players, communityPlayers, selectedLeague?.id]);
+  }, [hasCompletedRankings, players, communityPlayers, selectedLeague?.id]);
 
   const [draftStats, setDraftStats] = useState<{
     mostDrafted: { player: Player; count: number } | null;
@@ -388,6 +390,7 @@ const Statistics = () => {
           setPlayers(displayPlayers);
 
           setCommunityPlayers(guestCommunityStatic);
+          setHasCompletedRankings(true);
         } else {
           let list = adpPlayers;
           if (guestSessionDraft?.ids.length) {
@@ -395,6 +398,7 @@ const Statistics = () => {
           }
           setPlayers(list);
           setCommunityPlayers(guestCommunityStatic);
+          setHasCompletedRankings(false);
         }
         return;
       }
@@ -469,6 +473,7 @@ const Statistics = () => {
           personalForUi = mergeRankingsWithDraftOrder(sortedPersonal, allLeaguesSessionDraft.ids);
         }
         setPlayers(personalForUi);
+        setHasCompletedRankings(allLeagueRankingsData.length > 0);
 
         const allLeaguesCommunity = communityData.length > 0
           ? buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData))
@@ -542,6 +547,7 @@ const Statistics = () => {
           ? mergeRankingsWithDraftOrder(sortedPlayers, leagueSessionDraft.ids)
           : sortedPlayers;
         setPlayers(displayPlayers);
+        setHasCompletedRankings(hasRankings);
 
         const leagueCommunity = communityData.length > 0
           ? buildCommunityFromRpc(playerPool, communityRowsForBuild(communityData))
@@ -564,6 +570,7 @@ const Statistics = () => {
       if (players.length === 0 && communityPlayers.length === 0) {
         setPlayers([]);
         setCommunityPlayers([]);
+        setHasCompletedRankings(false);
       }
     } finally {
       setLoading(false);
@@ -2070,8 +2077,8 @@ const Statistics = () => {
             })()}
           </div>
 
-          {/* Studs and Duds Breakdown */}
-          {players.length > 0 && communityPlayers.length > 0 && (
+          {/* Studs and Duds Breakdown — only after a saved ranking */}
+          {hasCompletedRankings && players.length > 0 && communityPlayers.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Your Studs */}
               <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-3 sm:p-4">

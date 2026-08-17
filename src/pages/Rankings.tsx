@@ -1569,7 +1569,7 @@ const Rankings = () => {
   );
 
   const studsDudsVsConsensus = useMemo(() => {
-    if (players.length === 0 || communityConsensusForStuds.length === 0) {
+    if (!hasExistingRankings || players.length === 0 || communityConsensusForStuds.length === 0) {
       return { studsTop10: [] as StudDudEntry[], dudsTop10: [] as StudDudEntry[] };
     }
     const { studs, duds } = computeStudsDuds(players, communityConsensusForStuds, {
@@ -1577,7 +1577,7 @@ const Rankings = () => {
       maxRankConsider: STUDS_DUDS_RANKINGS_WINDOW,
     });
     return { studsTop10: studs.slice(0, 10), dudsTop10: duds.slice(0, 10) };
-  }, [players, communityConsensusForStuds]);
+  }, [hasExistingRankings, players, communityConsensusForStuds]);
 
   // Leagues matching the current bucket (for All Leagues dropdown)
   const matchingLeaguesForBucket = useMemo(
@@ -1925,7 +1925,7 @@ const Rankings = () => {
           personalForUi = mergeRankingsWithDraftOrder(sortedPersonal, allLeaguesSessionDraft.ids);
         }
         setPlayers(personalForUi);
-        setHasExistingRankings(true);
+        setHasExistingRankings(playerRankingsMap.size > 0);
         if (allLeaguesSessionDraft?.ids.length) setIsEditMode(allLeaguesSessionDraft.isEditMode);
         else setIsEditMode(false);
 
@@ -2994,7 +2994,7 @@ const Rankings = () => {
             </div>
 
             {/* Differential Analysis Section */}
-            {players.length > 0 && communityConsensusForStuds.length > 0 && (
+            {hasExistingRankings && players.length > 0 && communityConsensusForStuds.length > 0 && (
               <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Your Studs */}
                 <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
@@ -3280,7 +3280,7 @@ const Rankings = () => {
             </div>
 
             {/* Differential Analysis Section */}
-            {players.length > 0 && communityConsensusForStuds.length > 0 && (
+            {hasExistingRankings && players.length > 0 && communityConsensusForStuds.length > 0 && (
               <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Your Studs */}
                 <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
