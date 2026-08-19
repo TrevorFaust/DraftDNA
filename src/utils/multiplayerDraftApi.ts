@@ -35,6 +35,7 @@ export async function mpCreateDraft(params: {
   keepers?: MpKeeperInput[];
   displayName?: string;
   visibility?: MultiplayerDraftVisibility;
+  boardSource?: string;
 }): Promise<{
   draft_id: string;
   invite_code: string;
@@ -61,6 +62,7 @@ export async function mpCreateDraft(params: {
     p_keepers: params.keepers ?? [],
     p_display_name: params.displayName ?? 'Host',
     p_visibility: params.visibility ?? 'invite',
+    p_board_source: params.boardSource ?? 'consensus',
   });
   if (error) throw rpcError(error);
   return data as {
@@ -116,6 +118,22 @@ export async function mpCloseLobby(draftId: string) {
   });
   if (error) throw rpcError(error);
   return data as { ok: boolean; draft_id: string; status: string; cancel_reason: string };
+}
+
+export async function mpSetLobbyBoard(params: {
+  draftId: string;
+  boardSource: string;
+  boardPlayerIds: string[];
+  boardPlayerPositions: string[];
+}): Promise<{ ok: boolean; board_source: string }> {
+  const { data, error } = await supabase.rpc('mp_set_lobby_board' as any, {
+    p_draft_id: params.draftId,
+    p_board_source: params.boardSource,
+    p_board_player_ids: params.boardPlayerIds,
+    p_board_player_positions: params.boardPlayerPositions,
+  });
+  if (error) throw rpcError(error);
+  return data as { ok: boolean; board_source: string };
 }
 
 export async function mpJoinDraft(params: {

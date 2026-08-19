@@ -4,6 +4,14 @@ import { Navbar } from '@/components/Navbar';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { getOrCreateGuestSessionId } from '@/utils/temporaryStorage';
 import {
@@ -18,6 +26,7 @@ import {
   mpReleaseSlot,
   mpReplaceKeepers,
   mpSetHostPresence,
+  mpSetLobbyBoard,
   mpSetReady,
   mpSetTeamName,
   mpStartDraft,
@@ -54,7 +63,20 @@ import {
 import type { PositionLimitsLike } from '@/utils/rosterSlots';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Check, Copy, DoorClosed, Link2, Play, Radio, Timer, UserMinus, Users } from 'lucide-react';
+import {
+  boardSourceLabel,
+  draftAgainstOptions,
+  normalizeDraftAgainstId,
+  readMpYourBoardSource,
+  writeMpYourBoardSource,
+  yourBoardOptions,
+} from '@/constants/adpRankingSources';
+import {
+  fetchAdpSourceBoardForBucket,
+  reorderIdsByBoard,
+  sourceRowsForBoard,
+} from '@/utils/adpSourceBoards';
+import { Check, ClipboardList, Copy, DoorClosed, Link2, Play, Radio, Timer, UserMinus, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
 
@@ -90,6 +112,8 @@ const MultiplayerLobby = () => {
   const [nowMs, setNowMs] = useState(() => Date.now());
   /** clientNow - serverNow; keeps the 10-minute idle timer aligned with Postgres. */
   const [clockSkewMs, setClockSkewMs] = useState(0);
+  const [boardSourceOptions, setBoardSourceOptions] = useState<string[]>([]);
+  const [yourBoardSource, setYourBoardSource] = useState('yours');
 
   const guestSessionId = useMemo(
     () => (!user ? getOrCreateGuestSessionId() : null),
@@ -135,6 +159,29 @@ const MultiplayerLobby = () => {
   }, [participants, user, guestSessionId]);
 
   const isHost = Boolean(me?.is_host || (user && draft && draft.host_user_id === user.id));
+
+  useEffect(() => {
+    if (!draft) return;
+    let cancelled = false;
+    void fetchAdpSourceBoardForBucket({
+      scoringFormat: draft.scoring_format || 'ppr',
+      leagueType: draft.league_type || 'season',
+      isSuperflex: Boolean(draft.is_superflex),
+      rookiesOnly: draft.league_type === 'dynasty' && draft.player_pool === 'rookies',
+    }).then((board) => {
+      if (!cancelled) setBoardSourceOptions(board?.sources ?? []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft?.scoring_format, draft?.league_type, draft?.is_superflex, draft?.player_pool]);
+
+  useEffect(() => {
+    if (!draft?.id) return;
+    const allowed = yourBoardOptions(boardSourceOptions);
+    const saved = readMpYourBoardSource(draft.id);
+    setYourBoardSource(allowed.includes(saved as (typeof allowed)[number]) ? saved : 'yours');
+  }, [draft?.id, boardSourceOptions]);
 
   const leaveClosedLobby = useCallback(
     (reason?: string | null, lobbyName?: string | null) => {
@@ -472,6 +519,36 @@ const MultiplayerLobby = () => {
     }
   };
 
+  const handleChangeBoard = async (nextSource: string) => {
+    if (!draft || !isHost || draft.status !== 'lobby') return;
+    setBusy(true);
+    try {
+      const board = await fetchAdpSourceBoardForBucket({
+        scoringFormat: draft.scoring_format || 'ppr',
+        leagueType: draft.league_type || 'season',
+        isSuperflex: Boolean(draft.is_superflex),
+        rookiesOnly: draft.league_type === 'dynasty' && draft.player_pool === 'rookies',
+      });
+      const existing = (draft.board_player_ids || []).map((id, i) => ({
+        id,
+        position: draft.board_player_positions?.[i] || 'FLEX',
+      }));
+      const ordered = reorderIdsByBoard(existing, sourceRowsForBoard(board, nextSource));
+      await mpSetLobbyBoard({
+        draftId: draft.id,
+        boardSource: nextSource,
+        boardPlayerIds: ordered.map((p) => p.id),
+        boardPlayerPositions: ordered.map((p) => p.position),
+      });
+      await refresh();
+      toast.success(`Room board set to ${boardSourceLabel(nextSource)}`);
+    } catch (e: unknown) {
+      toast.error(userFacingErrorMessage(e, "Couldn't update the draft board"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleReady = async () => {
     if (!draft || !me?.team_number) return;
     setBusy(true);
@@ -747,6 +824,7 @@ const MultiplayerLobby = () => {
                 scoringFormat: draft.scoring_format,
                 leagueType: draft.league_type,
                 isSuperflex: draft.is_superflex,
+                boardSource: draft.board_source,
               })}
             </span>
           </div>
@@ -758,6 +836,69 @@ const MultiplayerLobby = () => {
             )}
             {draft.pick_timer > 0 ? ` · ${draft.pick_timer}s pick clock` : ' · No pick clock'}
           </p>
+          {draft.status === 'lobby' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm">
+                  <ClipboardList className="w-4 h-4 text-muted-foreground" />
+                  Your board
+                </Label>
+                <Select
+                  value={yourBoardSource}
+                  onValueChange={(v) => {
+                    setYourBoardSource(v);
+                    writeMpYourBoardSource(draft.id, v);
+                  }}
+                  disabled={busy}
+                >
+                  <SelectTrigger className="bg-secondary/50 border-border/50 min-h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yourBoardOptions(boardSourceOptions).map((src) => (
+                      <SelectItem key={src} value={src}>
+                        {boardSourceLabel(src)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Order of the available list on your screen. Other players keep their own boards.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm">
+                  <ClipboardList className="w-4 h-4 text-muted-foreground" />
+                  Draft against
+                </Label>
+                {isHost ? (
+                  <Select
+                    value={normalizeDraftAgainstId(draft.board_source)}
+                    onValueChange={(v) => void handleChangeBoard(v)}
+                    disabled={busy}
+                  >
+                    <SelectTrigger className="bg-secondary/50 border-border/50 min-h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {draftAgainstOptions(boardSourceOptions).map((src) => (
+                        <SelectItem key={src} value={src}>
+                          {boardSourceLabel(src)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex h-11 items-center rounded-md border border-input bg-secondary/50 px-3 text-sm">
+                    {boardSourceLabel(draft.board_source)}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  CPU seats pick from this board. Drafted players leave both lists.
+                </p>
+              </div>
+            </div>
+          )}
           {draft.visibility === 'open' && (
             <p className="text-xs text-muted-foreground">
               Closes after 10 minutes with no joins, seat changes, ready updates, or chat.

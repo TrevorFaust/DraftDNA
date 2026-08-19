@@ -37,6 +37,10 @@ export interface MockDraft {
   is_favorite?: boolean;
   cpu_speed?: 'slow' | 'normal' | 'fast' | 'rapid' | 'instant'; // 'instant' kept for backward compatibility
   pick_timer?: number;
+  /** Available-player board: yours, consensus, espn, yahoo, sleeper. */
+  board_source?: string | null;
+  /** CPU pick board: consensus, espn, yahoo, sleeper. */
+  cpu_board_source?: string | null;
   /** Optional: archetype id(s) per CPU team. 2–3 ids per team (e.g. hero_rb + mid_qb + late_te). Legacy: single string still supported. */
   cpu_archetypes?: Record<number, string | string[]>;
   /** Archetype name (e.g. The Captain) detected for the user when draft was completed. Used for Badges. */

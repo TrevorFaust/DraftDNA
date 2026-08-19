@@ -94,6 +94,13 @@ import { userFacingErrorMessage } from '@/utils/userFacingError';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import { Label } from '@/components/ui/label';
 import {
+  boardSourceLabel,
+  readMpYourBoardSource,
+  writeMpYourBoardSource,
+  yourBoardOptions,
+} from '@/constants/adpRankingSources';
+import { fetchAdpSourceBoardForBucket, sourceRowsForBoard } from '@/utils/adpSourceBoards';
+import {
   buildDraftListTierBreakBeforeIds,
   loadPersonalDraftBoardOverlay,
   type PersonalDraftBoardOverlay,
@@ -137,6 +144,9 @@ const MultiplayerDraftRoom = () => {
   } = useStickScrollToBottom(picks.length);
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [personalBoard, setPersonalBoard] = useState<PersonalDraftBoardOverlay | null>(null);
+  const [yourBoardSource, setYourBoardSource] = useState('yours');
+  const [boardSourceOptions, setBoardSourceOptions] = useState<string[]>([]);
+  const [sourceRankById, setSourceRankById] = useState<Map<string, number> | null>(null);
   const [results, setResults] = useState<MultiplayerResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -273,6 +283,13 @@ const MultiplayerDraftRoom = () => {
   }, [players, draftedIds, keeperIds, draft, positionLimits, myTeamPosCounts, myRosterSize]);
 
   const personalMetaById = personalBoard?.metaById;
+  const usingSiteBoard = yourBoardSource !== 'yours' && yourBoardSource !== 'mine';
+  const visibleBoardRank = (p: RankedPlayer) => {
+    if (usingSiteBoard) {
+      return sourceRankById?.get(p.id) ?? 10_000 + (Number(p.rank) || 9999);
+    }
+    return personalMetaById?.get(p.id)?.overallRank ?? p.rank;
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -286,10 +303,8 @@ const MultiplayerDraftRoom = () => {
         p.position.toLowerCase().includes(q)
       );
     });
-    const personalRank = (p: RankedPlayer) =>
-      personalMetaById?.get(p.id)?.overallRank ?? p.rank;
-    return list.sort((a, b) => personalRank(a) - personalRank(b));
-  }, [available, search, positionFilter, personalMetaById]);
+    return list.sort((a, b) => visibleBoardRank(a) - visibleBoardRank(b));
+  }, [available, search, positionFilter, personalMetaById, sourceRankById, yourBoardSource]);
 
   const availableListRows = useMemo(() => {
     // Keep a deep enough window that short viewports can still scroll a wide board.
@@ -307,13 +322,15 @@ const MultiplayerDraftRoom = () => {
       const meta = personalMetaById?.get(player.id);
       return {
         player,
-        displayRank: meta?.overallRank ?? player.rank,
+        displayRank: usingSiteBoard
+          ? sourceRankById?.get(player.id) ?? player.rank
+          : meta?.overallRank ?? player.rank,
         myPosRank: meta?.posRank ?? null,
         tier: meta?.tier ?? null,
         hasTierBreakBefore: breakBeforeIds.has(player.id),
       };
     });
-  }, [filtered, personalMetaById, positionFilter, personalBoard?.allViewBreakBeforeIds]);
+  }, [filtered, personalMetaById, positionFilter, personalBoard?.allViewBreakBeforeIds, usingSiteBoard, sourceRankById]);
 
   const mpBucketKey = draft
     ? `${draft.scoring_format || 'ppr'}/${draft.league_type || 'season'}/${Boolean(draft.is_superflex)}/${
@@ -350,6 +367,64 @@ const MultiplayerDraftRoom = () => {
     // mpPoolKey fingerprints the board; avoid reloading on every draft poll.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- draft fields via mpBucketKey
   }, [mpBucketKey, mpPoolKey, user?.id]);
+
+  useEffect(() => {
+    if (!draft) return;
+    let cancelled = false;
+    const rookiesOnly =
+      draft.player_pool === 'rookies' || draft.player_pool === 'rookies_only';
+    void fetchAdpSourceBoardForBucket({
+      scoringFormat: draft.scoring_format || 'ppr',
+      leagueType: draft.league_type || 'season',
+      isSuperflex: Boolean(draft.is_superflex),
+      rookiesOnly,
+    }).then((board) => {
+      if (cancelled) return;
+      const sources = board?.sources ?? [];
+      setBoardSourceOptions(sources);
+      const allowed = yourBoardOptions(sources);
+      const saved = readMpYourBoardSource(draft.id);
+      setYourBoardSource(allowed.includes(saved as (typeof allowed)[number]) ? saved : 'yours');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft?.id, draft?.scoring_format, draft?.league_type, draft?.is_superflex, draft?.player_pool]);
+
+  useEffect(() => {
+    if (!draft || !usingSiteBoard) {
+      setSourceRankById(null);
+      return;
+    }
+    let cancelled = false;
+    const rookiesOnly =
+      draft.player_pool === 'rookies' || draft.player_pool === 'rookies_only';
+    void fetchAdpSourceBoardForBucket({
+      scoringFormat: draft.scoring_format || 'ppr',
+      leagueType: draft.league_type || 'season',
+      isSuperflex: Boolean(draft.is_superflex),
+      rookiesOnly,
+    }).then((board) => {
+      if (cancelled) return;
+      const rows = sourceRowsForBoard(board, yourBoardSource);
+      if (!rows?.length) {
+        setSourceRankById(null);
+        return;
+      }
+      setSourceRankById(new Map(rows.map((row, i) => [row.id, i + 1])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    draft?.id,
+    draft?.scoring_format,
+    draft?.league_type,
+    draft?.is_superflex,
+    draft?.player_pool,
+    yourBoardSource,
+    usingSiteBoard,
+  ]);
 
   // If the active position chip has no draftable players left, snap back to ALL
   useEffect(() => {
@@ -1378,6 +1453,27 @@ const MultiplayerDraftRoom = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <Select
+                value={yourBoardSource}
+                onValueChange={(v) => {
+                  setYourBoardSource(v);
+                  writeMpYourBoardSource(draft.id, v);
+                }}
+              >
+                <SelectTrigger
+                  className="w-[9.5rem] h-8 bg-secondary/50 text-sm"
+                  aria-label="Your board"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yourBoardOptions(boardSourceOptions).map((src) => (
+                    <SelectItem key={src} value={src}>
+                      {boardSourceLabel(src)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div
@@ -1390,9 +1486,9 @@ const MultiplayerDraftRoom = () => {
             >
               {turnStatus}
             </div>
-            {!user && (
+            {!user && yourBoardSource === 'yours' && (
               <p className="text-[11px] text-muted-foreground px-0.5 shrink-0 mb-1 leading-snug line-clamp-2 sm:line-clamp-none">
-                Guest board uses community rankings. Sign in for your personal board.
+                Guest board uses community rankings unless you pick a site board. Sign in for your personal rankings.
               </p>
             )}
 

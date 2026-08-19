@@ -1,0 +1,3 @@
+-- Available-player board for mocks: yours | community | espn | yahoo | ...
+ALTER TABLE public.mock_drafts
+  ADD COLUMN IF NOT EXISTS board_source text;

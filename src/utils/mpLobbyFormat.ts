@@ -3,6 +3,7 @@ import {
   parseStarters,
   type PositionLimitsLike,
 } from '@/utils/rosterSlots';
+import { boardSourceLabel } from '@/constants/adpRankingSources';
 
 export type MpLobbyVisibility = 'invite' | 'open';
 
@@ -89,11 +90,13 @@ export function formatMpLobbyMeta(opts: {
   leagueType?: string | null;
   isSuperflex?: boolean;
   positionLimits?: PositionLimitsLike | null;
+  boardSource?: string | null;
 }): string {
   const bits = [
     formatMpScoring(opts.scoringFormat),
     formatMpLeagueType(opts.leagueType),
     opts.isSuperflex ? 'Superflex' : null,
+    opts.boardSource ? boardSourceLabel(opts.boardSource) : null,
   ].filter(Boolean);
   return bits.join(' · ');
 }

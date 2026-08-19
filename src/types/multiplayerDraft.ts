@@ -23,6 +23,8 @@ export interface MultiplayerDraft {
   source_league_id: string | null;
   board_player_ids: string[];
   board_player_positions: string[];
+  /** Host-selected room board: consensus, espn, yahoo, sleeper. */
+  board_source?: string | null;
   current_pick_number: number;
   pick_deadline_at: string | null;
   cpu_archetypes: Record<string, unknown> | null;

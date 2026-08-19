@@ -1,0 +1,149 @@
+ppr_season_1qb: matched 593/614 (10 sources), unmatched 21
+  - 341 Dominic Zvada K NYG
+  - 347 Justin Tucker K 
+  - 358 Cade York K NYJ
+  - 367 Michael Trigg TE DAL
+  - 400 N. Whittington RB HOU
+  - 406 Odell Beckham Jr. WR NYG
+  - 423 Melvin Gordon III RB 
+  - 444 Brendan Sorsby QB 
+  - 469 John Samuel Shenker TE 
+  - 482 DeWayne McBride RB 
+  - 505 Greg Zuerlein K 
+  - 506 Kadarius Toney WR 
+  - 507 Tanner Brown K NO
+  - 508 Jordan Travis QB 
+  - 544 Ezekiel Elliott RB 
+  … 6 more
+half_ppr_season_1qb: matched 495/505 (8 sources), unmatched 10
+  - 233 Odell Beckham Jr. WR NYG
+  - 246 Chase Claypool WR 
+  - 247 Chase Curtis TE NYJ
+  - 266 Haynes King QB CAR
+  - 268 Jack Strand QB ATL
+  - 272 Jake Funk RB 
+  - 276 Jamison Crowder WR 
+  - 289 Josh Pederson TE 
+  - 324 Tyren Montgomery WR TEN
+  - 438 Michael Trigg TE DAL
+standard_season_1qb: matched 397/398 (8 sources), unmatched 1
+  - 325 Michael Trigg TE DAL
+ppr_season_superflex: matched 702/958 (7 sources), unmatched 256
+  - 203 Antonio Brown WR 
+  - 215 Josh Love QB 
+  - 360 Mike Nugent K 
+  - 361 Davis Cheek QB 
+  - 366 Randy Bullock K 
+  - 369 Greg Zuerlein K 
+  - 370 DaeSean Hamilton WR 
+  - 372 Anders Carlson K 
+  - 374 Travell Harris WR 
+  - 375 Jonathan Garibay K 
+  - 379 Rodrigo Blankenship K 
+  - 381 Stephen Hauschka K 
+  - 382 Alex Hale K 
+  - 384 Christopher Dunn K 
+  - 387 Lamar Jordan QB 
+  … 241 more
+half_ppr_season_superflex: matched 862/1210 (4 sources), unmatched 348
+  - 295 Antonio Brown WR 
+  - 353 Mike Nugent K 
+  - 354 Davis Cheek QB 
+  - 358 Randy Bullock K 
+  - 360 Greg Zuerlein K 
+  - 362 DaeSean Hamilton WR 
+  - 363 Anders Carlson K 
+  - 364 Travell Harris WR 
+  - 365 Jonathan Garibay K 
+  - 370 Rodrigo Blankenship K 
+  - 372 Stephen Hauschka K 
+  - 373 Alex Hale K 
+  - 374 Christopher Dunn K 
+  - 376 Lamar Jordan QB 
+  - 378 Golden Tate WR 
+  … 333 more
+standard_season_superflex: matched 705/962 (4 sources), unmatched 257
+  - 295 Antonio Brown WR 
+  - 356 Mike Nugent K 
+  - 357 Davis Cheek QB 
+  - 360 Randy Bullock K 
+  - 362 Greg Zuerlein K 
+  - 365 DaeSean Hamilton WR 
+  - 367 Anders Carlson K 
+  - 368 Travell Harris WR 
+  - 369 Jonathan Garibay K 
+  - 376 Rodrigo Blankenship K 
+  - 378 Stephen Hauschka K 
+  - 379 Alex Hale K 
+  - 380 Christopher Dunn K 
+  - 384 Lamar Jordan QB 
+  - 385 Golden Tate WR 
+  … 242 more
+ppr_dynasty_1qb: matched 343/357 (5 sources), unmatched 14
+  - 287 Michael Trigg TE DAL
+  - 290 J'Mari Taylor RB JAX
+  - 319 Roman Hemby RB LV
+  - 323 Noah Thomas WR CIN
+  - 325 Dane Key WR DEN
+  - 332 Trebor Pena WR JAX
+  - 334 Aaron Anderson WR CLE
+  - 336 Eric McAlister WR 
+  - 343 Eric Rivers Jr WR TB
+  - 344 Lake McRee TE PIT
+  - 349 Davon Booth RB CLE
+  - 353 Lance Mason TE PIT
+  - 356 DT Sheffield WR NYJ
+  - 357 DJ Rogers TE DAL
+half_ppr_dynasty_1qb: matched 342/346 (3 sources), unmatched 4
+  - 282 J'Mari Taylor RB JAX
+  - 304 Michael Trigg TE DAL
+  - 320 Roman Hemby RB LV
+  - 334 Eli Heidenreich WR PIT
+standard_dynasty_1qb: matched 336/340 (3 sources), unmatched 4
+  - 265 J'Mari Taylor RB JAX
+  - 307 Michael Trigg TE DAL
+  - 316 Roman Hemby RB LV
+  - 340 Eli Heidenreich WR PIT
+ppr_dynasty_superflex: matched 338/340 (4 sources), unmatched 2
+  - 320 J'Mari Taylor RB JAX
+  - 321 Michael Trigg TE DAL
+ppr_dynasty_1qb_rookies: matched 81/143 (5 sources), unmatched 62
+  - 45 Chase Curtis TE NYJ
+  - 51 Robert Henry Jr. RB WAS
+  - 60 J'Mari Taylor RB JAX
+  - 66 Jeff Caldwell WR KC
+  - 71 Tyren Montgomery WR TEN
+  - 72 Eric McAlister WR 
+  - 75 Jaydn Ott RB KC
+  - 77 Diego Pavia QB 
+  - 78 Michael Trigg TE DAL
+  - 79 Jack Strand QB ATL
+  - 81 Kejon Owens RB MIN
+  - 82 Roman Hemby RB LV
+  - 83 John Michael Gyllenborg TE KC
+  - 84 Desmond Reid RB BUF
+  - 85 Terion Stewart RB KC
+  … 47 more
+ppr_dynasty_superflex_rookies: matched 80/109 (4 sources), unmatched 29
+  - 60 Jeff Caldwell WR KC
+  - 70 Eli Heidenreich WR PIT
+  - 72 DJ Rogers TE DAL
+  - 74 Eric Rivers WR TB
+  - 78 Robert Henry Jr. RB WAS
+  - 79 Michael Trigg TE DAL
+  - 80 Desmond Reid RB BUF
+  - 82 J'Mari Taylor RB JAX
+  - 83 John Michael Gyllenborg TE KC
+  - 84 Vinny Anthony II WR ATL
+  - 86 Luke Altmyer QB DET
+  - 88 Joe Fagnano QB BAL
+  - 89 Roman Hemby RB LV
+  - 90 Kejon Owens RB MIN
+  - 91 CJ Donaldson RB NO
+  … 14 more
+half_ppr_dynasty_superflex: matched 338/340 (4 sources), unmatched 2
+  - 320 J'Mari Taylor RB JAX
+  - 321 Michael Trigg TE DAL
+standard_dynasty_superflex: matched 338/340 (4 sources), unmatched 2
+  - 320 J'Mari Taylor RB JAX
+  - 321 Michael Trigg TE DAL

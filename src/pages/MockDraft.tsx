@@ -37,6 +37,13 @@ import { getOrCreateGuestSessionId, resetGuestSessionId } from '@/utils/temporar
 import { resolveNextMockDraftName } from '@/utils/mockDraftDefaultName';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
 import { getRosterRounds, type PositionLimitsLike } from '@/utils/rosterSlots';
+import {
+  boardSourceLabel,
+  draftAgainstOptions,
+  writeMpYourBoardSource,
+  yourBoardOptions,
+} from '@/constants/adpRankingSources';
+import { applyNamedBoardToPlayers, fetchAdpSourceBoardForBucket } from '@/utils/adpSourceBoards';
 import type { MultiplayerDraftVisibility } from '@/types/multiplayerDraft';
 
 const MockDraft = () => {
@@ -53,6 +60,9 @@ const MockDraft = () => {
   const [pickTimer, setPickTimer] = useState('30');
   const [cpuSpeed, setCpuSpeed] = useState<'slow' | 'normal' | 'fast' | 'rapid'>('rapid');
   const [playerPool, setPlayerPool] = useState('all');
+  const [yourBoardSource, setYourBoardSource] = useState('yours');
+  const [cpuBoardSource, setCpuBoardSource] = useState('consensus');
+  const [boardSourceOptions, setBoardSourceOptions] = useState<string[]>([]);
   const [activeMpDrafts, setActiveMpDrafts] = useState<
     Array<{
       draft_id: string;
@@ -98,6 +108,32 @@ const MockDraft = () => {
     }
     return getRosterRounds(null, false);
   };
+
+  useEffect(() => {
+    const scoringFormat =
+      (selectedLeague as { scoring_format?: string } | null)?.scoring_format ||
+      tempSettings?.scoringFormat ||
+      'ppr';
+    const leagueType =
+      (selectedLeague as { league_type?: string } | null)?.league_type ||
+      tempSettings?.leagueType ||
+      'season';
+    const isSuperflex = Boolean(
+      (selectedLeague as { is_superflex?: boolean } | null)?.is_superflex ?? tempSettings?.isSuperflex
+    );
+    const rookiesOnly = Boolean(
+      ((selectedLeague as { rookies_only?: boolean } | null)?.rookies_only || tempSettings?.rookiesOnly) &&
+        leagueType === 'dynasty'
+    );
+    void fetchAdpSourceBoardForBucket({ scoringFormat, leagueType, isSuperflex, rookiesOnly }).then((board) => {
+      const sources = board?.sources ?? [];
+      setBoardSourceOptions(sources);
+      const yourOpts = yourBoardOptions(sources);
+      const againstOpts = draftAgainstOptions(sources);
+      setYourBoardSource((prev) => (yourOpts.includes(prev as (typeof yourOpts)[number]) ? prev : 'yours'));
+      setCpuBoardSource((prev) => (againstOpts.includes(prev as (typeof againstOpts)[number]) ? prev : 'consensus'));
+    });
+  }, [selectedLeague, tempSettings?.scoringFormat, tempSettings?.leagueType, tempSettings?.isSuperflex, tempSettings?.rookiesOnly]);
   
   // Prefill settings from selected league or localStorage
   useEffect(() => {
@@ -310,7 +346,14 @@ const MockDraft = () => {
             pool as any,
             community
           );
-          boardPlayers = ranked.map((p) => ({ id: p.id, position: p.position }));
+          const adpBoard = await fetchAdpSourceBoardForBucket({
+            scoringFormat,
+            leagueType,
+            isSuperflex,
+            rookiesOnly: false,
+          });
+          const ordered = applyNamedBoardToPlayers(ranked, adpBoard, cpuBoardSource);
+          boardPlayers = ordered.map((p) => ({ id: p.id, position: p.position }));
           // Guarantee every team can draft a DEF and K (community board can bury them)
           const have = new Set(boardPlayers.map((p) => p.id));
           const needDef = validatedNumTeams;
@@ -396,6 +439,7 @@ const MockDraft = () => {
           boardPlayerPositions: boardPlayers.map((p) => p.position),
           keepers,
           visibility: lobbyVisibility,
+          boardSource: cpuBoardSource,
           displayName: (
             await supabase
               .from('profiles')
@@ -404,6 +448,7 @@ const MockDraft = () => {
               .maybeSingle()
           ).data?.username?.trim() || user.email?.split('@')[0] || 'Host',
         });
+        writeMpYourBoardSource(created.draft_id, yourBoardSource);
         const keeperN = created.keeper_count ?? keepers.length;
         const openLobby = lobbyVisibility === 'open';
         toast.success(
@@ -456,6 +501,8 @@ const MockDraft = () => {
           cpu_speed: cpuSpeed,
           player_pool: isDynasty ? effectivePlayerPool : undefined,
           cpu_archetypes: assignRandomNamedArchetypesForDraft(validatedNumTeams, validatedPickPosition),
+          board_source: yourBoardSource,
+          cpu_board_source: cpuBoardSource,
         } as MockDraft;
 
         // Save temporary draft
@@ -483,6 +530,8 @@ const MockDraft = () => {
           pick_timer: pickTimer === '0' ? 0 : parseInt(pickTimer),
           player_pool: isDynasty ? effectivePlayerPool : null,
           cpu_speed: cpuSpeed, // Always include cpu_speed
+          board_source: yourBoardSource,
+          cpu_board_source: cpuBoardSource,
         } as any)
         .select()
         .single();
@@ -891,6 +940,7 @@ const MockDraft = () => {
               </div>
             )}
 
+            <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Timer className="w-4 h-4 text-muted-foreground" />
@@ -929,6 +979,55 @@ const MockDraft = () => {
                 </SelectContent>
               </Select>
             </div>
+            </div>
+
+            <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-muted-foreground" />
+                Your board
+              </Label>
+              <Select value={yourBoardSource} onValueChange={setYourBoardSource}>
+                <SelectTrigger className="bg-secondary/50 border-border/50 min-h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yourBoardOptions(boardSourceOptions).map((src) => (
+                    <SelectItem key={src} value={src}>
+                      {boardSourceLabel(src)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Order of the available list on your screen. Drafted players leave this list the same as everyone else.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-muted-foreground" />
+                Draft against
+              </Label>
+              <Select value={cpuBoardSource} onValueChange={setCpuBoardSource}>
+                <SelectTrigger className="bg-secondary/50 border-border/50 min-h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {draftAgainstOptions(boardSourceOptions).map((src) => (
+                    <SelectItem key={src} value={src}>
+                      {boardSourceLabel(src)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {draftMode === 'multiplayer'
+                  ? 'Room board for CPU seats and the frozen pick order. Your available list uses Your board.'
+                  : 'CPUs pick from this board. Your board can stay on Your rankings.'}
+              </p>
+            </div>
+            </div>
           </div>
 
           <div className="pt-4">
@@ -966,7 +1065,7 @@ const MockDraft = () => {
             <li>• <strong className="text-foreground">Snake Draft:</strong> Order reverses each round</li>
             <li>• <strong className="text-foreground">Linear Draft:</strong> Same order every round</li>
             <li>• <strong className="text-foreground">Multiplayer:</strong> Invite link, claim seats, ready up, host starts</li>
-            <li>• Players are sorted by community consensus for multiplayer boards</li>
+            <li>• In multiplayer, Your board is only your available list. Draft against is the room board CPUs pick from.</li>
           </ul>
         </div>
       </main>

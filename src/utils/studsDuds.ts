@@ -1,10 +1,13 @@
 import type { RankedPlayer } from '@/types/database';
 
 /**
- * Rankings studs/duds: only your ranks 1..N and community consensus ranks 1..N count.
+ * Rankings studs/duds: players in your top N or community top N.
  * Draft Stats uses {@link computeStudsDuds} with `compareMode: 'full'` instead.
  */
 export const STUDS_DUDS_RANKINGS_WINDOW = 300;
+
+/** Ignore 1–4 spot jitter from live merge, D/ST holes, and reset/finalize of the default board. */
+export const STUDS_DUDS_MIN_ABS_DIFF = 5;
 
 /** Finalize saves the full UUID board; stale/partial leftover rows should not count. */
 export const STUDS_DUDS_MIN_SAVED_POOL_FRACTION = 0.5;
@@ -86,7 +89,11 @@ export function shouldComputeStudsDuds(
   }
   if (boardMatchesSeedOrder(myPlayers, communityPlayers)) return false;
   if (adpSeedOrder.length > 0 && boardMatchesSeedOrder(myPlayers, adpSeedOrder)) return false;
-  return true;
+  const { studs, duds } = computeStudsDuds(myPlayers, communityPlayers, {
+    compareMode: 'window',
+    maxRankConsider: STUDS_DUDS_RANKINGS_WINDOW,
+  });
+  return studs.length > 0 || duds.length > 0;
 }
 
 export type StudsDudsCompareMode = 'window' | 'full';
@@ -107,11 +114,14 @@ export type ComputeStudsDudsOptions = {
   compareMode?: StudsDudsCompareMode;
   /** Used only when `compareMode === 'window'` (default {@link STUDS_DUDS_RANKINGS_WINDOW}). */
   maxRankConsider?: number;
+  /** Drop tiny gaps that are not a real take (default {@link STUDS_DUDS_MIN_ABS_DIFF}). */
+  minAbsDiff?: number;
 };
 
 /**
- * Studs/duds vs pure community consensus order (same scale as `buildCommunityFromRpc` from
- * get_community_rankings rank_position, excluding the current user from the RPC).
+ * Studs/duds vs community order on the shared player pool.
+ * Ranks in the UI stay the board numbers; takes are measured after dropping
+ * ids that exist on only one list so missing players cannot create a +60 shift.
  */
 export function computeStudsDuds(
   myRankedPlayers: RankedPlayer[],
@@ -120,28 +130,38 @@ export function computeStudsDuds(
 ): { studs: StudDudEntry[]; duds: StudDudEntry[] } {
   const compareMode = options?.compareMode ?? 'window';
   const windowN = options?.maxRankConsider ?? STUDS_DUDS_RANKINGS_WINDOW;
+  const minAbsDiff = options?.minAbsDiff ?? STUDS_DUDS_MIN_ABS_DIFF;
 
-  const sourceList =
-    compareMode === 'full'
-      ? myRankedPlayers
-      : myRankedPlayers.slice(0, windowN);
+  const myIdSet = new Set(myRankedPlayers.map((p) => p.id));
+  const communityIdSet = new Set(communityConsensusOrdered.map((p) => p.id));
 
-  const diffs: StudDudEntry[] = sourceList.map((myPlayer) => {
-    const myRank = myPlayer.rank;
-    const idx = communityConsensusOrdered.findIndex((p) => p.id === myPlayer.id);
-    const communityRank = idx + 1;
-    return { player: myPlayer, myRank, communityRank, diff: communityRank - myRank };
-  });
+  const myShared = myRankedPlayers.filter((p) => communityIdSet.has(p.id));
+  const communityShared = communityConsensusOrdered.filter((p) => myIdSet.has(p.id));
+
+  const alignedMyById = new Map<string, number>();
+  for (let i = 0; i < myShared.length; i++) alignedMyById.set(myShared[i].id, i + 1);
+  const alignedCommunityById = new Map<string, number>();
+  for (let i = 0; i < communityShared.length; i++) {
+    alignedCommunityById.set(communityShared[i].id, i + 1);
+  }
 
   const studs: StudDudEntry[] = [];
   const duds: StudDudEntry[] = [];
-  for (const d of diffs) {
-    if (d.communityRank < 1) continue;
-    if (compareMode === 'window') {
-      if (d.myRank > windowN || d.communityRank > windowN) continue;
-    }
-    if (d.diff > 0) studs.push(d);
-    else if (d.diff < 0) duds.push(d);
+  for (const player of myShared) {
+    const alignedMy = alignedMyById.get(player.id);
+    const alignedCommunity = alignedCommunityById.get(player.id);
+    if (alignedMy == null || alignedCommunity == null) continue;
+    if (compareMode === 'window' && (alignedMy > windowN || alignedCommunity > windowN)) continue;
+    const alignedDiff = alignedCommunity - alignedMy;
+    if (Math.abs(alignedDiff) < minAbsDiff) continue;
+    const entry: StudDudEntry = {
+      player,
+      myRank: alignedMy,
+      communityRank: alignedCommunity,
+      diff: alignedDiff,
+    };
+    if (alignedDiff > 0) studs.push(entry);
+    else duds.push(entry);
   }
   studs.sort((a, b) => b.diff - a.diff);
   duds.sort((a, b) => a.diff - b.diff);

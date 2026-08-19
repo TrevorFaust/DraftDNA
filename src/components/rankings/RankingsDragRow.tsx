@@ -106,9 +106,9 @@ export const RankingsDragRow = memo(function RankingsDragRow({
       className={cn(
         'relative glass-card p-2 sm:p-3 flex items-center gap-1.5 sm:gap-3 border-l-4',
         !tone && 'border-l-transparent',
-        breakTone != null && 'mt-3',
+        breakTone != null && 'mt-2',
         isOverlay && 'border-primary shadow-lg ring-1 ring-primary/40 cursor-grabbing',
-        isSourceGhost && 'opacity-40 border-dashed border-2 border-primary/60 bg-primary/5 min-h-[110px]',
+        isSourceGhost && 'opacity-40 border-dashed border-2 border-primary/60 bg-primary/5 min-h-[72px]',
         isSourceHidden && 'opacity-0',
         className
       )}
@@ -201,7 +201,14 @@ export const RankingsDragRow = memo(function RankingsDragRow({
           </TooltipContent>
         </Tooltip>
       ) : null}
-      {!isOverlay ? (
+      {isOverlay ? (
+        <div
+          aria-hidden
+          className="shrink-0 w-10 h-full min-h-[44px] flex items-center justify-center text-muted-foreground pointer-events-none"
+        >
+          <GripVertical className="w-4 h-4" />
+        </div>
+      ) : onHandlePointerDown || dragHandleAttributes || dragHandleListeners ? (
         <button
           type="button"
           ref={dragHandleRef}
@@ -213,17 +220,10 @@ export const RankingsDragRow = memo(function RankingsDragRow({
         >
           <GripVertical className="w-4 h-4" />
         </button>
-      ) : (
-        <div
-          aria-hidden
-          className="shrink-0 w-10 h-full min-h-[44px] flex items-center justify-center text-muted-foreground pointer-events-none"
-        >
-          <GripVertical className="w-4 h-4" />
-        </div>
-      )}
+      ) : null}
       {breakTone != null && (
         <div
-          className="pointer-events-none absolute -top-2.5 left-3 right-3 flex items-center gap-2 z-[1]"
+          className="pointer-events-none absolute -top-2 left-3 right-3 flex items-center gap-2 z-[1]"
           aria-hidden
         >
           <span className="h-0.5 flex-1 rounded-full" style={{ backgroundColor: breakTone.color }} />

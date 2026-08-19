@@ -24,6 +24,12 @@ dist
 dist-ssr
 *.local
 
+# Local script/run artifacts (not used by the app)
+scripts/**/output/
+scripts/reddit-promo/
+tmp-analyze.json
+*.tsbuildinfo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

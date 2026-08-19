@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, type RefObject } from 'react';
+import { memo, useState, useCallback, useEffect, type RefObject } from 'react';
 import { useVirtualizer, defaultRangeExtractor, type VirtualItem } from '@tanstack/react-virtual';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -6,9 +6,44 @@ import type { RankedPlayer } from '@/types/database';
 import { RankingsDragRow } from '@/components/rankings/RankingsDragRow';
 import type { CommunityRankTrend } from '@/utils/communityRankTrend';
 
-/** Fixed row height (card + mb-2 gap) — avoids dynamic measure churn while scrolling. */
-/** Includes phone layout where Comm/Mine/tier sit under the player name. */
-export const RANKINGS_ROW_ESTIMATE_PX = 118;
+/**
+ * Fixed row heights (card + mb-2) — avoids dynamic measure churn while scrolling.
+ * Desktop: Comm/Mine/tier sit inline. Phone: those controls stack under the name.
+ * Tier-break rows get a little extra for the label bar above the card.
+ */
+export const RANKINGS_ROW_ESTIMATE_DESKTOP_PX = 78;
+export const RANKINGS_ROW_ESTIMATE_MOBILE_PX = 110;
+export const RANKINGS_TIER_BREAK_EXTRA_PX = 10;
+/** @deprecated Prefer getRankingsRowSizePx — kept as desktop default. */
+export const RANKINGS_ROW_ESTIMATE_PX = RANKINGS_ROW_ESTIMATE_DESKTOP_PX;
+
+const RANKINGS_MOBILE_MQ = '(max-width: 639px)';
+
+export function getRankingsRowSizePx(
+  isMobileLayout: boolean,
+  hasTierBreakBefore = false
+): number {
+  const base = isMobileLayout
+    ? RANKINGS_ROW_ESTIMATE_MOBILE_PX
+    : RANKINGS_ROW_ESTIMATE_DESKTOP_PX;
+  return hasTierBreakBefore ? base + RANKINGS_TIER_BREAK_EXTRA_PX : base;
+}
+
+function useRankingsMobileLayout(): boolean {
+  const [isMobileLayout, setIsMobileLayout] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia(RANKINGS_MOBILE_MQ).matches : false
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia(RANKINGS_MOBILE_MQ);
+    const onChange = () => setIsMobileLayout(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  return isMobileLayout;
+}
 
 type Player2025StatsEntry = {
   avgPointsPerGame: number | null;
@@ -100,7 +135,7 @@ const VirtualSortableRow = memo(function VirtualSortableRow({
         top: virtualRow.start,
         left: 0,
         width: '100%',
-        height: RANKINGS_ROW_ESTIMATE_PX,
+        height: virtualRow.size,
         zIndex: isDragging ? 0 : 1,
       }}
     >
@@ -123,9 +158,14 @@ const VirtualSortableRow = memo(function VirtualSortableRow({
 
 type GapRowProps = {
   virtualRow: VirtualItem;
+  isMobileLayout: boolean;
 };
 
-const GapRow = memo(function GapRow({ virtualRow }: GapRowProps) {
+const GapRow = memo(function GapRow({ virtualRow, isMobileLayout }: GapRowProps) {
+  const ghostMinH = isMobileLayout
+    ? RANKINGS_ROW_ESTIMATE_MOBILE_PX - 8
+    : RANKINGS_ROW_ESTIMATE_DESKTOP_PX - 8;
+
   return (
     <div
       data-index={virtualRow.index}
@@ -135,11 +175,14 @@ const GapRow = memo(function GapRow({ virtualRow }: GapRowProps) {
         top: virtualRow.start,
         left: 0,
         width: '100%',
-        height: RANKINGS_ROW_ESTIMATE_PX,
+        height: virtualRow.size,
         zIndex: 1,
       }}
     >
-      <div className="mb-2 min-h-[110px] rounded-lg border-2 border-dashed border-primary/60 bg-primary/5" />
+      <div
+        className="mb-2 rounded-lg border-2 border-dashed border-primary/60 bg-primary/5"
+        style={{ minHeight: ghostMinH }}
+      />
     </div>
   );
 });
@@ -246,6 +289,8 @@ export function RankingsVirtualSortableList({
   player2025Stats,
   onPlayerClick,
 }: RankingsVirtualSortableListProps) {
+  const isMobileLayout = useRankingsMobileLayout();
+
   const pinnedIndex =
     dragMode === 'edit' && activeDragId
       ? items.findIndex((item) => item.kind === 'gap')
@@ -256,7 +301,16 @@ export function RankingsVirtualSortableList({
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollElement,
-    estimateSize: () => RANKINGS_ROW_ESTIMATE_PX,
+    estimateSize: (index) => {
+      const item = items[index];
+      if (!item || item.kind === 'gap') {
+        return getRankingsRowSizePx(isMobileLayout, false);
+      }
+      return getRankingsRowSizePx(
+        isMobileLayout,
+        hasTierBreakBeforePlayer?.(item.player.id) ?? false
+      );
+    },
     overscan: 6,
     enabled: scrollElement != null && items.length > 0,
     getItemKey: (index) => {
@@ -270,6 +324,11 @@ export function RankingsVirtualSortableList({
       return [...next].sort((a, b) => a - b);
     },
   });
+
+  // Remeasure when layout breakpoint or tier-break map changes (fixed estimates).
+  useEffect(() => {
+    virtualizer.measure();
+  }, [virtualizer, isMobileLayout, hasTierBreakBeforePlayer, items.length]);
 
   const virtualItems = virtualizer.getVirtualItems();
 
@@ -304,7 +363,13 @@ export function RankingsVirtualSortableList({
         const item = items[virtualRow.index];
         if (!item) return null;
         if (item.kind === 'gap') {
-          return <GapRow key={`gap-${activeDragId}`} virtualRow={virtualRow} />;
+          return (
+            <GapRow
+              key={`gap-${activeDragId}`}
+              virtualRow={virtualRow}
+              isMobileLayout={isMobileLayout}
+            />
+          );
         }
         const displayAdp = getDisplayAdp(item.player.id, item.player.adp);
         return (
@@ -324,6 +389,145 @@ export function RankingsVirtualSortableList({
             stats2025={player2025Stats.get(item.player.id)}
             onPlayerClick={onPlayerClick}
             dragMode={dragMode}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+export type RankingsReadOnlyVirtualListProps = {
+  scrollElement: HTMLDivElement | null;
+  players: RankedPlayer[];
+  getRank: (playerId: string) => number;
+  getDisplayAdp: (playerId: string, fallback: number) => number;
+  getCommunityPosRank?: (playerId: string) => number | null | undefined;
+  getMyPosRank?: (playerId: string) => number | null | undefined;
+  getCommunityTrend?: (playerId: string, overallRank: number) => CommunityRankTrend | null | undefined;
+  getTier?: (playerId: string) => number | null | undefined;
+  hasTierBreakBeforePlayer?: (playerId: string) => boolean;
+  player2025Stats: Map<string, Player2025StatsEntry>;
+  onPlayerClick: (player: RankedPlayer) => void;
+};
+
+const ReadOnlyVirtualRow = memo(function ReadOnlyVirtualRow({
+  player,
+  virtualRow,
+  rank,
+  displayAdp,
+  communityPosRank,
+  myPosRank,
+  communityTrend,
+  tier,
+  hasTierBreakBefore,
+  stats2025,
+  onPlayerClick,
+}: {
+  player: RankedPlayer;
+  virtualRow: VirtualItem;
+  rank: number;
+  displayAdp: number;
+  communityPosRank?: number | null;
+  myPosRank?: number | null;
+  communityTrend?: CommunityRankTrend | null;
+  tier?: number | null;
+  hasTierBreakBefore?: boolean;
+  stats2025?: Player2025StatsEntry;
+  onPlayerClick: (player: RankedPlayer) => void;
+}) {
+  return (
+    <div
+      data-index={virtualRow.index}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        transform: `translateY(${virtualRow.start}px)`,
+      }}
+      className="mb-2"
+    >
+      <RankingsDragRow
+        player={player}
+        rank={rank}
+        displayAdp={displayAdp}
+        communityPosRank={communityPosRank}
+        myPosRank={myPosRank}
+        communityTrend={communityTrend}
+        tier={tier}
+        hasTierBreakBefore={hasTierBreakBefore}
+        stats2025={stats2025}
+        onPlayerClick={onPlayerClick}
+      />
+    </div>
+  );
+});
+
+/** Read-only virtual board (community / site ADP) — no dnd-kit, no jersey cards. */
+export function RankingsReadOnlyVirtualList({
+  scrollElement,
+  players,
+  getRank,
+  getDisplayAdp,
+  getCommunityPosRank,
+  getMyPosRank,
+  getCommunityTrend,
+  getTier,
+  hasTierBreakBeforePlayer,
+  player2025Stats,
+  onPlayerClick,
+}: RankingsReadOnlyVirtualListProps) {
+  const isMobileLayout = useRankingsMobileLayout();
+
+  const virtualizer = useVirtualizer({
+    count: players.length,
+    getScrollElement: () => scrollElement,
+    estimateSize: (index) => {
+      const player = players[index];
+      return getRankingsRowSizePx(
+        isMobileLayout,
+        player ? hasTierBreakBeforePlayer?.(player.id) ?? false : false
+      );
+    },
+    overscan: 8,
+    enabled: scrollElement != null && players.length > 0,
+    getItemKey: (index) => players[index]?.id ?? index,
+  });
+
+  useEffect(() => {
+    virtualizer.measure();
+  }, [virtualizer, isMobileLayout, hasTierBreakBeforePlayer, players.length]);
+
+  if (!scrollElement || players.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        height: virtualizer.getTotalSize(),
+        width: '100%',
+        position: 'relative',
+      }}
+    >
+      {virtualizer.getVirtualItems().map((virtualRow) => {
+        const player = players[virtualRow.index];
+        if (!player) return null;
+        const rank = getRank(player.id);
+        return (
+          <ReadOnlyVirtualRow
+            key={player.id}
+            player={player}
+            virtualRow={virtualRow}
+            rank={rank}
+            displayAdp={getDisplayAdp(player.id, Number(player.adp) || 0)}
+            communityPosRank={getCommunityPosRank?.(player.id)}
+            myPosRank={getMyPosRank?.(player.id)}
+            communityTrend={getCommunityTrend?.(player.id, rank)}
+            tier={getTier?.(player.id)}
+            hasTierBreakBefore={hasTierBreakBeforePlayer?.(player.id)}
+            stats2025={player2025Stats.get(player.id)}
+            onPlayerClick={onPlayerClick}
           />
         );
       })}

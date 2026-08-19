@@ -92,6 +92,8 @@ import {
   type DraftDisplayBucket,
   type PersonalDraftBoardOverlay,
 } from '@/utils/draftPersonalBoard';
+import { applyNamedBoardToPlayers, fetchAdpSourceBoardForBucket, sourceRowsForBoard } from '@/utils/adpSourceBoards';
+import { normalizeDraftAgainstId } from '@/constants/adpRankingSources';
 
 /** Minimum ms between rapid CPU picks finishing — keeps pace steady when the board is lighter late in the draft. */
 const RAPID_CPU_PICK_GAP_MS = 360;
@@ -115,6 +117,7 @@ const DraftRoom = () => {
   const [draftBucket, setDraftBucket] = useState<DraftDisplayBucket | null>(null);
   const [draftLeagueId, setDraftLeagueId] = useState<string | null>(null);
   const [personalBoard, setPersonalBoard] = useState<PersonalDraftBoardOverlay | null>(null);
+  const [sourceRankById, setSourceRankById] = useState<Map<string, number> | null>(null);
   const positionAdpRankMap = useMemo(
     () => buildPositionAdpRankMap(players),
     [players]
@@ -576,18 +579,22 @@ const DraftRoom = () => {
         : { excludeGuestSessionId: getOrCreateGuestSessionId() };
 
       const communityRows = await fetchCommunityRankingsForDraft(supabase, draftBucket, communityExclude);
-      const sortedRankedPlayers = await buildDraftRankingsFromCommunity(
+      let sortedRankedPlayers = await buildDraftRankingsFromCommunity(
         supabase,
         allPlayersData || [],
         communityRows
       );
 
+      const cpuSource = normalizeDraftAgainstId((draftData as MockDraft).cpu_board_source);
+      const adpBoard = await fetchAdpSourceBoardForBucket(draftBucket);
+      sortedRankedPlayers = applyNamedBoardToPlayers(sortedRankedPlayers, adpBoard, cpuSource);
+
       if (communityRows.length > 0) {
         console.log(
-          `[DraftRoom] CPU board: community rankings (${draftBucket.scoringFormat}/${draftBucket.leagueType}/sf=${draftBucket.isSuperflex}), excluding drafter from consensus`
+          `[DraftRoom] CPU board: ${cpuSource} (${draftBucket.scoringFormat}/${draftBucket.leagueType}/sf=${draftBucket.isSuperflex})`
         );
       } else {
-        console.warn('[DraftRoom] No community rankings for bucket — CPU board using players.adp order');
+        console.warn('[DraftRoom] No community rankings for bucket — CPU board using ADP consensus / players.adp order');
       }
 
       // Load picks before capping rounds so we never schedule more full rounds than the loaded pool supports
@@ -674,7 +681,7 @@ const DraftRoom = () => {
 
   const soloPoolKey = useMemo(() => players.map((p) => p.id).join(','), [players]);
 
-  // Personal rankings + tiers for the available list (CPUs stay on community board).
+  // Personal rankings + tiers for the available list (CPUs use cpu_board_source).
   useEffect(() => {
     if (!draftBucket || players.length === 0) {
       setPersonalBoard(null);
@@ -694,6 +701,27 @@ const DraftRoom = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pool via soloPoolKey
   }, [draftBucket, draftLeagueId, user?.id, soloPoolKey]);
+
+  useEffect(() => {
+    const source = draft?.board_source;
+    if (!draftBucket || !source || source === 'yours' || source === 'mine') {
+      setSourceRankById(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchAdpSourceBoardForBucket(draftBucket).then((board) => {
+      if (cancelled) return;
+      const rows = sourceRowsForBoard(board, source);
+      if (!rows?.length) {
+        setSourceRankById(null);
+        return;
+      }
+      setSourceRankById(new Map(rows.map((row, i) => [row.id, i + 1])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft?.board_source, draftBucket]);
 
   const getCurrentTeam = () => {
     if (!draft) return 1;
@@ -1605,6 +1633,13 @@ const DraftRoom = () => {
   ]);
 
   const personalMetaById = personalBoard?.metaById;
+  const visibleBoardRank = (p: RankedPlayer) => {
+    const source = draft?.board_source;
+    if (source && source !== 'yours' && source !== 'mine') {
+      return sourceRankById?.get(p.id) ?? 10_000 + (Number(p.rank) || 9999);
+    }
+    return personalMetaById?.get(p.id)?.overallRank ?? p.rank;
+  };
 
   // Highlight who falls to you at each remaining pick on YOUR board order
   // (same sort as the available list): next round, then 5th/6th/7th… as you scroll.
@@ -1614,9 +1649,7 @@ const DraftRoom = () => {
     if (!draft) return ids;
 
     const sortedAvailable = [...availablePlayers].sort((a, b) => {
-      const ra = personalMetaById?.get(a.id)?.overallRank ?? a.rank;
-      const rb = personalMetaById?.get(b.id)?.overallRank ?? b.rank;
-      return ra - rb;
+      return visibleBoardRank(a) - visibleBoardRank(b);
     });
 
     for (const pickNum of getUserUpcomingPicks()) {
@@ -1631,6 +1664,8 @@ const DraftRoom = () => {
   }, [
     availablePlayers,
     personalMetaById,
+    sourceRankById,
+    draft?.board_source,
     currentPick,
     draft?.user_pick_position,
     draft?.num_teams,
@@ -1670,9 +1705,7 @@ const DraftRoom = () => {
       return true;
     });
 
-    const personalRank = (p: RankedPlayer) =>
-      personalMetaById?.get(p.id)?.overallRank ?? p.rank;
-    const playersToRender = deduped.sort((a, b) => personalRank(a) - personalRank(b));
+    const playersToRender = deduped.sort((a, b) => visibleBoardRank(a) - visibleBoardRank(b));
 
     // All Positions: fixed breaks from board load (never reset when a late T1 QB rises).
     // Position filter: live frontier breaks for that position's leftovers.
@@ -1688,9 +1721,13 @@ const DraftRoom = () => {
 
     return playersToRender.map((player) => {
       const meta = personalMetaById?.get(player.id);
+      const source = draft?.board_source;
+      const usingSiteBoard = Boolean(source && source !== 'yours' && source !== 'mine');
       return {
         player,
-        displayRank: meta?.overallRank ?? player.rank,
+        displayRank: usingSiteBoard
+          ? sourceRankById?.get(player.id) ?? player.rank
+          : meta?.overallRank ?? player.rank,
         myPosRank: meta?.posRank ?? null,
         tier: meta?.tier ?? null,
         hasTierBreakBefore: breakBeforeIds.has(player.id),
@@ -1708,6 +1745,8 @@ const DraftRoom = () => {
     userDraftedPlayers,
     isRookiesOnlyDraft,
     personalMetaById,
+    sourceRankById,
+    draft?.board_source,
     personalBoard?.allViewBreakBeforeIds,
   ]);
 
@@ -2629,7 +2668,7 @@ const DraftRoom = () => {
             )}
             {!user && (
               <p className="mb-1 text-[11px] text-muted-foreground px-0.5 shrink-0 leading-snug line-clamp-2 sm:line-clamp-none">
-                Guest board uses community rankings. Sign in for your personal board.
+                Guest board uses Consensus unless you pick another board. Sign in for your personal rankings.
               </p>
             )}
 

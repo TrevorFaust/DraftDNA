@@ -1,0 +1,383 @@
+ADP consensus parse report
+
+== PPR · Redraft · 1QB (ppr_season_1qb) ==
+  players: 614  sources: ESPN, Sleeper, CBS, RTSports, Fantrax, FantasyPros, PFF, DraftSharks, Yahoo, Underdog
+  DST: 32 rows / 32 teams (max 32)
+    ESPN: 300
+    Sleeper: 297
+    CBS: 221
+    RTSports: 259
+    Fantrax: 349
+    FantasyPros: 598
+    PFF: 219
+    DraftSharks: 298
+    Yahoo: 373
+    Underdog: 216
+
+== Half PPR · Redraft · 1QB (half_ppr_season_1qb) ==
+  players: 505  sources: Yahoo, Sleeper, RTSports, FantasyPros, PFF, DraftSharks, Underdog, ESPN
+  DST: 32 rows / 32 teams (max 32)
+    Yahoo: 373
+    Sleeper: 297
+    RTSports: 308
+    FantasyPros: 337
+    PFF: 219
+    DraftSharks: 300
+    Underdog: 431
+    ESPN: 300
+
+== Standard · Redraft · 1QB (standard_season_1qb) ==
+  players: 398  sources: Sleeper, RTSports, FantasyPros, PFF, CBS, DraftSharks, ESPN, Yahoo
+  DST: 32 rows / 32 teams (max 32)
+    Sleeper: 297
+    RTSports: 308
+    FantasyPros: 337
+    PFF: 227
+    CBS: 206
+    DraftSharks: 299
+    ESPN: 300
+    Yahoo: 373
+
+== PPR · Redraft · 2QB (ppr_season_superflex) ==
+  players: 958  sources: FantasyPros, PFF, DraftSharks, Sleeper, Underdog, ESPN, Yahoo
+  DST: 32 rows / 32 teams (max 32)
+    FantasyPros: 541
+    PFF: 50
+    DraftSharks: 300
+    Sleeper: 824
+    Underdog: 305
+    ESPN: 300
+    Yahoo: 199
+  short lists:
+    - ppr_season_superflex / pff (pff_sheet): 50 ranked players (shorter than the typical 200–300).
+    - ppr_season_superflex / espn (espn_tsv): 199 ranked players (shorter than the typical 200–300).
+    - ppr_season_superflex / yahoo (yahoo_list): 199 ranked players (shorter than the typical 200–300).
+
+== Half PPR · Redraft · 2QB (half_ppr_season_superflex) ==
+  players: 1210  sources: FantasyPros, Sleeper, Yahoo, ESPN
+  DST: 32 rows / 32 teams (max 32)
+    FantasyPros: 872
+    Sleeper: 824
+    Yahoo: 199
+    ESPN: 300
+  short lists:
+    - half_ppr_season_superflex / yahoo (yahoo_list): 199 ranked players (shorter than the typical 200–300).
+    - half_ppr_season_superflex / espn (espn_tsv): 199 ranked players (shorter than the typical 200–300).
+
+== Standard · Redraft · 2QB (standard_season_superflex) ==
+  players: 962  sources: Sleeper, FantasyPros, ESPN, Yahoo
+  DST: 32 rows / 32 teams (max 32)
+    Sleeper: 824
+    FantasyPros: 548
+    ESPN: 308
+    Yahoo: 199
+  short lists:
+    - standard_season_superflex / yahoo (yahoo_list): 199 ranked players (shorter than the typical 200–300).
+
+== PPR · Dynasty · 1QB (ppr_dynasty_1qb) ==
+  players: 357  sources: ESPN, FantasyPros, PFF, Sleeper, Yahoo
+  DST: 32 rows / 32 teams (max 32)
+    ESPN: 316
+    FantasyPros: 315
+    PFF: 50
+    Sleeper: 298
+    Yahoo: 197
+  short lists:
+    - ppr_dynasty_1qb / pff (pff_sheet): 50 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_1qb / yahoo (yahoo_list): 197 ranked players (shorter than the typical 200–300).
+
+== Half PPR · Dynasty · 1QB (half_ppr_dynasty_1qb) ==
+  players: 346  sources: Sleeper, ESPN, Yahoo
+  DST: 32 rows / 32 teams (max 32)
+    Sleeper: 299
+    ESPN: 316
+    Yahoo: 197
+  short lists:
+    - half_ppr_dynasty_1qb / yahoo (yahoo_list): 197 ranked players (shorter than the typical 200–300).
+
+== Standard · Dynasty · 1QB (standard_dynasty_1qb) ==
+  players: 340  sources: Sleeper, ESPN, Yahoo
+  DST: 32 rows / 32 teams (max 32)
+    Sleeper: 299
+    ESPN: 310
+    Yahoo: 197
+  short lists:
+    - standard_dynasty_1qb / yahoo (yahoo_list): 197 ranked players (shorter than the typical 200–300).
+
+== PPR · Dynasty · 2QB (ppr_dynasty_superflex) ==
+  players: 340  sources: Sleeper, PFF, Yahoo, ESPN
+  DST: 32 rows / 32 teams (max 32)
+    Sleeper: 299
+    PFF: 50
+    Yahoo: 197
+    ESPN: 247
+  short lists:
+    - ppr_dynasty_superflex / pff (pff_sheet): 50 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_superflex / yahoo (yahoo_sf_blend): 197 ranked players (shorter than the typical 200–300).
+
+== PPR · Dynasty · 1QB · Rookies (ppr_dynasty_1qb_rookies) ==
+  players: 143  sources: FantasyPros, PFF, Sleeper, Yahoo, ESPN
+  DST: 0 rows / 0 teams (max 32)
+    FantasyPros: 137
+    PFF: 60
+    Sleeper: 93
+    Yahoo: 90
+    ESPN: 82
+  short lists:
+    - ppr_dynasty_1qb_rookies / fantasypros (fp_adp): 137 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_1qb_rookies / pff (pff_sheet): 60 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_1qb_rookies / sleeper (sleeper_sheet): 93 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_1qb_rookies / yahoo (yahoo_list): 90 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_1qb_rookies / espn (espn_ppr_order): 82 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_1qb_rookies / espn (espn_pdf): 60 ranked players (shorter than the typical 200–300).
+
+== PPR · Dynasty · 2QB · Rookies (ppr_dynasty_superflex_rookies) ==
+  players: 109  sources: Sleeper, PFF, Yahoo, ESPN
+  DST: 0 rows / 0 teams (max 32)
+    Sleeper: 93
+    PFF: 60
+    Yahoo: 50
+    ESPN: 82
+  short lists:
+    - ppr_dynasty_superflex_rookies / sleeper (sleeper_sheet): 93 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_superflex_rookies / pff (pff_sheet): 60 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_superflex_rookies / yahoo (yahoo_list): 50 ranked players (shorter than the typical 200–300).
+    - ppr_dynasty_superflex_rookies / espn (espn_ppr_order): 82 ranked players (shorter than the typical 200–300).
+
+== Half PPR · Dynasty · 2QB (half_ppr_dynasty_superflex) ==
+  players: 340  sources: Yahoo, ESPN, Sleeper, PFF
+  DST: 32 rows / 32 teams (max 32)
+    Yahoo: 197
+    ESPN: 247
+    Sleeper: 299
+    PFF: 50
+  short lists:
+    - half_ppr_dynasty_superflex / yahoo (yahoo_sf_blend): 197 ranked players (shorter than the typical 200–300).
+    - half_ppr_dynasty_superflex / pff (pff_sheet): 50 ranked players (shorter than the typical 200–300).
+
+== Standard · Dynasty · 2QB (standard_dynasty_superflex) ==
+  players: 340  sources: Yahoo, ESPN, Sleeper, PFF
+  DST: 32 rows / 32 teams (max 32)
+    Yahoo: 197
+    ESPN: 247
+    Sleeper: 299
+    PFF: 50
+  short lists:
+    - standard_dynasty_superflex / yahoo (yahoo_sf_blend): 197 ranked players (shorter than the typical 200–300).
+    - standard_dynasty_superflex / pff (pff_sheet): 50 ranked players (shorter than the typical 200–300).
+
+Native vs duplicate copies
+
+[ppr_season_1qb] espn: MAJOR DIFF espn_tsv vs espn_pdf mean |diff| 41.08 (82.5% off by 15+) on 200 players. Using native espn_pdf.
+[ppr_season_1qb]     Ryan Flournoy: espn_pdf 204.0 vs espn_tsv 300.0 (Δ96)
+[ppr_season_1qb]     Tre Harris: espn_pdf 203.0 vs espn_tsv 298.0 (Δ95)
+[ppr_season_1qb]     Stefon Diggs: espn_pdf 202.0 vs espn_tsv 295.0 (Δ93)
+[ppr_season_1qb]     Darnell Mooney: espn_pdf 201.0 vs espn_tsv 293.0 (Δ92)
+[ppr_season_1qb]     Cam Ward: espn_pdf 199.0 vs espn_tsv 286.0 (Δ87)
+[ppr_season_1qb]     Jordan Love: espn_pdf 198.0 vs espn_tsv 284.0 (Δ86)
+[ppr_season_1qb]     Zachariah Branch: espn_pdf 197.0 vs espn_tsv 281.0 (Δ84)
+[ppr_season_1qb]     Justice Hill: espn_pdf 196.0 vs espn_tsv 278.0 (Δ82)
+[ppr_season_1qb] espn: MAJOR DIFF fp_adp vs espn_pdf mean |diff| 22.58 (48.6% off by 15+) on 216 players. Using native espn_pdf.
+[ppr_season_1qb]     Brandon Aubrey: espn_pdf 181.0 vs fp_adp 70.0 (Δ111)
+[ppr_season_1qb]     Omar Cooper Jr.: espn_pdf 162.0 vs fp_adp 272.0 (Δ110)
+[ppr_season_1qb]     San Francisco 49ers: espn_pdf 297.0 vs fp_adp 189.0 (Δ108)
+[ppr_season_1qb]     Denver Broncos: espn_pdf 169.0 vs fp_adp 74.0 (Δ95)
+[ppr_season_1qb]     Jake Elliott: espn_pdf 288.0 vs fp_adp 194.0 (Δ94)
+[ppr_season_1qb]     Houston Texans: espn_pdf 170.0 vs fp_adp 81.0 (Δ89)
+[ppr_season_1qb]     Los Angeles Rams: espn_pdf 173.0 vs fp_adp 85.0 (Δ88)
+[ppr_season_1qb]     Cameron Dicker: espn_pdf 182.0 vs fp_adp 98.0 (Δ84)
+[ppr_season_1qb] espn: MAJOR DIFF draftsharks vs espn_pdf mean |diff| 21.99 (48.1% off by 15+) on 214 players. Using native espn_pdf.
+[ppr_season_1qb]     Brandon Aubrey: espn_pdf 181.0 vs draftsharks 70.0 (Δ111)
+[ppr_season_1qb]     San Francisco 49ers: espn_pdf 297.0 vs draftsharks 189.0 (Δ108)
+[ppr_season_1qb]     Denver Broncos: espn_pdf 169.0 vs draftsharks 74.0 (Δ95)
+[ppr_season_1qb]     Jake Elliott: espn_pdf 288.0 vs draftsharks 194.0 (Δ94)
+[ppr_season_1qb]     Houston Texans: espn_pdf 170.0 vs draftsharks 80.0 (Δ90)
+[ppr_season_1qb]     Los Angeles Rams: espn_pdf 173.0 vs draftsharks 85.0 (Δ88)
+[ppr_season_1qb]     Jauan Jennings: espn_pdf 164.0 vs draftsharks 248.0 (Δ84)
+[ppr_season_1qb]     Cameron Dicker: espn_pdf 182.0 vs draftsharks 98.0 (Δ84)
+[ppr_season_1qb] espn: 300 players from espn_pdf
+[ppr_season_1qb] sleeper: draftsharks vs fp_adp mean |diff| 0.05 on 297 players — using native fp_adp.
+[ppr_season_1qb] sleeper: 297 players from fp_adp
+[ppr_season_1qb] cbs: MAJOR DIFF fp_adp vs cbs_sheet mean |diff| 11.7 (27.4% off by 15+) on 219 players. Using native cbs_sheet.
+[ppr_season_1qb]     Eddy Pineiro: cbs_sheet 166.5 vs fp_adp 223.0 (Δ56)
+[ppr_season_1qb]     Brian Robinson Jr.: cbs_sheet 157.18 vs fp_adp 211.0 (Δ54)
+[ppr_season_1qb]     CJ. Stroud: cbs_sheet 167.64 vs fp_adp 221.0 (Δ53)
+[ppr_season_1qb]     Nicholas Singleton: cbs_sheet 169.11 vs fp_adp 222.0 (Δ53)
+[ppr_season_1qb]     Cam Ward: cbs_sheet 168.22 vs fp_adp 220.0 (Δ52)
+[ppr_season_1qb]     Harrison Butker: cbs_sheet 168.6 vs fp_adp 219.0 (Δ50)
+[ppr_season_1qb]     Will Reichard: cbs_sheet 173.64 vs fp_adp 224.0 (Δ50)
+[ppr_season_1qb]     Jacksonville Jaguars: cbs_sheet 166.59 vs fp_adp 215.0 (Δ48)
+[ppr_season_1qb] cbs: MAJOR DIFF draftsharks vs cbs_sheet mean |diff| 11.7 (27.4% off by 15+) on 219 players. Using native cbs_sheet.
+[ppr_season_1qb]     Eddy Pineiro: cbs_sheet 166.5 vs draftsharks 223.0 (Δ56)
+[ppr_season_1qb]     Brian Robinson Jr.: cbs_sheet 157.18 vs draftsharks 211.0 (Δ54)
+[ppr_season_1qb]     CJ. Stroud: cbs_sheet 167.64 vs draftsharks 221.0 (Δ53)
+[ppr_season_1qb]     Nicholas Singleton: cbs_sheet 169.11 vs draftsharks 222.0 (Δ53)
+[ppr_season_1qb]     Cam Ward: cbs_sheet 168.22 vs draftsharks 220.0 (Δ52)
+[ppr_season_1qb]     Harrison Butker: cbs_sheet 168.6 vs draftsharks 219.0 (Δ50)
+[ppr_season_1qb]     Will Reichard: cbs_sheet 173.64 vs draftsharks 224.0 (Δ50)
+[ppr_season_1qb]     Jacksonville Jaguars: cbs_sheet 166.59 vs draftsharks 215.0 (Δ48)
+[ppr_season_1qb] cbs: 221 players from cbs_sheet
+[ppr_season_1qb] rtsports: 259 players from fp_adp
+[ppr_season_1qb] fantrax: 349 players from fp_adp
+[ppr_season_1qb] fantasypros: 598 players from fp_adp
+[ppr_season_1qb] pff: 219 players from pff_sheet
+[ppr_season_1qb] draftsharks: 298 players from draftsharks
+[ppr_season_1qb] yahoo: 373 players from yahoo_sheet
+[ppr_season_1qb] underdog: 216 players from underdog_csv
+[half_ppr_season_1qb] yahoo: MAJOR DIFF fp_adp vs yahoo_sheet mean |diff| 19.78 (36.7% off by 15+) on 221 players. Using native yahoo_sheet.
+[half_ppr_season_1qb]     Andy Borregales: yahoo_sheet 145.0 vs fp_adp 222.0 (Δ77)
+[half_ppr_season_1qb]     Chris Boswell: yahoo_sheet 139.5 vs fp_adp 216.0 (Δ76)
+[half_ppr_season_1qb]     Cairo Santos: yahoo_sheet 144.5 vs fp_adp 221.0 (Δ76)
+[half_ppr_season_1qb]     Will Reichard: yahoo_sheet 138.7 vs fp_adp 215.0 (Δ76)
+[half_ppr_season_1qb]     Eddy Pineiro: yahoo_sheet 143.7 vs fp_adp 220.0 (Δ76)
+[half_ppr_season_1qb]     Evan McPherson: yahoo_sheet 143.1 vs fp_adp 219.0 (Δ76)
+[half_ppr_season_1qb]     Chase McLaughlin: yahoo_sheet 142.3 vs fp_adp 218.0 (Δ76)
+[half_ppr_season_1qb]     Tyler Loop: yahoo_sheet 141.4 vs fp_adp 217.0 (Δ76)
+[half_ppr_season_1qb] yahoo: 373 players from yahoo_sheet
+[half_ppr_season_1qb] sleeper: draftsharks vs fp_adp mean |diff| 0.05 on 297 players — using native fp_adp.
+[half_ppr_season_1qb] sleeper: 297 players from fp_adp
+[half_ppr_season_1qb] rtsports: 308 players from fp_adp
+[half_ppr_season_1qb] fantasypros: 337 players from fp_adp
+[half_ppr_season_1qb] pff: 219 players from pff_sheet
+[half_ppr_season_1qb] draftsharks: 300 players from draftsharks
+[half_ppr_season_1qb] underdog: 431 players from underdog_csv
+[half_ppr_season_1qb] espn: MAJOR DIFF espn_tsv vs espn_pdf mean |diff| 41.08 (82.5% off by 15+) on 200 players. Using native espn_pdf.
+[half_ppr_season_1qb]     Ryan Flournoy: espn_pdf 204.0 vs espn_tsv 300.0 (Δ96)
+[half_ppr_season_1qb]     Tre Harris: espn_pdf 203.0 vs espn_tsv 298.0 (Δ95)
+[half_ppr_season_1qb]     Stefon Diggs: espn_pdf 202.0 vs espn_tsv 295.0 (Δ93)
+[half_ppr_season_1qb]     Darnell Mooney: espn_pdf 201.0 vs espn_tsv 293.0 (Δ92)
+[half_ppr_season_1qb]     Cam Ward: espn_pdf 199.0 vs espn_tsv 286.0 (Δ87)
+[half_ppr_season_1qb]     Jordan Love: espn_pdf 198.0 vs espn_tsv 284.0 (Δ86)
+[half_ppr_season_1qb]     Zachariah Branch: espn_pdf 197.0 vs espn_tsv 281.0 (Δ84)
+[half_ppr_season_1qb]     Justice Hill: espn_pdf 196.0 vs espn_tsv 278.0 (Δ82)
+[half_ppr_season_1qb] espn: MAJOR DIFF fp_adp vs espn_pdf mean |diff| 22.58 (48.6% off by 15+) on 216 players. Using native espn_pdf.
+[half_ppr_season_1qb]     Brandon Aubrey: espn_pdf 181.0 vs fp_adp 70.0 (Δ111)
+[half_ppr_season_1qb]     Omar Cooper Jr.: espn_pdf 162.0 vs fp_adp 272.0 (Δ110)
+[half_ppr_season_1qb]     San Francisco 49ers: espn_pdf 297.0 vs fp_adp 189.0 (Δ108)
+[half_ppr_season_1qb]     Denver Broncos: espn_pdf 169.0 vs fp_adp 74.0 (Δ95)
+[half_ppr_season_1qb]     Jake Elliott: espn_pdf 288.0 vs fp_adp 194.0 (Δ94)
+[half_ppr_season_1qb]     Houston Texans: espn_pdf 170.0 vs fp_adp 81.0 (Δ89)
+[half_ppr_season_1qb]     Los Angeles Rams: espn_pdf 173.0 vs fp_adp 85.0 (Δ88)
+[half_ppr_season_1qb]     Cameron Dicker: espn_pdf 182.0 vs fp_adp 98.0 (Δ84)
+[half_ppr_season_1qb] espn: MAJOR DIFF draftsharks vs espn_pdf mean |diff| 21.99 (48.1% off by 15+) on 214 players. Using native espn_pdf.
+[half_ppr_season_1qb]     Brandon Aubrey: espn_pdf 181.0 vs draftsharks 70.0 (Δ111)
+[half_ppr_season_1qb]     San Francisco 49ers: espn_pdf 297.0 vs draftsharks 189.0 (Δ108)
+[half_ppr_season_1qb]     Denver Broncos: espn_pdf 169.0 vs draftsharks 74.0 (Δ95)
+[half_ppr_season_1qb]     Jake Elliott: espn_pdf 288.0 vs draftsharks 194.0 (Δ94)
+[half_ppr_season_1qb]     Houston Texans: espn_pdf 170.0 vs draftsharks 80.0 (Δ90)
+[half_ppr_season_1qb]     Los Angeles Rams: espn_pdf 173.0 vs draftsharks 85.0 (Δ88)
+[half_ppr_season_1qb]     Jauan Jennings: espn_pdf 164.0 vs draftsharks 248.0 (Δ84)
+[half_ppr_season_1qb]     Cameron Dicker: espn_pdf 182.0 vs draftsharks 98.0 (Δ84)
+[half_ppr_season_1qb] espn: 300 players from espn_pdf
+[standard_season_1qb] sleeper: draftsharks vs fp_adp mean |diff| 0.01 on 297 players — using native fp_adp.
+[standard_season_1qb] sleeper: 297 players from fp_adp
+[standard_season_1qb] rtsports: 308 players from fp_adp
+[standard_season_1qb] fantasypros: 337 players from fp_adp
+[standard_season_1qb] pff: 227 players from pff_sheet
+[standard_season_1qb] cbs: MAJOR DIFF draftsharks vs cbs_sheet mean |diff| 10.04 (26.2% off by 15+) on 206 players. Using native cbs_sheet.
+[standard_season_1qb]     Kenyon Sadiq: cbs_sheet 163.5 vs draftsharks 218.0 (Δ54)
+[standard_season_1qb]     AJ Barner: cbs_sheet 164.5 vs draftsharks 204.0 (Δ40)
+[standard_season_1qb]     Braelon Allen: cbs_sheet 182.0 vs draftsharks 217.0 (Δ35)
+[standard_season_1qb]     Jayden Higgins: cbs_sheet 186.0 vs draftsharks 221.0 (Δ35)
+[standard_season_1qb]     Emari Demercado: cbs_sheet 188.0 vs draftsharks 223.0 (Δ35)
+[standard_season_1qb]     Greg Dulcich: cbs_sheet 180.5 vs draftsharks 215.0 (Δ34)
+[standard_season_1qb]     Oronde Gadsden II: cbs_sheet 181.5 vs draftsharks 216.0 (Δ34)
+[standard_season_1qb]     De'Zhaun Stribling: cbs_sheet 180.0 vs draftsharks 214.0 (Δ34)
+[standard_season_1qb] cbs: 206 players from cbs_sheet
+[standard_season_1qb] draftsharks: 299 players from draftsharks
+[standard_season_1qb] espn: MAJOR DIFF espn_tsv vs espn_pdf mean |diff| 41.07 (82.5% off by 15+) on 200 players. Using native espn_pdf.
+[standard_season_1qb]     Ryan Flournoy: espn_pdf 204.0 vs espn_tsv 300.0 (Δ96)
+[standard_season_1qb]     Tre Harris: espn_pdf 203.0 vs espn_tsv 298.0 (Δ95)
+[standard_season_1qb]     Stefon Diggs: espn_pdf 202.0 vs espn_tsv 295.0 (Δ93)
+[standard_season_1qb]     Darnell Mooney: espn_pdf 201.0 vs espn_tsv 293.0 (Δ92)
+[standard_season_1qb]     Cam Ward: espn_pdf 199.0 vs espn_tsv 286.0 (Δ87)
+[standard_season_1qb]     Jordan Love: espn_pdf 198.0 vs espn_tsv 284.0 (Δ86)
+[standard_season_1qb]     Zachariah Branch: espn_pdf 197.0 vs espn_tsv 281.0 (Δ84)
+[standard_season_1qb]     Justice Hill: espn_pdf 196.0 vs espn_tsv 278.0 (Δ82)
+[standard_season_1qb] espn: 300 players from espn_pdf
+[standard_season_1qb] yahoo: MAJOR DIFF fp_adp vs yahoo_sheet mean |diff| 19.78 (36.7% off by 15+) on 221 players. Using native yahoo_sheet.
+[standard_season_1qb]     Andy Borregales: yahoo_sheet 145.0 vs fp_adp 222.0 (Δ77)
+[standard_season_1qb]     Chris Boswell: yahoo_sheet 139.5 vs fp_adp 216.0 (Δ76)
+[standard_season_1qb]     Cairo Santos: yahoo_sheet 144.5 vs fp_adp 221.0 (Δ76)
+[standard_season_1qb]     Will Reichard: yahoo_sheet 138.7 vs fp_adp 215.0 (Δ76)
+[standard_season_1qb]     Eddy Pineiro: yahoo_sheet 143.7 vs fp_adp 220.0 (Δ76)
+[standard_season_1qb]     Evan McPherson: yahoo_sheet 143.1 vs fp_adp 219.0 (Δ76)
+[standard_season_1qb]     Chase McLaughlin: yahoo_sheet 142.3 vs fp_adp 218.0 (Δ76)
+[standard_season_1qb]     Tyler Loop: yahoo_sheet 141.4 vs fp_adp 217.0 (Δ76)
+[standard_season_1qb] yahoo: 373 players from yahoo_sheet
+[ppr_season_superflex] fantasypros: 541 players from fp_ecr
+[ppr_season_superflex] pff: 50 players from pff_sheet
+[ppr_season_superflex] draftsharks: 300 players from draftsharks
+[ppr_season_superflex] sleeper: 824 players from sleeper_api
+[ppr_season_superflex] underdog: 305 players from underdog_csv
+[ppr_season_superflex] espn: MAJOR DIFF espn_tsv vs espn_pdf mean |diff| 22.08 (43.8% off by 15+) on 192 players. Using native espn_pdf.
+[ppr_season_superflex]     Mike Gesicki: espn_pdf 298.0 vs espn_tsv 193.0 (Δ105)
+[ppr_season_superflex]     Emanuel Wilson: espn_pdf 279.0 vs espn_tsv 176.0 (Δ103)
+[ppr_season_superflex]     Evan Engram: espn_pdf 299.0 vs espn_tsv 196.0 (Δ103)
+[ppr_season_superflex]     Dalton Schultz: espn_pdf 258.0 vs espn_tsv 167.0 (Δ91)
+[ppr_season_superflex]     Dyami Brown: espn_pdf 277.0 vs espn_tsv 188.0 (Δ89)
+[ppr_season_superflex]     Dontayvion Wicks: espn_pdf 265.0 vs espn_tsv 180.0 (Δ85)
+[ppr_season_superflex]     Oronde Gadsden: espn_pdf 271.0 vs espn_tsv 190.0 (Δ81)
+[ppr_season_superflex]     Michael Penix Jr.: espn_pdf 208.0 vs espn_tsv 128.0 (Δ80)
+[ppr_season_superflex] espn: 300 players from espn_pdf
+[ppr_season_superflex] yahoo: 199 players from yahoo_list
+[half_ppr_season_superflex] fantasypros: 872 players from fp_ecr
+[half_ppr_season_superflex] sleeper: 824 players from sleeper_api
+[half_ppr_season_superflex] yahoo: 199 players from yahoo_list
+[half_ppr_season_superflex] espn: MAJOR DIFF espn_tsv vs espn_pdf mean |diff| 22.08 (43.8% off by 15+) on 192 players. Using native espn_pdf.
+[half_ppr_season_superflex]     Mike Gesicki: espn_pdf 298.0 vs espn_tsv 193.0 (Δ105)
+[half_ppr_season_superflex]     Emanuel Wilson: espn_pdf 279.0 vs espn_tsv 176.0 (Δ103)
+[half_ppr_season_superflex]     Evan Engram: espn_pdf 299.0 vs espn_tsv 196.0 (Δ103)
+[half_ppr_season_superflex]     Dalton Schultz: espn_pdf 258.0 vs espn_tsv 167.0 (Δ91)
+[half_ppr_season_superflex]     Dyami Brown: espn_pdf 277.0 vs espn_tsv 188.0 (Δ89)
+[half_ppr_season_superflex]     Dontayvion Wicks: espn_pdf 265.0 vs espn_tsv 180.0 (Δ85)
+[half_ppr_season_superflex]     Oronde Gadsden: espn_pdf 271.0 vs espn_tsv 190.0 (Δ81)
+[half_ppr_season_superflex]     Michael Penix Jr.: espn_pdf 208.0 vs espn_tsv 128.0 (Δ80)
+[half_ppr_season_superflex] espn: 300 players from espn_pdf
+[standard_season_superflex] sleeper: 824 players from sleeper_api
+[standard_season_superflex] fantasypros: 548 players from fp_ecr
+[standard_season_superflex] espn: 308 players from espn_sf_blend
+[standard_season_superflex] yahoo: 199 players from yahoo_list
+[ppr_dynasty_1qb] espn: espn_pdf vs espn_dynasty_fill mean |diff| 0.18 on 240 players — using native espn_dynasty_fill.
+[ppr_dynasty_1qb] espn: 316 players from espn_dynasty_fill
+[ppr_dynasty_1qb] fantasypros: 315 players from fp_adp
+[ppr_dynasty_1qb] pff: 50 players from pff_sheet
+[ppr_dynasty_1qb] sleeper: 298 players from sleeper_sheet
+[ppr_dynasty_1qb] yahoo: 197 players from yahoo_list
+[half_ppr_dynasty_1qb] sleeper: 299 players from sleeper_sheet
+[half_ppr_dynasty_1qb] espn: espn_pdf vs espn_dynasty_fill mean |diff| 0.18 on 240 players — using native espn_dynasty_fill.
+[half_ppr_dynasty_1qb] espn: 316 players from espn_dynasty_fill
+[half_ppr_dynasty_1qb] yahoo: 197 players from yahoo_list
+[standard_dynasty_1qb] sleeper: 299 players from sleeper_sheet
+[standard_dynasty_1qb] espn: 310 players from espn_dynasty_fill
+[standard_dynasty_1qb] yahoo: 197 players from yahoo_list
+[ppr_dynasty_superflex] sleeper: 299 players from sleeper_sheet
+[ppr_dynasty_superflex] pff: 50 players from pff_sheet
+[ppr_dynasty_superflex] yahoo: 197 players from yahoo_sf_blend
+[ppr_dynasty_superflex] espn: 247 players from espn_sf_blend
+[ppr_dynasty_1qb_rookies] fantasypros: 137 players from fp_adp
+[ppr_dynasty_1qb_rookies] pff: 60 players from pff_sheet
+[ppr_dynasty_1qb_rookies] sleeper: 93 players from sleeper_sheet
+[ppr_dynasty_1qb_rookies] yahoo: 90 players from yahoo_list
+[ppr_dynasty_1qb_rookies] espn: MAJOR DIFF espn_pdf vs espn_ppr_order mean |diff| 9.82 (25.0% off by 15+) on 60 players. Using native espn_ppr_order.
+[ppr_dynasty_1qb_rookies]     Chris Brazzell II: espn_ppr_order 63.0 vs espn_pdf 15.0 (Δ48)
+[ppr_dynasty_1qb_rookies]     Demond Claiborne: espn_ppr_order 21.0 vs espn_pdf 50.0 (Δ29)
+[ppr_dynasty_1qb_rookies]     Emmanuel Henderson Jr.: espn_ppr_order 81.0 vs espn_pdf 56.0 (Δ25)
+[ppr_dynasty_1qb_rookies]     Malachi Fields: espn_ppr_order 41.0 vs espn_pdf 17.0 (Δ24)
+[ppr_dynasty_1qb_rookies]     Marlin Klein: espn_ppr_order 54.0 vs espn_pdf 30.0 (Δ24)
+[ppr_dynasty_1qb_rookies]     Eli Heidenreich: espn_ppr_order 75.0 vs espn_pdf 51.0 (Δ24)
+[ppr_dynasty_1qb_rookies]     Cyrus Allen: espn_ppr_order 35.0 vs espn_pdf 57.0 (Δ22)
+[ppr_dynasty_1qb_rookies]     Seth McGowan: espn_ppr_order 28.0 vs espn_pdf 49.0 (Δ21)
+[ppr_dynasty_1qb_rookies] espn: 82 players from espn_ppr_order
+[ppr_dynasty_superflex_rookies] sleeper: 93 players from sleeper_sheet
+[ppr_dynasty_superflex_rookies] pff: 60 players from pff_sheet
+[ppr_dynasty_superflex_rookies] yahoo: 50 players from yahoo_list
+[ppr_dynasty_superflex_rookies] espn: 82 players from espn_ppr_order
+[half_ppr_dynasty_superflex] yahoo: 197 players from yahoo_sf_blend
+[half_ppr_dynasty_superflex] espn: 247 players from espn_sf_blend
+[half_ppr_dynasty_superflex] sleeper: 299 players from sleeper_sheet
+[half_ppr_dynasty_superflex] pff: 50 players from pff_sheet
+[standard_dynasty_superflex] yahoo: 197 players from yahoo_sf_blend
+[standard_dynasty_superflex] espn: 247 players from espn_sf_blend
+[standard_dynasty_superflex] sleeper: 299 players from sleeper_sheet
+[standard_dynasty_superflex] pff: 50 players from pff_sheet

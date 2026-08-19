@@ -6,7 +6,6 @@ import { useCommunityRankingsBucket } from '@/hooks/useCommunityRankingsBucket';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
-import { PlayerCard } from '@/components/PlayerCard';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +37,8 @@ import {
   resolvePositionAdpRankForDisplay,
 } from '@/utils/positionAdpRank';
 import { getCommunityRankTrend, recordCommunityRankSnapshot } from '@/utils/communityRankTrend';
+import { boardSourceLabel, draftAgainstOptions, importBoardOptions, type AdpSourceBoardFile } from '@/constants/adpRankingSources';
+import { fetchAdpSourceBoardForBucket, orderPlayersBySourceBoard, sourceRowsForBoard } from '@/utils/adpSourceBoards';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import {
   TEAM_ABBREV_TO_FULL_NAME,
@@ -72,7 +73,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { RankingsDragRow } from '@/components/rankings/RankingsDragRow';
-import { RankingsVirtualSortableList, useRankingsScrollContainer, type RankingsListItem } from '@/components/rankings/RankingsVirtualSortableList';
+import { RankingsReadOnlyVirtualList, RankingsVirtualSortableList, useRankingsScrollContainer, type RankingsListItem } from '@/components/rankings/RankingsVirtualSortableList';
 import { RankingsCompareDragPanel } from '@/components/rankings/RankingsCompareDragPanel';
 import { sameIdOrder } from '@/components/rankings/RankingsCompareScrollList';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -636,15 +637,20 @@ const Rankings = () => {
   const [allLeaguesSelectedMatchingLeagueId, setAllLeaguesSelectedMatchingLeagueId] = useState<string | null>(null);
   /** Phone: show one compare board at a time so the list can use most of the viewport. */
   const [mobileRankingsBoard, setMobileRankingsBoard] = useState<'community' | 'mine'>('mine');
+  const [communityBoardSource, setCommunityBoardSource] = useState('consensus');
+  const [adpSourceBoard, setAdpSourceBoard] = useState<AdpSourceBoardFile | null>(null);
   const compareBoardScrollClassName =
     'h-[min(70dvh,640px)] lg:h-[560px] overflow-y-auto pr-2 scrollbar-thin';
   const fetchInProgressRef = useRef(false);
   const myRankingsScrollRef1 = useRef<HTMLDivElement>(null);
   const myRankingsScrollRef2 = useRef<HTMLDivElement>(null);
   const myRankingsScrollRef3 = useRef<HTMLDivElement>(null);
+  const communityBoardScrollRef = useRef<HTMLDivElement>(null);
   const [myRankingsScrollEl1, bindMyRankingsScroll1] = useRankingsScrollContainer(myRankingsScrollRef1);
   const [myRankingsScrollEl2, bindMyRankingsScroll2] = useRankingsScrollContainer(myRankingsScrollRef2);
   const [myRankingsScrollEl3, bindMyRankingsScroll3] = useRankingsScrollContainer(myRankingsScrollRef3);
+  const [communityBoardScrollEl, bindCommunityBoardScroll] = useRankingsScrollContainer(communityBoardScrollRef);
+  const pendingFetchPlayersRef = useRef(false);
   const bucketRef = useRef<string>('');
   // Ref to latest fetchPlayers so refetch-after-bucket-change uses current bucket, not stale closure
   const fetchPlayersRef = useRef<() => void>(() => {});
@@ -729,6 +735,27 @@ const Rankings = () => {
           rookiesOnly: allLeaguesBucketLeagueType === 'dynasty' && allLeaguesBucketRookiesOnly,
         }
       : { ...bucket, rookiesOnly: bucket.rookiesOnly };
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAdpSourceBoardForBucket(displayBucket).then((board) => {
+      if (cancelled) return;
+      setAdpSourceBoard(board);
+      setCommunityBoardSource((prev) => {
+        if (prev === 'community' || prev === 'consensus') return 'consensus';
+        if (board?.sources.includes(prev)) return prev;
+        return 'consensus';
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    displayBucket.scoringFormat,
+    displayBucket.leagueType,
+    displayBucket.isSuperflex,
+    displayBucket.rookiesOnly,
+  ]);
+
   const player2025Stats = usePlayer2025Stats(displayBucket.scoringFormat as 'standard' | 'ppr' | 'half_ppr');
   const positionAdpRankMap = useMemo(() => {
     const byId = new Map<string, RankedPlayer>();
@@ -750,6 +777,13 @@ const Rankings = () => {
   }, [positionsAlphabetical, selectedPosition]);
   const bucketKey = `${displayBucket.scoringFormat}/${displayBucket.leagueType}/${displayBucket.isSuperflex}/${displayBucket.rookiesOnly || false}`;
   bucketRef.current = bucketKey;
+
+  useEffect(() => {
+    const snap = rankingsPageSnapshotStorage.get();
+    if (snap?.bucketKey && snap.bucketKey !== bucketKey) {
+      setCommunityConsensusForStuds([]);
+    }
+  }, [bucketKey]);
 
   /** Import control: edit mode only; signed-in needs a league (not All Leagues); guests use bucket temp saves. */
   const showImportRankingControl =
@@ -1130,6 +1164,26 @@ const Rankings = () => {
     [user, players, persistRankingsSessionDraft, displayBucket.rookiesOnly]
   );
 
+  const applySiteBoardImport = useCallback(
+    (sourceId: string) => {
+      const rows = sourceRowsForBoard(adpSourceBoard, sourceId);
+      if (!rows?.length) {
+        toast.error('That board is not available for this format.');
+        return;
+      }
+      const next = mergeRankingsWithDraftOrder(
+        players,
+        rows.map((row) => row.id)
+      );
+      setPlayers(next);
+      setIsEditMode(true);
+      persistRankingsSessionDraft(next, true);
+      setImportTemplateDialogOpen(false);
+      toast.success(`Imported ${boardSourceLabel(sourceId)} order. Adjust as needed, then finalize.`);
+    },
+    [adpSourceBoard, players, persistRankingsSessionDraft]
+  );
+
   const applySpreadsheetImport = useCallback(
     (orderedPlayerIds: string[], summary: FinalizedImportSummary) => {
       const next = mergeRankingsWithDraftOrder(players, orderedPlayerIds);
@@ -1174,6 +1228,17 @@ const Rankings = () => {
     }
     return communityPlayers;
   }, [communityRawExcludingMe, players, communityPlayers]);
+
+  const communityColumnPlayers = useMemo(() => {
+    if (!adpSourceBoard) return displayedCommunityPlayers;
+    const rows = sourceRowsForBoard(adpSourceBoard, communityBoardSource);
+    if (!rows?.length) return displayedCommunityPlayers;
+    return orderPlayersBySourceBoard(displayedCommunityPlayers, rows);
+  }, [communityBoardSource, adpSourceBoard, displayedCommunityPlayers]);
+  const communityColumnRankMap = useMemo(
+    () => new Map(communityColumnPlayers.map((p, i) => [p.id, i + 1])),
+    [communityColumnPlayers]
+  );
 
   // Live community overall rank (moves as the user drags when live-merge is on).
   const communityRankMap = useMemo(
@@ -1569,18 +1634,29 @@ const Rankings = () => {
     [positionAdpRankMap, communityDefenseRankFromList]
   );
 
+  const studsDudsCompareBoard = useMemo(() => {
+    if (communityConsensusForStuds.length === 0) return [];
+    if (communityBoardSource !== 'community' && communityBoardSource !== 'consensus' && adpSourceBoard) {
+      const rows = sourceRowsForBoard(adpSourceBoard, communityBoardSource);
+      if (rows?.length) {
+        return orderPlayersBySourceBoard(communityConsensusForStuds, rows);
+      }
+    }
+    return communityConsensusForStuds;
+  }, [adpSourceBoard, communityBoardSource, communityConsensusForStuds]);
+
   const studsDudsVsConsensus = useMemo(() => {
     if (
-      !shouldComputeStudsDuds(hasExistingRankings, players, communityConsensusForStuds, [])
+      !shouldComputeStudsDuds(hasExistingRankings, players, studsDudsCompareBoard, [])
     ) {
       return { studsTop10: [] as StudDudEntry[], dudsTop10: [] as StudDudEntry[] };
     }
-    const { studs, duds } = computeStudsDuds(players, communityConsensusForStuds, {
+    const { studs, duds } = computeStudsDuds(players, studsDudsCompareBoard, {
       compareMode: 'window',
       maxRankConsider: STUDS_DUDS_RANKINGS_WINDOW,
     });
     return { studsTop10: studs.slice(0, 10), dudsTop10: duds.slice(0, 10) };
-  }, [hasExistingRankings, players, communityConsensusForStuds]);
+  }, [hasExistingRankings, players, studsDudsCompareBoard]);
 
   // Leagues matching the current bucket (for All Leagues dropdown)
   const matchingLeaguesForBucket = useMemo(
@@ -1597,8 +1673,8 @@ const Rankings = () => {
 
   const fetchPlayers = useCallback(async () => {
     const currentBucketKey = bucketRef.current;
-    // If a fetch is in progress for the same bucket, skip (allow refetch when bucket changed)
     if (fetchInProgressRef.current) {
+      pendingFetchPlayersRef.current = true;
       return;
     }
 
@@ -1723,9 +1799,9 @@ const Rankings = () => {
             sample_count: 100,
           }));
         }
-        const sf = selectedLeague != null ? Boolean(selectedLeague.is_superflex) : effectiveBucket.isSuperflex;
-        const fmt = selectedLeague ? (selectedLeague.scoring_format || 'ppr') : effectiveBucket.scoringFormat;
-        const typ = selectedLeague ? (selectedLeague.league_type || 'season') : effectiveBucket.leagueType;
+        const sf = effectiveBucket.isSuperflex;
+        const fmt = effectiveBucket.scoringFormat;
+        const typ = effectiveBucket.leagueType;
         const { data } = (await supabase.rpc('get_community_rankings' as any, {
           p_scoring_format: fmt,
           p_league_type: typ,
@@ -1738,25 +1814,6 @@ const Rankings = () => {
 
       const excludeForLive = user ? { excludeUserId: user.id } : (typeof window !== 'undefined' ? { excludeGuestSessionId: getOrCreateGuestSessionId() } : {});
       let communityData: CommunityRow[] = await fetchCommunity(excludeForLive);
-      // If no baseline for this bucket, try same league_type + is_superflex with fallback scoring so we always show community order (not raw ADP)
-      if (communityData.length === 0 && !effectiveBucket.rookiesOnly) {
-        const fallbacks: Array<'ppr' | 'half_ppr' | 'standard'> = ['ppr', 'half_ppr', 'standard'];
-        const typ = effectiveBucket.leagueType as string;
-        const sf = effectiveBucket.isSuperflex;
-        for (const fmt of fallbacks) {
-          const { data } = (await supabase.rpc('get_community_rankings' as any, {
-            p_scoring_format: fmt,
-            p_league_type: typ,
-            p_is_superflex: sf,
-            p_exclude_user_id: excludeForLive && 'excludeUserId' in excludeForLive ? excludeForLive.excludeUserId : null,
-            p_exclude_guest_session_id: excludeForLive && 'excludeGuestSessionId' in excludeForLive ? excludeForLive.excludeGuestSessionId : null,
-          })) as { data: CommunityRow[] | null };
-          if (Array.isArray(data) && data.length > 0) {
-            communityData = data;
-            break;
-          }
-        }
-      }
       setHasCommunityConsensus(communityData.length > 0);
       const bucketAdpMap = new Map(communityData.map((r) => [r.player_id, Number(r.rank_position)]));
 
@@ -2083,17 +2140,26 @@ const Rankings = () => {
       if (guestPathJustCompletedRef.current) {
         guestPathJustCompletedRef.current = false;
         setLoading(false); // Guest path returned early from try; must clear loading here
-        return; // Don't refetch - guest path just set dropdown; refetch would cause flip loop
+        if (pendingFetchPlayersRef.current) {
+          pendingFetchPlayersRef.current = false;
+          queueMicrotask(() => fetchPlayersRef.current());
+        }
+        return;
       }
       // This completion was the refetch we triggered due to bucket change — stop here and show data (avoid perpetual refetch loop)
       if (isRefetchAfterBucketChangeRef.current) {
         isRefetchAfterBucketChangeRef.current = false;
         setLoading(false);
+        if (pendingFetchPlayersRef.current) {
+          pendingFetchPlayersRef.current = false;
+          queueMicrotask(() => fetchPlayersRef.current());
+        }
         return;
       }
       // If bucket changed while we were fetching, refetch once with current bucket; mark so that refetch doesn't loop
       const nowKey = bucketRef.current;
-      if (nowKey !== currentBucketKey) {
+      if (pendingFetchPlayersRef.current || nowKey !== currentBucketKey) {
+        pendingFetchPlayersRef.current = false;
         isRefetchAfterBucketChangeRef.current = true;
         if (!hasRankingsOnScreenRef.current) {
           setLoading(true);
@@ -2185,16 +2251,6 @@ const Rankings = () => {
         fetchPlayers();
       }, 0);
       return () => clearTimeout(t);
-    }
-
-    // Guest in All Leagues: use bucket from hook so first fetch uses temp settings (avoids bucket-changed refetch)
-    if (!user && isAllLeagues) {
-      communityBucketRef.current = {
-        scoringFormat: bucket.scoringFormat,
-        leagueType: bucket.leagueType,
-        isSuperflex: bucket.isSuperflex,
-        rookiesOnly: bucket.rookiesOnly ?? false,
-      };
     }
 
     if (!hasRankingsOnScreenRef.current) {
@@ -2590,16 +2646,20 @@ const Rankings = () => {
     }
   };
   const resetToADP = () => {
-    // Reset to community rankings for current bucket (uses live community when dragging)
-    const communityRankMap = new Map(displayedCommunityPlayers.map((p, i) => [p.id, i]));
-    const sorted = [...players].sort((a, b) => {
-      const ra = communityRankMap.get(a.id) ?? 9999;
-      const rb = communityRankMap.get(b.id) ?? 9999;
-      return (ra as number) - (rb as number);
-    });
-    const resetPlayers = sorted.map((p, index) => ({ ...p, rank: index + 1 }));
+    const baseline =
+      studsDudsCompareBoard.length > 0
+        ? studsDudsCompareBoard
+        : communityConsensusForStuds.length > 0
+          ? communityConsensusForStuds
+          : displayedCommunityPlayers;
+    const resetPlayers = baseline.map((p, index) => ({ ...p, rank: index + 1 }));
     setPlayers(resetPlayers);
-    if (isAllLeagues && user) {
+    if (!user) {
+      if (tempRankingsStorage.get(bucketKey)?.length) {
+        tempRankingsStorage.save(resetPlayers, bucketKey);
+      }
+      persistRankingsSessionDraft(resetPlayers, isEditMode);
+    } else if (isAllLeagues) {
       void saveRankings(resetPlayers, null, userRankingBucketFromDisplayBucket(displayBucket)).then(() =>
         rankingsDraftSessionStorage.clear(rankingsSessionDraftKey)
       );
@@ -2609,7 +2669,7 @@ const Rankings = () => {
     toast.info('Rankings reset to community consensus');
   };
 
-  const filteredCommunityPlayers = displayedCommunityPlayers.filter((p) => {
+  const filteredCommunityPlayers = communityColumnPlayers.filter((p) => {
     // Improved search: search in full name (handles "Travis Hunter" when searching "hunter")
     const searchLower = searchTerm.toLowerCase().trim();
     const matchesSearch = searchLower === '' || 
@@ -2623,6 +2683,32 @@ const Rankings = () => {
     const matchesTeam = playerMatchesTeamSelection(p, selectedTeam);
     return matchesSearch && matchesPosition && matchesTeam;
   });
+
+  const communityBoardLabel = boardSourceLabel(communityBoardSource);
+  const studsBoardLabel =
+    communityBoardSource === 'community' || communityBoardSource === 'consensus'
+      ? 'this format'
+      : `the ${communityBoardLabel} board`;
+  const communityBoardSelect =
+    adpSourceBoard && adpSourceBoard.sources.length > 0 ? (
+      <Select
+        value={communityBoardSource === 'community' ? 'consensus' : communityBoardSource}
+        onValueChange={(v) => {
+          startTransition(() => setCommunityBoardSource(v));
+        }}
+      >
+        <SelectTrigger className="h-8 w-auto min-w-[9.5rem] max-w-[12rem] bg-background/50 shrink-0" aria-label="Rankings board">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {draftAgainstOptions(adpSourceBoard.sources).map((src) => (
+            <SelectItem key={src} value={src}>
+              {boardSourceLabel(src)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    ) : null;
 
   if (authLoading || loading) {
     return (
@@ -2904,38 +2990,39 @@ const Rankings = () => {
               >
                 <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3 pb-2 border-b border-border">
                   <Users className="w-5 h-5 text-accent shrink-0" />
-                  <h2 className="font-display text-lg sm:text-xl tracking-wide shrink-0">COMMUNITY RANKINGS</h2>
+                  <h2 className="font-display text-lg sm:text-xl tracking-wide shrink-0">
+                    {communityBoardSource === 'community' || communityBoardSource === 'consensus' ? 'CONSENSUS RANKINGS' : `${communityBoardLabel.toUpperCase()} BOARD`}
+                  </h2>
+                  {communityBoardSelect}
                   <div className="ml-auto">
                     <RankingsColumnExportMenu
                       players={filteredCommunityPlayers}
                       bucket={exportBucket}
-                      boardLabel="Community"
+                      boardLabel={communityBoardLabel}
                     />
                   </div>
                 </div>
-                <div className={compareBoardScrollClassName}>
-                  <div className="space-y-1.5 sm:space-y-2">
-                    {filteredCommunityPlayers.map((player) => {
-                      const rankMeta = getPlayerRankCardMeta(player.id);
-                      const stableAdp = getDisplayAdp(player.id, Number(player.adp) || 0);
-                      return (
-                      <PlayerCard
-                        key={player.id}
-                        player={stableAdp !== Number(player.adp) ? { ...player, adp: stableAdp } : player}
-                        rank={displayedCommunityPlayers.findIndex((p) => p.id === player.id) + 1}
-                        onClick={() => handlePlayerClick(player)}
-                        positionColoredRank
-                        compactStats
-                        stats2025={player2025Stats.get(player.id)}
-                        communityPosRank={rankMeta.communityPosRank}
-                        myPosRank={rankMeta.myPosRank}
-                        communityTrend={rankMeta.communityTrend}
-                        tier={rankMeta.communityTier}
-                        hasTierBreakBefore={rankMeta.hasCommunityTierBreakBefore}
-                      />
-                      );
-                    })}
-                  </div>
+                <div ref={bindCommunityBoardScroll} className={compareBoardScrollClassName}>
+                  <RankingsReadOnlyVirtualList
+                    scrollElement={communityBoardScrollEl}
+                    players={filteredCommunityPlayers}
+                    getRank={(id) => communityColumnRankMap.get(id) ?? 0}
+                    getDisplayAdp={
+                      communityBoardSource === 'community' || communityBoardSource === 'consensus'
+                        ? getDisplayAdp
+                        : (_id, fallback) => fallback
+                    }
+                    getCommunityPosRank={getCommunityPosRank}
+                    getMyPosRank={getMyPosRank}
+                    getCommunityTrend={(id) => {
+                      const commRank = communityRankMap.get(id);
+                      return commRank != null ? getCommunityTrend(id, commRank) : null;
+                    }}
+                    getTier={getCommunityPlayerTier}
+                    hasTierBreakBeforePlayer={hasCommunityTierBreakBeforePlayer}
+                    player2025Stats={player2025Stats}
+                    onPlayerClick={handlePlayerClick}
+                  />
                 </div>
               </div>
 
@@ -2997,7 +3084,8 @@ const Rankings = () => {
             </div>
 
             {/* Differential Analysis Section */}
-            {hasExistingRankings && players.length > 0 && communityConsensusForStuds.length > 0 && (
+            {(studsDudsVsConsensus.studsTop10.length > 0 ||
+              studsDudsVsConsensus.dudsTop10.length > 0) && (
               <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Your Studs */}
                 <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
@@ -3006,10 +3094,12 @@ const Rankings = () => {
                     <h2 className="font-display text-xl tracking-wide text-green-400">YOUR STUDS</h2>
                   </div>
                   <div className="mb-3 sm:mb-4 space-y-1 text-center text-xs sm:text-sm text-muted-foreground leading-snug">
-                    <p className="sm:hidden">Top 10 vs community (both in top {STUDS_DUDS_RANKINGS_WINDOW}).</p>
-                    <p className="hidden sm:block text-balance">Top 10 players you rank higher than community consensus.</p>
+                    <p className="sm:hidden">Top 10 vs {studsBoardLabel} (top {STUDS_DUDS_RANKINGS_WINDOW} on either board).</p>
+                    <p className="hidden sm:block text-balance">
+                      Top 10 players you rank higher than {studsBoardLabel}.
+                    </p>
                     <p className="hidden sm:block">
-                      (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
+                      (Counts when either rank is within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
                     </p>
                     <p className="hidden sm:block">See all studs in the Draft Stats tab.</p>
                   </div>
@@ -3046,10 +3136,12 @@ const Rankings = () => {
                     <h2 className="font-display text-xl tracking-wide text-red-400">YOUR DUDS</h2>
                   </div>
                   <div className="mb-3 sm:mb-4 space-y-1 text-center text-xs sm:text-sm text-muted-foreground leading-snug">
-                    <p className="sm:hidden">Top 10 vs community (both in top {STUDS_DUDS_RANKINGS_WINDOW}).</p>
-                    <p className="hidden sm:block text-balance">Top 10 players you rank lower than community consensus.</p>
+                    <p className="sm:hidden">Top 10 vs {studsBoardLabel} (top {STUDS_DUDS_RANKINGS_WINDOW} on either board).</p>
+                    <p className="hidden sm:block text-balance">
+                      Top 10 players you rank lower than {studsBoardLabel}.
+                    </p>
                     <p className="hidden sm:block">
-                      (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
+                      (Counts when either rank is within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
                     </p>
                     <p className="hidden sm:block">See all duds in the Draft Stats tab.</p>
                   </div>
@@ -3190,38 +3282,39 @@ const Rankings = () => {
               >
                 <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3 pb-2 border-b border-border">
                   <Users className="w-5 h-5 text-accent shrink-0" />
-                  <h2 className="font-display text-lg sm:text-xl tracking-wide shrink-0">COMMUNITY RANKINGS</h2>
+                  <h2 className="font-display text-lg sm:text-xl tracking-wide shrink-0">
+                    {communityBoardSource === 'community' || communityBoardSource === 'consensus' ? 'CONSENSUS RANKINGS' : `${communityBoardLabel.toUpperCase()} BOARD`}
+                  </h2>
+                  {communityBoardSelect}
                   <div className="ml-auto">
                     <RankingsColumnExportMenu
                       players={filteredCommunityPlayers}
                       bucket={exportBucket}
-                      boardLabel="Community"
+                      boardLabel={communityBoardLabel}
                     />
                   </div>
                 </div>
-                <div className={compareBoardScrollClassName}>
-                  <div className="space-y-1.5 sm:space-y-2">
-                    {filteredCommunityPlayers.map((player) => {
-                      const rankMeta = getPlayerRankCardMeta(player.id);
-                      const stableAdp = getDisplayAdp(player.id, Number(player.adp) || 0);
-                      return (
-                      <PlayerCard
-                        key={player.id}
-                        player={stableAdp !== Number(player.adp) ? { ...player, adp: stableAdp } : player}
-                        rank={displayedCommunityPlayers.findIndex((p) => p.id === player.id) + 1}
-                        onClick={() => handlePlayerClick(player)}
-                        positionColoredRank
-                        compactStats
-                        stats2025={player2025Stats.get(player.id)}
-                        communityPosRank={rankMeta.communityPosRank}
-                        myPosRank={rankMeta.myPosRank}
-                        communityTrend={rankMeta.communityTrend}
-                        tier={rankMeta.communityTier}
-                        hasTierBreakBefore={rankMeta.hasCommunityTierBreakBefore}
-                      />
-                      );
-                    })}
-                  </div>
+                <div ref={bindCommunityBoardScroll} className={compareBoardScrollClassName}>
+                  <RankingsReadOnlyVirtualList
+                    scrollElement={communityBoardScrollEl}
+                    players={filteredCommunityPlayers}
+                    getRank={(id) => communityColumnRankMap.get(id) ?? 0}
+                    getDisplayAdp={
+                      communityBoardSource === 'community' || communityBoardSource === 'consensus'
+                        ? getDisplayAdp
+                        : (_id, fallback) => fallback
+                    }
+                    getCommunityPosRank={getCommunityPosRank}
+                    getMyPosRank={getMyPosRank}
+                    getCommunityTrend={(id) => {
+                      const commRank = communityRankMap.get(id);
+                      return commRank != null ? getCommunityTrend(id, commRank) : null;
+                    }}
+                    getTier={getCommunityPlayerTier}
+                    hasTierBreakBeforePlayer={hasCommunityTierBreakBeforePlayer}
+                    player2025Stats={player2025Stats}
+                    onPlayerClick={handlePlayerClick}
+                  />
                 </div>
               </div>
 
@@ -3283,7 +3376,8 @@ const Rankings = () => {
             </div>
 
             {/* Differential Analysis Section */}
-            {hasExistingRankings && players.length > 0 && communityConsensusForStuds.length > 0 && (
+            {(studsDudsVsConsensus.studsTop10.length > 0 ||
+              studsDudsVsConsensus.dudsTop10.length > 0) && (
               <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Your Studs */}
                 <div className="bg-green-500/10 rounded-lg border border-green-500/30 p-4">
@@ -3292,10 +3386,12 @@ const Rankings = () => {
                     <h2 className="font-display text-xl tracking-wide text-green-400">YOUR STUDS</h2>
                   </div>
                   <div className="mb-3 sm:mb-4 space-y-1 text-center text-xs sm:text-sm text-muted-foreground leading-snug">
-                    <p className="sm:hidden">Top 10 vs community (both in top {STUDS_DUDS_RANKINGS_WINDOW}).</p>
-                    <p className="hidden sm:block text-balance">Top 10 players you rank higher than community consensus.</p>
+                    <p className="sm:hidden">Top 10 vs {studsBoardLabel} (top {STUDS_DUDS_RANKINGS_WINDOW} on either board).</p>
+                    <p className="hidden sm:block text-balance">
+                      Top 10 players you rank higher than {studsBoardLabel}.
+                    </p>
                     <p className="hidden sm:block">
-                      (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
+                      (Counts when either rank is within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
                     </p>
                     <p className="hidden sm:block">See all studs in the Draft Stats tab.</p>
                   </div>
@@ -3332,10 +3428,12 @@ const Rankings = () => {
                     <h2 className="font-display text-xl tracking-wide text-red-400">YOUR DUDS</h2>
                   </div>
                   <div className="mb-3 sm:mb-4 space-y-1 text-center text-xs sm:text-sm text-muted-foreground leading-snug">
-                    <p className="sm:hidden">Top 10 vs community (both in top {STUDS_DUDS_RANKINGS_WINDOW}).</p>
-                    <p className="hidden sm:block text-balance">Top 10 players you rank lower than community consensus.</p>
+                    <p className="sm:hidden">Top 10 vs {studsBoardLabel} (top {STUDS_DUDS_RANKINGS_WINDOW} on either board).</p>
+                    <p className="hidden sm:block text-balance">
+                      Top 10 players you rank lower than {studsBoardLabel}.
+                    </p>
                     <p className="hidden sm:block">
-                      (Only when both ranks are within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
+                      (Counts when either rank is within the top {STUDS_DUDS_RANKINGS_WINDOW}.)
                     </p>
                     <p className="hidden sm:block">See all duds in the Draft Stats tab.</p>
                   </div>
@@ -3405,11 +3503,36 @@ const Rankings = () => {
               </DialogDescription>
             </DialogHeader>
             <Tabs defaultValue="upload" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
                 <TabsTrigger value="upload">Upload file</TabsTrigger>
+                <TabsTrigger value="sites">Site boards</TabsTrigger>
                 <TabsTrigger value="template">From other league</TabsTrigger>
                 <TabsTrigger value="export">Export</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="sites" className="pt-3 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Start from any ADP board in this format, including sites that are not in the draft picker.
+                </p>
+                {adpSourceBoard && importBoardOptions(adpSourceBoard.sources).length > 0 ? (
+                  <div className="max-h-[min(60vh,320px)] min-h-0 overflow-y-auto overflow-x-hidden space-y-2 pr-2 scrollbar-thin rounded-md bg-muted/30 py-1.5">
+                    {importBoardOptions(adpSourceBoard.sources).map((src) => (
+                      <Button
+                        key={src}
+                        variant="secondary"
+                        className="w-full justify-start text-left h-auto py-3 px-3 whitespace-normal min-h-11"
+                        onClick={() => applySiteBoardImport(src)}
+                      >
+                        {boardSourceLabel(src)}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-4">
+                    No site boards are loaded for this format yet.
+                  </p>
+                )}
+              </TabsContent>
 
               <TabsContent value="template" className="pt-3">
                 {loadingTemplateOptions ? (
