@@ -50,6 +50,11 @@
     --te: 35 100% 50%;
     --k: 320 70% 55%;
     --def: 0 70% 55%;
+    --ol: 55 90% 52%;
+    --coach: 45 45% 88%;
+    --other: 210 18% 62%;
+    --weekly: 42 60% 52%;
+    --tag: 145 32% 18%;
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(190 95% 50%), hsl(220 90% 55%));
@@ -112,6 +117,11 @@
     --te: 25 85% 45%;
     --k: 320 60% 45%;
     --def: 0 65% 45%;
+    --ol: 45 80% 32%;
+    --coach: 30 20% 32%;
+    --other: 215 18% 38%;
+    --weekly: 38 75% 38%;
+    --tag: 145 28% 88%;
 
     /* Light mode gradients */
     --gradient-primary: linear-gradient(135deg, hsl(190 80% 35%), hsl(220 70% 45%));
@@ -201,6 +211,49 @@
     background: hsl(var(--def) / 0.2);
     color: hsl(var(--def));
     border: 1px solid hsl(var(--def) / 0.5);
+  }
+
+  .position-ol {
+    background: hsl(var(--ol) / 0.2);
+    color: hsl(var(--ol));
+    border: 1px solid hsl(var(--ol) / 0.5);
+  }
+
+  .position-coach {
+    background: hsl(var(--coach) / 0.2);
+    color: hsl(var(--coach));
+    border: 1px solid hsl(var(--coach) / 0.5);
+  }
+
+  .position-other {
+    background: hsl(var(--other) / 0.18);
+    color: hsl(var(--other));
+    border: 1px solid hsl(var(--other) / 0.45);
+  }
+
+  .position-unknown {
+    background: hsl(222 30% 30% / 0.2);
+    color: hsl(var(--muted-foreground));
+    border: 1px solid hsl(222 30% 40% / 0.5);
+  }
+
+  .position-name-chip {
+    text-transform: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    letter-spacing: normal;
+    padding: 0.125rem 0.625rem;
+    margin: 0 0.1rem;
+    line-height: 1.35;
+    vertical-align: baseline;
+    white-space: nowrap;
+    display: inline-block;
+  }
+
+  .news-name-run {
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: baseline;
   }
 
   .dragging {
@@ -389,5 +442,253 @@
     -webkit-box-shadow: 0 0 0 30px hsl(var(--secondary) / 0.5) inset !important;
     -webkit-text-fill-color: hsl(var(--foreground)) !important;
     caret-color: hsl(var(--foreground)) !important;
+  }
+}
+
+@layer components {
+  .edition-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+  }
+
+  .edition-weekly {
+    background: hsl(var(--weekly) / 0.2);
+    color: hsl(var(--weekly));
+    border: 1px solid hsl(var(--weekly) / 0.35);
+  }
+
+  .team-day-entry {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    padding: 1.25rem 1.35rem 1.35rem;
+  }
+
+  .team-day-entry-weekly {
+    border-left: 3px solid hsl(var(--weekly));
+  }
+
+  .team-week-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .team-week-subtitle {
+    font-size: 0.88rem;
+    color: hsl(var(--muted-foreground));
+    font-weight: 500;
+  }
+
+  .team-day-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .team-day-date {
+    font-family: Inter, sans-serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: normal;
+    color: hsl(var(--foreground));
+  }
+
+  .team-section-tags {
+    margin-bottom: 0.75rem;
+  }
+
+  .team-section-body h3 {
+    font-family: Inter, sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
+    margin: 1.25rem 0 0.5rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .news-issue h1,
+  .news-issue h2,
+  .news-issue h3 {
+    font-family: Inter, sans-serif;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+
+  .news-issue h1 {
+    font-family: "Bebas Neue", sans-serif;
+    letter-spacing: 0.02em;
+  }
+
+  .prose-team {
+    font-family: Inter, sans-serif;
+    line-height: 1.65;
+    color: hsl(var(--foreground));
+  }
+
+  .prose-team p {
+    margin: 0 0 1rem;
+  }
+
+  .prose-team ul,
+  .prose-team ol {
+    margin: 0.5rem 0 1.25rem;
+    padding-left: 1.35rem;
+  }
+
+  .prose-team li {
+    margin-bottom: 0.65rem;
+  }
+
+  .prose-team li:last-child {
+    margin-bottom: 0;
+  }
+
+  .prose-team strong {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+
+  .prose-team sup {
+    font-size: 0.72em;
+    vertical-align: super;
+    line-height: 0;
+    margin-left: 0.05em;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    background: hsl(var(--tag));
+    color: hsl(145 45% 72%);
+    margin-right: 0.35rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .light .tag {
+    color: hsl(145 45% 22%);
+  }
+
+  .references {
+    margin-top: 1rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    background: hsl(var(--card));
+  }
+
+  .references summary {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: hsl(var(--muted-foreground));
+    list-style: none;
+  }
+
+  .references summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .references[open] summary {
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .footnote-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0.75rem 0.75rem;
+  }
+
+  .footnote-list li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    margin-bottom: 0.6rem;
+    font-size: 0.88rem;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.5;
+  }
+
+  .footnote-list .fn-index {
+    flex-shrink: 0;
+    font-weight: 600;
+    min-width: 1.25rem;
+  }
+
+  .footnote-list .fn-link {
+    color: hsl(var(--primary));
+    text-decoration: none;
+  }
+
+  .footnote-list .fn-link:hover {
+    text-decoration: underline;
+  }
+
+  .issue-adjacent-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    gap: 1rem;
+    margin: 0 0 1.5rem;
+    padding: 0.85rem 0;
+    border-top: 1px solid hsl(var(--border));
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .issue-adjacent-spacer {
+    flex: 1;
+  }
+
+  .issue-adjacent-link {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    text-decoration: none;
+    color: hsl(var(--foreground));
+    padding: 0.35rem 0.5rem;
+    min-height: 44px;
+    border-radius: 8px;
+    max-width: 48%;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .issue-adjacent-link:hover {
+    background: hsl(var(--secondary));
+    color: hsl(var(--primary));
+  }
+
+  .issue-adjacent-next {
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .issue-adjacent-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  .issue-adjacent-dir {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .issue-adjacent-date {
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.3;
   }
 }

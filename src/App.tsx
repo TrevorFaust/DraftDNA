@@ -31,6 +31,9 @@ import { NflTeamContextProvider } from "@/contexts/NflTeamContext";
 const Statistics = lazy(() => import("./pages/Statistics").then((m) => ({ default: m.default })));
 const History = lazy(() => import("./pages/History").then((m) => ({ default: m.default })));
 const Badges = lazy(() => import("./pages/Badges").then((m) => ({ default: m.default })));
+const NewsTeamDirectory = lazy(() => import("./pages/NewsTeamDirectory"));
+const NewsTeamWeeklies = lazy(() => import("./pages/NewsTeamWeeklies"));
+const NewsTeamIssue = lazy(() => import("./pages/NewsTeamIssue"));
 
 function PageFallback() {
   return (
@@ -86,6 +89,9 @@ const App = () => (
                     <Route path="/draft/:draftId" element={<DraftRoom />} />
                     <Route path="/history" element={<Suspense fallback={<PageFallback />}><History /></Suspense>} />
                     <Route path="/badges" element={<Suspense fallback={<PageFallback />}><Badges /></Suspense>} />
+                    <Route path="/news/:teamSlug/:issueSlug" element={<Suspense fallback={<PageFallback />}><NewsTeamIssue /></Suspense>} />
+                    <Route path="/news/:teamSlug" element={<Suspense fallback={<PageFallback />}><NewsTeamWeeklies /></Suspense>} />
+                    <Route path="/news" element={<Suspense fallback={<PageFallback />}><NewsTeamDirectory /></Suspense>} />
                     <Route path="/prediction-challenge" element={<PredictionChallenge />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/league-settings" element={<LeagueSettings />} />

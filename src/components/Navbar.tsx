@@ -37,8 +37,10 @@ import {
   Menu,
   ChevronRight,
   ChevronLeft,
+  Newspaper,
 } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
+import { NewsTeamPicker } from '@/components/news/NewsTeamPicker';
 import { cn } from '@/lib/utils';
 
 type NavItem = { path: string; label: string; icon: LucideIcon };
@@ -182,7 +184,8 @@ export const Navbar = () => {
     navigate('/auth', { replace: true });
   };
 
-  const isActivePath = (path: string) => location.pathname === path;
+  const isActivePath = (path: string) =>
+    path === '/news' ? location.pathname.startsWith('/news') : location.pathname === path;
 
   const navLinkClass = (path: string) =>
     cn('gap-2', isActivePath(path) && 'bg-secondary text-primary');
@@ -221,7 +224,24 @@ export const Navbar = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 border-border bg-card">
                 <DropdownMenuLabel className="text-xs text-muted-foreground">Go to</DropdownMenuLabel>
-                {navItems.map((item) => (
+                {navItems.slice(0, 3).map((item) => (
+                  <DropdownMenuItem
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    className={menuItemClass(item.path)}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem
+                  onClick={() => navigate('/news')}
+                  className={menuItemClass('/news')}
+                >
+                  <Newspaper className="h-4 w-4" />
+                  News
+                </DropdownMenuItem>
+                {navItems.slice(3).map((item) => (
                   <DropdownMenuItem
                     key={item.path}
                     onClick={() => navigate(item.path)}
@@ -288,7 +308,16 @@ export const Navbar = () => {
                 <div className="hidden h-6 w-px shrink-0 bg-border sm:block" />
               </>
             )}
-            {navItems.map((item) => (
+            {navItems.slice(0, 3).map((item) => (
+              <Link key={item.path} to={item.path} className="shrink-0">
+                <Button variant="ghost" size="sm" className={navLinkClass(item.path)}>
+                  <item.icon className="h-4 w-4" />
+                  <span className="hidden lg:inline">{item.label}</span>
+                </Button>
+              </Link>
+            ))}
+            <NewsTeamPicker />
+            {navItems.slice(3).map((item) => (
               <Link key={item.path} to={item.path} className="shrink-0">
                 <Button variant="ghost" size="sm" className={navLinkClass(item.path)}>
                   <item.icon className="h-4 w-4" />
