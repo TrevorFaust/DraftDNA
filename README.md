@@ -1,47 +1,50 @@
-# DraftDNA — Fantasy Football Draft Tool
+# Draft DNA
 
-Custom NFL fantasy rankings, mock drafts, player research, draft badges, and the free **Pick Six Challenge** (up to $36,000 in prizes).
+I built [Draft DNA](https://draftdna.com) for 2026 fantasy prep. One site for your board, mocks, player research, and a free Pick Six contest with real prizes.
 
-## Features
+Rank and mock without an account if you want to kick the tires. Make one when you want leagues saved, badges, history, and Pick Six.
 
-- **Custom Rankings** — Drag-and-drop big board with community ADP, import from other league formats, and scoring buckets (standard, PPR, half-PPR, dynasty, superflex, rookies-only)
-- **Mock Drafts & Draft Room** — 8–16 teams, snake or linear, CPU opponents with archetype-based logic, timers, and draft history
-- **Draft Grades** — Post-draft report with narrative feedback on roster construction
-- **Badges** — Archetype achievements from completed mock drafts
-- **Players & Statistics** — Spreadsheet-style player table, expanded player profiles, 2025 stats, fantasy team depth chart, O-line context, and strength of schedule
-- **Pick Six Challenge** — Predict top 6 at each position (QB, RB, WR, TE, K, D/ST) plus tiebreakers; live partial-credit scoring, dashboard leaderboard, and shareable prediction cards
-- **Leagues & Settings** — Multi-league support, keepers, position limits, custom scoring, account management
-- **Guest Mode** — Rankings and mock drafts without signing in (localStorage)
+## What's on it
 
-## Tech Stack
+**Rankings.** Drag-and-drop your big board. Flip between your list, consensus, ESPN, Yahoo, Sleeper, CBS, and the other site boards. Import a cheat sheet if you already have one you like (CSV, paste, those ESPN PDFs). Standard, PPR, half-PPR, dynasty, superflex, rookies-only. Eighteen format buckets so the ADP matches the league you play.
 
-- **Frontend:** Vite, React, TypeScript, Tailwind CSS, shadcn/ui
-- **Backend:** Supabase (auth, PostgreSQL)
-- **Data & UI:** TanStack Query, React Hook Form, Zod, dnd-kit, Recharts
+**Mock drafts.** Solo vs CPU, or multiplayer with friends (invite code or an open lobby). Snake or linear, 4 to 32 teams, timers, keepers, and chat in the room. You pick which board you draft from. CPUs can run consensus or a named site board, and they fill a real starter lineup before they start stacking benches. After the last pick you get a grade that talks through how you built the roster, plus archetype badges from how the draft went.
 
-## About This Repository
+**Player research.** Spreadsheet view of the pool, player profiles, 2025 stats, fantasy depth, O-line context, and 2026 strength of schedule. Draft stats show where you tend to reach and steal.
 
-This repo is the **source code** for DraftDNA. It is not a turnkey copy of the live site.
+**News.** Monday week-in-reviews. Pick a franchise and read that team's issue.
 
-The app you use in production is backed by a **hosted Supabase project** (database, auth, edge functions) and deployed via **Vercel**. Player pools, ranking baselines, community data, and user accounts live in that backend — they are not bundled here. Without your own Supabase project, migrations applied, and data pipelines run, a clone is mostly an empty UI shell.
+**Pick Six Challenge.** Pick the top 6 fantasy scorers at each position (QB, RB, WR, TE, K, D/ST) in order. Nail a perfect board and you win $6,000 for that position. Six positions, up to $36,000. Partial-credit scoring and a leaderboard once the season starts. Free to enter. Official rules on the site. Deadline is NFL kickoff, Wednesday September 9, 2026.
 
-If you only want to **use** DraftDNA, visit the live site — you do not need this repo.
+**Leagues.** Multiple leagues, custom scoring, lineup slots, position limits, keepers. Guest mode keeps rankings and mocks in the browser until you sign in.
 
-### Local development (optional)
+## Stack
 
-For contributors or your own local work:
+Vite, React, TypeScript, Tailwind, shadcn/ui. Supabase for auth and Postgres. TanStack Query, React Hook Form, Zod, dnd-kit, Recharts.
+
+## This repo
+
+This is the source for Draft DNA. It is not a copy of the live site you can spin up with one command.
+
+Production runs on a hosted Supabase project (database, auth, edge functions) and deploys on Vercel. Player pools, ranking baselines, community data, and accounts live there. They are not bundled here. Clone without your own project, migrations, and data pipelines and you get an empty shell.
+
+If you want to use Draft DNA, go to [draftdna.com](https://draftdna.com). You do not need this repo.
+
+### Local work (optional)
+
+For me, or anyone helping on the code:
 
 ```sh
 npm i
-cp .env.example .env   # fill in your Supabase (and optional) keys — see file for comments
+cp .env.example .env   # fill in your Supabase keys. Comments in the file.
 npm run dev
 ```
 
-Required client env vars are documented in `.env.example`. Server-side scripts (rookies import, player sync, baselines) need `SUPABASE_SERVICE_ROLE_KEY` and are listed in `package.json`.
+Client env vars are in `.env.example`. Server-side scripts (rookies import, player sync, baselines) need `SUPABASE_SERVICE_ROLE_KEY` and live in `package.json`.
 
-Further data setup: `HOW_TO_SYNC_DATA.md`, `sync_instructions.md`. Pick Six verification notes: `PICK_SIX_VERIFICATION.md`.
+Data setup: `HOW_TO_SYNC_DATA.md`, `sync_instructions.md`. Pick Six notes: `PICK_SIX_VERIFICATION.md`.
 
-## Project Structure
+## Layout
 
 ```
 src/
