@@ -47,9 +47,17 @@ export type PositionLimitsLike = {
   K?: number;
   DEF?: number;
   BENCH?: number;
+  IR?: number;
   KEEPERS?: number;
   starters?: Partial<StarterCounts> | null;
 };
+
+/** Map D/ST / DST / DEF onto the same roster key. */
+export function normalizeRosterPos(pos: string | null | undefined): string {
+  const p = (pos || '').toUpperCase();
+  if (p === 'D/ST' || p === 'DST' || p === 'DEF') return 'DEF';
+  return p;
+}
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
@@ -86,6 +94,11 @@ export function getFlexCount(
 
 export function getBenchCount(limits?: PositionLimitsLike | null, fallback = 6): number {
   return clampInt(limits?.BENCH, 0, 15, fallback);
+}
+
+/** Injured reserve slots. Not drafted; Team Rankings puts IR players in the Bench room. */
+export function getIrCount(limits?: PositionLimitsLike | null, fallback = 0): number {
+  return clampInt(limits?.IR, 0, 4, fallback);
 }
 
 /** Numeric max for a draftable position (ignores nested starters object). */
@@ -236,12 +249,14 @@ export function ensureLimitsCoverStarters(
 
 export function formatLineupSummary(
   starters: StarterCounts,
-  flexCount: number
+  flexCount: number,
+  irCount = 0
 ): string {
   const parts: string[] = [];
   for (const pos of STARTER_POSITION_ORDER) {
     if (starters[pos] > 0) parts.push(`${starters[pos]} ${pos}`);
   }
   if (flexCount > 0) parts.push(`${flexCount} FLEX`);
+  if (irCount > 0) parts.push(`${irCount} IR`);
   return parts.join(' · ');
 }

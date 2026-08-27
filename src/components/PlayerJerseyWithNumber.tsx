@@ -10,6 +10,8 @@ interface PlayerJerseyWithNumberProps {
   numberFillColor: string;
   size?: JerseySize;
   className?: string;
+  /** Extra SVG Y offset. Positive moves the number down toward the jersey center. */
+  numberNudgeY?: number;
   /** Defense / FA placeholders when there is no jersey number */
   position?: string | null;
 }
@@ -61,6 +63,7 @@ export function PlayerJerseyWithNumber({
   numberFillColor,
   size = 'card',
   className,
+  numberNudgeY = 0,
   position = null,
 }: PlayerJerseyWithNumberProps) {
   const src = getTeamJerseyImageUrl(team);
@@ -84,7 +87,7 @@ export function PlayerJerseyWithNumber({
   const numYBase = size === 'card' ? 75 : 82;
   /** “X” / “?” sit a bit high on Graduate; nudge down toward jersey center. */
   const numY =
-    overlayStr === 'X' || overlayStr === '?' ? numYBase + 3 : numYBase;
+    (overlayStr === 'X' || overlayStr === '?' ? numYBase + 3 : numYBase) + numberNudgeY;
 
   if (!src) return null;
 

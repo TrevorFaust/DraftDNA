@@ -357,21 +357,25 @@
   }
 
   /* Custom scrollbar (Rankings / Badges / site-wide via .scrollbar-thin) — dark-theme friendly */
+  html,
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted-foreground) / 0.5) transparent;
   }
 
+  html::-webkit-scrollbar,
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
+  html::-webkit-scrollbar-track,
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
     border-radius: 3px;
   }
 
+  html::-webkit-scrollbar-thumb,
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--muted-foreground) / 0.5);
     border-radius: 3px;
@@ -393,6 +397,7 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  html::-webkit-scrollbar-thumb:hover,
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.7);
   }

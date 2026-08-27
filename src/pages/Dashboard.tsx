@@ -14,7 +14,7 @@ import {
   BarChart3,
   Table2,
 } from 'lucide-react';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, Medal, ListChecks } from 'lucide-react';
 import { PICK_SIX_TOTAL_PRIZE_POOL_USD } from '@/constants/contest';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickSixMark } from '@/components/PickSixIcon';
@@ -126,6 +126,24 @@ const Dashboard = () => {
       hoverBorder: 'hover:border-[hsl(350_50%_50%/0.45)]',
       iconColor: 'text-primary-foreground',
     },
+    {
+      title: "Pick'em",
+      description: 'Pick NFL winners each week and keep a season record against your league',
+      icon: ListChecks,
+      path: '/pickem',
+      gradient: 'bg-gradient-to-br from-sky-500 to-cyan-600',
+      hoverBorder: 'hover:border-sky-500/50',
+      iconColor: 'text-white',
+    },
+    {
+      title: 'Team Rankings',
+      description: 'Rank every team QB/RB/WR/TE room after the draft and get a computed board',
+      icon: Medal,
+      path: '/league-ranker',
+      gradient: 'bg-gradient-to-br from-emerald-500 to-teal-600',
+      hoverBorder: 'hover:border-emerald-500/50',
+      iconColor: 'text-white',
+    },
   ];
 
   return (
@@ -144,7 +162,7 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {quickActions.map((action) => (
             <Link 
               key={action.path} 
@@ -224,33 +242,56 @@ const Dashboard = () => {
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {leagues.map((league) => (
-                <button
+                <div
                   key={league.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedLeague(league);
-                    navigate('/rankings');
-                  }}
-                  className="w-full text-left p-4 rounded-lg bg-secondary/30 border border-border/50 hover:border-primary/30 transition-colors cursor-pointer"
+                  className="rounded-lg border border-border/50 bg-secondary/30 transition-colors hover:border-primary/30"
                 >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <Trophy className="w-5 h-5 text-primary flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-medium truncate">{league.name}</h3>
-                        <p className="text-sm text-primary truncate">
-                          {teamNamesByLeagueId[league.id] ?? `Team #${league.user_pick_position}`}
-                        </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLeague(league);
+                      navigate('/rankings');
+                    }}
+                    className="w-full cursor-pointer p-4 text-left"
+                  >
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <Trophy className="h-5 w-5 flex-shrink-0 text-primary" />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate font-medium">{league.name}</h3>
+                          <p className="truncate text-sm text-primary">
+                            {teamNamesByLeagueId[league.id] ?? `Team #${league.user_pick_position}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 text-right text-sm text-muted-foreground">
+                        {league.user_id === user?.id
+                          ? `${league.num_teams} teams • Pick #${league.user_pick_position}`
+                          : `${league.num_teams} teams • Joined`}
                       </div>
                     </div>
-                    <div className="text-sm text-muted-foreground text-right flex-shrink-0">
-                      {league.num_teams} teams • Pick #{league.user_pick_position}
+                    <div className="text-sm text-muted-foreground">
+                      {draftCountByLeagueId[league.id] ?? 0} mock draft
+                      {(draftCountByLeagueId[league.id] ?? 0) !== 1 ? 's' : ''} completed
                     </div>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {draftCountByLeagueId[league.id] ?? 0} mock draft{(draftCountByLeagueId[league.id] ?? 0) !== 1 ? 's' : ''} completed
-                  </div>
-                </button>
+                  </button>
+                  {league.user_id === user?.id ? (
+                    <div className="px-4 pb-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-11 w-full"
+                        onClick={() => {
+                          setSelectedLeague(league);
+                          navigate('/league-settings?tab=members');
+                        }}
+                      >
+                        Invite friends
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
               ))}
             </div>
           )}

@@ -50,7 +50,7 @@ import {
   mpRoundForPick,
   mpTeamForPick,
 } from '@/utils/multiplayerDraftMath';
-import { fetchPlayersByIds } from '@/utils/fetchPlayersByIds';
+import { fetchPlayersByIds, mergeMissingRankedPlayers } from '@/utils/fetchPlayersByIds';
 import {
   computeDraftGrade,
   parseStoredDraftGrade,
@@ -448,8 +448,24 @@ const MultiplayerDraftRoom = () => {
     return buildStartingSlots(positionLimits, !!draft?.is_superflex);
   }, [positionLimits, draft?.is_superflex]);
 
-  const loadPlayersFromBoard = useCallback(async (d: MultiplayerDraft) => {
-    const ids = d.board_player_ids || [];
+  useEffect(() => {
+    if (players.length === 0) return;
+    const ids = [...picks.map((p) => p.player_id), ...keepers.map((k) => k.player_id)];
+    if (ids.length === 0) return;
+    let cancelled = false;
+    void mergeMissingRankedPlayers(players, ids).then((merged) => {
+      if (cancelled || merged.length === players.length) return;
+      setPlayers(merged);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [picks, keepers, players]);
+
+  const loadPlayersFromBoard = useCallback(async (d: MultiplayerDraft, extraIds: string[] = []) => {
+    const boardIds = d.board_player_ids || [];
+    const extra = extraIds.filter((id) => id && !boardIds.includes(id));
+    const ids = [...boardIds, ...extra];
     if (!ids.length) {
       setPlayers([]);
       boardLoadedRef.current = true;
@@ -506,7 +522,10 @@ const MultiplayerDraftRoom = () => {
     setPicks(pk);
     setResults(res);
     if (!boardLoadedRef.current && d.board_player_ids?.length) {
-      await loadPlayersFromBoard(d);
+      await loadPlayersFromBoard(d, [
+        ...pk.map((p) => p.player_id),
+        ...ks.map((k) => k.player_id),
+      ]);
     }
     if (d.status === 'lobby') {
       navigate(`/lobby/${d.invite_code}`);
@@ -1488,7 +1507,7 @@ const MultiplayerDraftRoom = () => {
             </div>
             {!user && yourBoardSource === 'yours' && (
               <p className="text-[11px] text-muted-foreground px-0.5 shrink-0 mb-1 leading-snug line-clamp-2 sm:line-clamp-none">
-                Guest board uses community rankings unless you pick a site board. Sign in for your personal rankings.
+                Your board uses rankings from this device if you finalized them; otherwise community.
               </p>
             )}
 

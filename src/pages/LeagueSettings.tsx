@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useLeagues } from '@/hooks/useLeagues';
@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Save, Users, Settings2, ArrowLeft, Layers, BookmarkPlus, Plus, Trash2, HelpCircle, ListOrdered, Info, LayoutList } from 'lucide-react';
+import { Save, Users, Settings2, ArrowLeft, Layers, BookmarkPlus, Plus, Trash2, HelpCircle, ListOrdered, Info, LayoutList, UserPlus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { tempSettingsStorage } from '@/utils/temporaryStorage';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import type { Player } from '@/types/database';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
+import { LeagueMembersPanel } from '@/components/league/LeagueMembersPanel';
+import { isLeagueOwner } from '@/utils/leagueAccess';
 import {
   DEFAULT_STARTERS,
   STARTER_MAX,
@@ -45,6 +47,7 @@ interface PositionLimits {
   K: number;
   DEF: number;
   BENCH: number;
+  IR: number;
   KEEPERS: number;
   starters?: StarterCounts;
 }
@@ -63,6 +66,12 @@ export default function LeagueSettings() {
   const { user, loading: authLoading } = useAuth();
   const { selectedLeague, refreshLeagues, setSelectedLeague, loading: leaguesLoading, leagues } = useLeagues();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [settingsTab, setSettingsTab] = useState(
+    searchParams.get('tab') === 'members' ? 'members' : 'general'
+  );
+  const visibleSettingsTab =
+    settingsTab === 'members' && !(user && selectedLeague) ? 'general' : settingsTab;
   
   // Track previous selectedLeague to detect transitions
   const prevSelectedLeagueRef = useRef<typeof selectedLeague>(null);
@@ -86,14 +95,14 @@ export default function LeagueSettings() {
   }, [user, selectedLeague, leaguesLoading, leagues, setSelectedLeague]);
   
   const [positionLimits, setPositionLimits] = useState<Record<keyof Omit<PositionLimits, 'starters'>, number | string>>({
-    QB: 4, RB: 8, WR: 8, TE: 6, FLEX: 1, K: 3, DEF: 3, BENCH: 5, KEEPERS: 1
+    QB: 4, RB: 8, WR: 8, TE: 6, FLEX: 1, K: 3, DEF: 3, BENCH: 5, IR: 0, KEEPERS: 1
   });
   const [starterCounts, setStarterCounts] = useState<Record<StarterPosition, number | string>>({
     ...DEFAULT_STARTERS,
   });
   
   const defaultMaximums: Record<keyof Omit<PositionLimits, 'starters'>, number> = {
-    QB: 15, RB: 15, WR: 15, TE: 15, FLEX: 6, K: 15, DEF: 15, BENCH: 15, KEEPERS: 20
+    QB: 15, RB: 15, WR: 15, TE: 15, FLEX: 6, K: 15, DEF: 15, BENCH: 15, IR: 4, KEEPERS: 20
   };
 
   const resolvedStarters = (): StarterCounts => ({
@@ -109,6 +118,10 @@ export default function LeagueSettings() {
     if (positionLimits.FLEX === '') return isSuperflex ? 2 : 1;
     return Math.max(0, Math.min(6, Number(positionLimits.FLEX) || 0));
   };
+  const resolvedIr = (): number => {
+    if (positionLimits.IR === '') return 0;
+    return Math.max(0, Math.min(4, Number(positionLimits.IR) || 0));
+  };
   const [teamNames, setTeamNames] = useState<TeamName[]>([]);
   const [leagueName, setLeagueName] = useState('');
   const [numTeams, setNumTeams] = useState<number | string>(12);
@@ -119,7 +132,7 @@ export default function LeagueSettings() {
   const [isSuperflex, setIsSuperflex] = useState(false);
   const [rookiesOnly, setRookiesOnly] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Keepers: per team, 1-5 slots. Each slot: { player, round }. Logged-in users only.
+  // Keepers: per team, 1-5 slots. Each slot: { player, round }.
   const [keepersByTeam, setKeepersByTeam] = useState<Record<number, KeeperSlot[]>>({});
   
   // Detect when selectedLeague is transitioning from null to a league
@@ -136,14 +149,14 @@ export default function LeagueSettings() {
     prevSelectedLeagueRef.current = selectedLeague;
   }, [selectedLeague]);
 
-  // Don't redirect - allow non-logged-in users to view league settings (read-only)
-  // They can adjust settings but can't save without being logged in
+  // Guests can edit and save settings on this device.
 
   // Load settings from localStorage for guests on mount
   useEffect(() => {
     if (!user && !selectedLeague) {
       const tempSettings = tempSettingsStorage.get();
       if (tempSettings) {
+        if (tempSettings.leagueName) setLeagueName(tempSettings.leagueName);
         if (tempSettings.numTeams) setNumTeams(tempSettings.numTeams);
         if (tempSettings.userPickPosition) setUserPickPosition(tempSettings.userPickPosition);
         if (tempSettings.draftOrder) setDraftOrder(tempSettings.draftOrder);
@@ -151,6 +164,9 @@ export default function LeagueSettings() {
         if (tempSettings.leagueType) setLeagueType(tempSettings.leagueType);
         if (tempSettings.isSuperflex !== undefined) setIsSuperflex(tempSettings.isSuperflex);
         if (tempSettings.rookiesOnly !== undefined) setRookiesOnly(tempSettings.rookiesOnly);
+        if (Array.isArray(tempSettings.teamNames) && tempSettings.teamNames.length > 0) {
+          setTeamNames(tempSettings.teamNames);
+        }
         if (tempSettings.positionLimits) {
           // Calculate DEF limit based on numTeams if not already calculated
           const numTeamsValue = tempSettings.numTeams || 12;
@@ -166,6 +182,7 @@ export default function LeagueSettings() {
             K: tempSettings.positionLimits.K ?? 3,
             DEF: tempSettings.positionLimits.DEF ?? calculatedDefLimit, // Use calculated if not set
             BENCH: tempSettings.positionLimits.BENCH ?? 5, // Default to 5 for guests
+            IR: guestLimits.IR ?? 0,
             KEEPERS: guestLimits.KEEPERS ?? 1,
           });
           setStarterCounts(parseStarters(guestLimits));
@@ -247,6 +264,36 @@ export default function LeagueSettings() {
   }, [selectedLeague, user]);
 
   useEffect(() => {
+    if (user) return;
+    const rawKeepers = tempSettingsStorage.get()?.keepers as
+      | Array<{ team_number: number; player_id: string; round_number: number }>
+      | undefined;
+    if (!rawKeepers || rawKeepers.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const playerIds = [...new Set(rawKeepers.map((k) => k.player_id).filter(Boolean))];
+      const playersMap = new Map<string, Player>();
+      if (playerIds.length > 0) {
+        const { data: playersData } = await supabase.from('players').select('*').in('id', playerIds);
+        (playersData || []).forEach((p: Player) => playersMap.set(p.id, p));
+      }
+      if (cancelled) return;
+      const byTeam: Record<number, KeeperSlot[]> = {};
+      rawKeepers.forEach((row) => {
+        if (!byTeam[row.team_number]) byTeam[row.team_number] = [];
+        byTeam[row.team_number].push({
+          player: playersMap.get(row.player_id) || null,
+          round: row.round_number,
+        });
+      });
+      setKeepersByTeam(byTeam);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
     if (selectedLeague) {
       // Load league name
       setLeagueName(selectedLeague.name);
@@ -264,6 +311,7 @@ export default function LeagueSettings() {
           K: limits.K ?? 3,
           DEF: limits.DEF ?? 3,
           BENCH: limits.BENCH ?? 7,
+          IR: limits.IR ?? 0,
           KEEPERS: limits.KEEPERS ?? 1,
         });
         setStarterCounts(parseStarters(limits));
@@ -346,7 +394,7 @@ export default function LeagueSettings() {
       return;
     }
     if (/^0+$/.test(cleaned)) {
-      if (position === 'BENCH' || position === 'FLEX') {
+      if (position === 'BENCH' || position === 'FLEX' || position === 'IR') {
         setPositionLimits(prev => ({ ...prev, [position]: 0 }));
       } else {
         setPositionLimits(prev => ({ ...prev, [position]: '' }));
@@ -357,7 +405,7 @@ export default function LeagueSettings() {
     const numValue = parseInt(limited, 10);
     if (isNaN(numValue)) return;
     const maxDefLimit = position === 'DEF' ? 29 : 15;
-    const max = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : defaultMaximums[position];
+    const max = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : position === 'FLEX' ? 6 : position === 'IR' ? 4 : defaultMaximums[position];
     const clamped = Math.min(max, Math.max(0, numValue));
     setPositionLimits(prev => ({ ...prev, [position]: clamped }));
   };
@@ -473,8 +521,10 @@ export default function LeagueSettings() {
         draftOrder: draftOrder || 'snake',
         scoringFormat: scoringFormat || 'ppr',
         leagueType: leagueType || 'season',
+        leagueName: leagueName.trim() || 'My Fantasy League',
         isSuperflex: isSuperflex || false,
         rookiesOnly: leagueType === 'dynasty' ? rookiesOnly : false,
+        teamNames,
         positionLimits: {
           QB: typeof positionLimits.QB === 'number' ? positionLimits.QB : parseInt(String(positionLimits.QB)) || 4,
           RB: typeof positionLimits.RB === 'number' ? positionLimits.RB : parseInt(String(positionLimits.RB)) || 8,
@@ -484,7 +534,9 @@ export default function LeagueSettings() {
           K: typeof positionLimits.K === 'number' ? positionLimits.K : parseInt(String(positionLimits.K)) || 3,
           DEF: defLimit,
           BENCH: typeof positionLimits.BENCH === 'number' ? positionLimits.BENCH : parseInt(String(positionLimits.BENCH)) || 5,
+          IR: typeof positionLimits.IR === 'number' ? positionLimits.IR : Math.max(0, Math.min(4, parseInt(String(positionLimits.IR)) || 0)),
           KEEPERS: typeof positionLimits.KEEPERS === 'number' ? positionLimits.KEEPERS : parseInt(String(positionLimits.KEEPERS)) || 1,
+          starters: resolvedStarters(),
         },
       });
       
@@ -492,7 +544,7 @@ export default function LeagueSettings() {
       
       setNumTeams(finalNumTeams);
       setUserPickPosition(finalUserPickPosition);
-      toast.success('Settings saved locally');
+      toast.success('Settings saved on this device');
       return;
     }
     
@@ -747,6 +799,7 @@ export default function LeagueSettings() {
         ? Math.max(3, starters.DEF)
         : Math.max(starters.DEF, Math.min(29, Number(positionLimits.DEF) || 0)),
       BENCH: bench,
+      IR: resolvedIr(),
       KEEPERS: positionLimits.KEEPERS === '' ? 1 : Math.max(0, Math.min(maxKeepersForSave, Number(positionLimits.KEEPERS) || 0)),
       starters,
     };
@@ -788,6 +841,7 @@ export default function LeagueSettings() {
       K: finalLimits.K,
       DEF: finalLimits.DEF,
       BENCH: finalLimits.BENCH,
+      IR: finalLimits.IR,
       KEEPERS: finalLimits.KEEPERS,
     });
     if (finalLimits.starters) setStarterCounts(finalLimits.starters);
@@ -804,12 +858,6 @@ export default function LeagueSettings() {
   };
 
   const savePositionLimits = async () => {
-    if (!user) {
-      toast.error('Please sign in to save position limits');
-      return;
-    }
-    if (!selectedLeague) return;
-
     setSaving(true);
     const finalLimits = buildFinalPositionLimits();
     const currentNumTeams = typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || selectedLeague?.num_teams || 12;
@@ -819,6 +867,25 @@ export default function LeagueSettings() {
       setSaving(false);
       return;
     }
+    if (!user) {
+      const cur = tempSettingsStorage.get() || {};
+      tempSettingsStorage.save({
+        ...cur,
+        isSuperflex,
+        positionLimits: {
+          ...(cur.positionLimits || {}),
+          ...finalLimits,
+        },
+      });
+      toast.success('Position limits saved on this device');
+      setSaving(false);
+      return;
+    }
+    if (!selectedLeague) {
+      setSaving(false);
+      return;
+    }
+
     await persistPositionLimits(finalLimits, 'Position limits saved');
     setSaving(false);
   };
@@ -856,10 +923,11 @@ export default function LeagueSettings() {
         K: finalLimits.K,
         DEF: finalLimits.DEF,
         BENCH: finalLimits.BENCH,
+        IR: finalLimits.IR,
         KEEPERS: finalLimits.KEEPERS,
       });
       setStarterCounts(finalLimits.starters || DEFAULT_STARTERS);
-      toast.success('Starting lineup saved for your mock drafts');
+      toast.success('Starting lineup saved on this device');
       setSaving(false);
       return;
     }
@@ -935,10 +1003,12 @@ export default function LeagueSettings() {
   };
 
   const saveKeepers = async () => {
-    if (!user || !selectedLeague) return;
+    if (user && !selectedLeague) return;
     const numRounds = calculateNumRounds();
     const keeperLimit = getKeeperLimit();
-    const teamCount = selectedLeague.num_teams;
+    const teamCount =
+      selectedLeague?.num_teams ??
+      (typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || 12);
     const allPlayerIds = new Set<string>();
     const roundUsedByTeam = new Map<string, Set<number>>();
 
@@ -1042,12 +1112,51 @@ export default function LeagueSettings() {
 
     setSaving(true);
 
-    // Keep Position Limits.KEEPERS in sync with the most slots any team is using.
+    const serializeKeepers = () => {
+      const rows: Array<{ team_number: number; player_id: string; round_number: number }> = [];
+      for (let t = 1; t <= teamCount; t++) {
+        for (const slot of keepersByTeam[t] || []) {
+          if (slot.player) {
+            rows.push({
+              team_number: t,
+              player_id: slot.player.id,
+              round_number: slot.round,
+            });
+          }
+        }
+      }
+      return rows;
+    };
+
     const maxSlotsUsed = Math.max(
       0,
       ...Array.from({ length: teamCount }, (_, i) => (keepersByTeam[i + 1] || []).length)
     );
     const nextKeeperLimit = Math.min(getMaxKeepers(), Math.max(getKeeperLimit(), maxSlotsUsed));
+
+    if (!user) {
+      const keepers = serializeKeepers();
+      const cur = tempSettingsStorage.get() || {};
+      tempSettingsStorage.save({
+        ...cur,
+        keepers,
+        positionLimits: {
+          ...(cur.positionLimits || {}),
+          KEEPERS: nextKeeperLimit,
+        },
+      });
+      setPositionLimits((prev) => ({ ...prev, KEEPERS: nextKeeperLimit }));
+      toast.success(keepers.length > 0 ? 'Keepers saved on this device' : 'Keepers cleared');
+      setSaving(false);
+      return;
+    }
+
+    if (!selectedLeague) {
+      setSaving(false);
+      return;
+    }
+
+    // Keep Position Limits.KEEPERS in sync with the most slots any team is using.
     const existingLimits = (selectedLeague.position_limits || {}) as Record<string, number>;
     if ((existingLimits.KEEPERS ?? 1) < nextKeeperLimit || positionLimits.KEEPERS !== nextKeeperLimit) {
       const updatedLimits = { ...existingLimits, KEEPERS: nextKeeperLimit };
@@ -1098,7 +1207,9 @@ export default function LeagueSettings() {
 
   const saveTeamNames = async () => {
     if (!user) {
-      toast.error('Please sign in to save team names');
+      const cur = tempSettingsStorage.get() || {};
+      tempSettingsStorage.save({ ...cur, teamNames });
+      toast.success('Team names saved on this device');
       return;
     }
     
@@ -1177,6 +1288,7 @@ export default function LeagueSettings() {
   }
 
   const isRookieOnlyLeague = leagueType === 'dynasty' && rookiesOnly;
+  const canEditLeague = !user || isLeagueOwner(selectedLeague, user.id);
 
   return (
     <div className="min-h-screen bg-background">
@@ -1190,34 +1302,41 @@ export default function LeagueSettings() {
             <h1 className="font-display text-3xl tracking-wide text-gradient">
               LEAGUE SETTINGS
             </h1>
-            <p className="text-muted-foreground">{leagueName || selectedLeague?.name || 'Preview Mode'}</p>
+            <p className="text-muted-foreground">{leagueName || selectedLeague?.name || 'Guest league'}</p>
           </div>
         </div>
 
-        {/* Teaser Banner for non-logged-in users */}
         {!user && (
-          <div className="glass-card p-6 mb-6 bg-gradient-to-r from-primary/10 to-accent/10 border-2 border-primary/20 relative overflow-hidden">
-            <div className="absolute inset-0 bg-background/40 backdrop-blur-sm" />
-            <div className="relative z-10 flex items-center justify-between">
-              <div>
-                <h3 className="font-display text-xl mb-2">Unlock Full League Management</h3>
-                <p className="text-sm text-muted-foreground">
-                  Sign in to save your settings, create multiple leagues, and access advanced customization options
-                </p>
-              </div>
-              <Button variant="hero" onClick={() => navigate('/auth')} className="shrink-0">
-                Sign In to Unlock
-              </Button>
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground mb-6">
+            Settings on this device are not saved to an account and do not affect community consensus.
+          </p>
         )}
 
-        <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 bg-secondary/50 h-auto gap-1">
+        {user && selectedLeague && !canEditLeague && (
+          <Alert className="mb-6">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              You joined this league. You can use rankings, mocks, team boards, and pick&apos;em.
+              Settings here are view-only; only the commissioner can change them.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Tabs value={visibleSettingsTab} onValueChange={setSettingsTab} className="space-y-6">
+          <TabsList className={cn(
+            'grid w-full bg-secondary/50 h-auto gap-1',
+            user && selectedLeague ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-2 sm:grid-cols-5'
+          )}>
             <TabsTrigger value="general" className="gap-2">
               <Settings2 className="w-4 h-4" />
               General
             </TabsTrigger>
+            {user && selectedLeague && (
+              <TabsTrigger value="members" className="gap-2">
+                <UserPlus className="w-4 h-4" />
+                Members
+              </TabsTrigger>
+            )}
             <TabsTrigger value="lineup" className="gap-2">
               <LayoutList className="w-4 h-4" />
               Lineup
@@ -1236,6 +1355,21 @@ export default function LeagueSettings() {
             </TabsTrigger>
           </TabsList>
 
+          {user && selectedLeague && (
+            <TabsContent value="members">
+              <LeagueMembersPanel
+                leagueId={selectedLeague.id}
+                leagueName={selectedLeague.name}
+                isOwner={canEditLeague}
+                onLeftLeague={() => {
+                  setSelectedLeague(null);
+                  void refreshLeagues();
+                  navigate('/dashboard');
+                }}
+              />
+            </TabsContent>
+          )}
+
           <TabsContent value="general" className="relative">
             <Card className="glass-card">
               <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4">
@@ -1243,7 +1377,7 @@ export default function LeagueSettings() {
                   <CardTitle className="flex items-center gap-2">
                     General Settings
                     {!user && (
-                      <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Preview</span>
+                      <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Local</span>
                     )}
                   </CardTitle>
                   <CardDescription>
@@ -1251,7 +1385,7 @@ export default function LeagueSettings() {
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Button onClick={saveGeneralSettings} disabled={saving} className="shrink-0">
+                  <Button onClick={saveGeneralSettings} disabled={saving || !canEditLeague} className="shrink-0">
                     <Save className="w-4 h-4 mr-2" />
                     Save
                   </Button>
@@ -1262,13 +1396,6 @@ export default function LeagueSettings() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 relative z-0">
-                {!user && (
-                  <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                    <p className="text-sm text-primary/80">
-                      💡 <strong>Preview Mode:</strong> You can adjust all settings below, but changes won't be saved until you sign in.
-                    </p>
-                  </div>
-                )}
                 <div className="space-y-2">
                   <Label htmlFor="leagueName" className="text-sm font-medium">
                     League Name
@@ -1280,7 +1407,7 @@ export default function LeagueSettings() {
                     onChange={(e) => setLeagueName(e.target.value)}
                     className="bg-secondary/50 max-w-xs"
                     placeholder="My Fantasy League"
-                    disabled={!user}
+                    disabled={!canEditLeague}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -1339,6 +1466,7 @@ export default function LeagueSettings() {
                         }
                       }}
                       className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      disabled={!canEditLeague}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1348,6 +1476,7 @@ export default function LeagueSettings() {
                     <Select 
                       value={String(userPickPosition)} 
                       onValueChange={(value) => setUserPickPosition(parseInt(value))}
+                      disabled={!canEditLeague}
                     >
                       <SelectTrigger className="bg-secondary/50">
                         <SelectValue />
@@ -1369,7 +1498,7 @@ export default function LeagueSettings() {
                     <Label htmlFor="draftOrder" className="text-sm font-medium">
                       Draft Order
                     </Label>
-                    <Select value={draftOrder} onValueChange={setDraftOrder}>
+                    <Select value={draftOrder} onValueChange={setDraftOrder} disabled={!canEditLeague}>
                       <SelectTrigger className="bg-secondary/50">
                         <SelectValue />
                       </SelectTrigger>
@@ -1393,7 +1522,7 @@ export default function LeagueSettings() {
                     <Label htmlFor="leagueType" className="text-sm font-medium">
                       League Type
                     </Label>
-                    <Select value={leagueType} onValueChange={setLeagueType}>
+                    <Select value={leagueType} onValueChange={setLeagueType} disabled={!canEditLeague}>
                       <SelectTrigger className="bg-secondary/50">
                         <SelectValue />
                       </SelectTrigger>
@@ -1407,6 +1536,7 @@ export default function LeagueSettings() {
                         id="isSuperflex"
                         checked={isSuperflex}
                         onCheckedChange={(checked) => setIsSuperflex(checked === true)}
+                        disabled={!canEditLeague}
                       />
                       <Label htmlFor="isSuperflex" className="text-sm font-medium cursor-pointer">
                         Superflex (allows QB in flex position)
@@ -1418,6 +1548,7 @@ export default function LeagueSettings() {
                           id="rookiesOnly"
                           checked={rookiesOnly}
                           onCheckedChange={(checked) => setRookiesOnly(checked === true)}
+                          disabled={!canEditLeague}
                         />
                         <Label htmlFor="rookiesOnly" className="text-sm font-medium cursor-pointer">
                           Rookies only
@@ -1429,7 +1560,7 @@ export default function LeagueSettings() {
                     <Label htmlFor="scoringFormat" className="text-sm font-medium">
                       Scoring Format
                     </Label>
-                    <Select value={scoringFormat} onValueChange={(v) => setScoringFormat(v as 'standard' | 'ppr' | 'half_ppr')}>
+                    <Select value={scoringFormat} onValueChange={(v) => setScoringFormat(v as 'standard' | 'ppr' | 'half_ppr')} disabled={!canEditLeague}>
                       <SelectTrigger className="bg-secondary/50">
                         <SelectValue />
                       </SelectTrigger>
@@ -1441,11 +1572,11 @@ export default function LeagueSettings() {
                     </Select>
                   </div>
                 </div>
-                {!user && (
-                  <p className="text-xs text-muted-foreground">
-                    Settings are saved locally and will be used for your mock drafts.
-                  </p>
-                )}
+                  {!user && (
+                    <p className="text-xs text-muted-foreground">
+                      Settings are saved on this device and used for your mock drafts.
+                    </p>
+                  )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1467,12 +1598,13 @@ export default function LeagueSettings() {
                       </>
                     ) : (
                       <>
-                        Set how many of each position start (and how many flex slots). Extra drafted players go to the bench.
+                        Extra drafted players go to the bench. Injured reserve (IR) is for hurt players
+                        sitting out. IR is not a draft slot; Team Rankings counts those players in the Bench room.
                       </>
                     )}
                   </CardDescription>
                 </div>
-                <Button onClick={saveStartingLineup} disabled={saving || isRookieOnlyLeague} className="shrink-0">
+                <Button onClick={saveStartingLineup} disabled={saving || isRookieOnlyLeague || !canEditLeague} className="shrink-0">
                   <Save className="w-4 h-4 mr-2" />
                   Save Lineup
                 </Button>
@@ -1511,7 +1643,7 @@ export default function LeagueSettings() {
                           if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
                         }}
                         className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        disabled={isRookieOnlyLeague}
+                        disabled={isRookieOnlyLeague || !canEditLeague}
                       />
                     </div>
                   ))}
@@ -1531,13 +1663,32 @@ export default function LeagueSettings() {
                         if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
                       }}
                       className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      disabled={isRookieOnlyLeague}
+                      disabled={isRookieOnlyLeague || !canEditLeague}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="starter-IR" className="text-sm font-medium">
+                      IR
+                      <span className="text-xs text-muted-foreground ml-1">(0–4)</span>
+                    </Label>
+                    <Input
+                      id="starter-IR"
+                      type="number"
+                      min={0}
+                      max={4}
+                      value={positionLimits.IR}
+                      onChange={(e) => handlePositionLimitChange('IR', e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                      }}
+                      className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      disabled={isRookieOnlyLeague || !canEditLeague}
                     />
                   </div>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm space-y-2">
                   <p className="font-medium text-foreground">
-                    {formatLineupSummary(resolvedStarters(), resolvedFlex())}
+                    {formatLineupSummary(resolvedStarters(), resolvedFlex(), resolvedIr())}
                   </p>
                   <p className="text-muted-foreground">
                     Draft rounds: {countBaseStarters(resolvedStarters()) + resolvedFlex() + (
@@ -1545,11 +1696,11 @@ export default function LeagueSettings() {
                         ? positionLimits.BENCH
                         : parseInt(String(positionLimits.BENCH)) || 0
                     )}{' '}
-                    (starters + flex + bench). Second RB with 1 RB starter goes to flex or bench.
+                    (starters + flex + bench). IR does not add draft rounds. Second RB with 1 RB starter goes to flex or bench.
                   </p>
                   {!user && (
                     <p className="text-muted-foreground">
-                      Saved locally for guest mock drafts. Sign in to store this on a league.
+                      Saved on this device for guest mock drafts. Sign in to store this on a league.
                     </p>
                   )}
                 </div>
@@ -1558,13 +1709,13 @@ export default function LeagueSettings() {
           </TabsContent>
 
           <TabsContent value="positions" className="relative">
-            <Card className={cn("glass-card", !user && "opacity-90")}>
+            <Card className="glass-card">
               <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     Position Limits
                     {!user && (
-                      <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Preview</span>
+                      <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Local</span>
                     )}
                   </CardTitle>
                   <CardDescription>
@@ -1577,12 +1728,10 @@ export default function LeagueSettings() {
                     )}
                   </CardDescription>
                 </div>
-                {user && (
-                  <Button onClick={savePositionLimits} disabled={saving || isRookieOnlyLeague} className="shrink-0">
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Position Limits
-                  </Button>
-                )}
+                <Button onClick={savePositionLimits} disabled={saving || isRookieOnlyLeague || !canEditLeague} className="shrink-0">
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Position Limits
+                </Button>
               </CardHeader>
               <CardContent className="space-y-6 relative">
                 {isRookieOnlyLeague && (
@@ -1593,79 +1742,14 @@ export default function LeagueSettings() {
                     </AlertDescription>
                   </Alert>
                 )}
-                {!user && (
-                  <>
-                    {/* Overlay that blocks interaction */}
-                    <div className="absolute inset-0 bg-background/60 backdrop-blur-sm z-20 rounded-lg flex items-center justify-center">
-                      <div className="text-center p-6 bg-background/90 rounded-lg border-2 border-primary/30 max-w-md">
-                        <Layers className="w-12 h-12 mx-auto mb-4 text-primary/60" />
-                        <h3 className="font-display text-xl mb-2">Sign In to Customize Position Limits</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Position limits allow you to control how many players can be drafted at each position. Sign in to unlock this feature and customize your league settings.
-                        </p>
-                        <Button variant="hero" onClick={() => navigate('/auth')} className="w-full">
-                          Sign In to Unlock
-                        </Button>
-                      </div>
-                    </div>
-                    {/* Preview content behind overlay */}
-                    <div className={cn('opacity-50 pointer-events-none', isRookieOnlyLeague && 'opacity-40')}>
-                      <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                        <p className="text-sm text-primary/80">
-                          💡 <strong>Preview Mode:</strong> Position limits allow you to control roster composition.
-                          {isRookieOnlyLeague && (
-                            <span className="block mt-2 text-muted-foreground">
-                              Rookies only is on—limits are not used for rookie mocks (limited player pool).
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {(Object.keys(positionLimits) as Array<keyof Omit<PositionLimits, 'starters'>>)
-                          .filter((position) => position !== 'FLEX')
-                          .map((position) => {
-                          const maxDefLimit = position === 'DEF' ? 29 : 15;
-                          const maxValue = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : 15;
-                          const label = position === 'DEF' ? 'Defense' : position === 'BENCH' ? 'Bench' : position === 'KEEPERS' ? 'Keepers' : position;
-                          return (
-                            <div key={position} className="space-y-2">
-                              <Label htmlFor={position} className="text-sm font-medium">
-                                {label}
-                                {position === 'KEEPERS' && (
-                                  <span className="text-xs text-muted-foreground ml-1">
-                                    (max: {getMaxKeepers()} rounds)
-                                  </span>
-                                )}
-                              </Label>
-                              <Input
-                                id={position}
-                                type="number"
-                                min={0}
-                                max={maxValue}
-                                maxLength={3}
-                                value={positionLimits[position]}
-                                onChange={(e) => handlePositionLimitChange(position, e.target.value)}
-                                onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
-                                className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                disabled
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </>
-                )}
-                {user && (
-                  <>
-                    <div
-                      className={cn(
-                        'grid grid-cols-2 sm:grid-cols-3 gap-4',
-                        isRookieOnlyLeague && 'pointer-events-none opacity-50'
-                      )}
-                    >
+                <div
+                  className={cn(
+                    'grid grid-cols-2 sm:grid-cols-3 gap-4',
+                    isRookieOnlyLeague && 'pointer-events-none opacity-50'
+                  )}
+                >
                       {(Object.keys(positionLimits) as Array<keyof Omit<PositionLimits, 'starters'>>)
-                        .filter((position) => position !== 'FLEX')
+                        .filter((position) => position !== 'FLEX' && position !== 'IR')
                         .map((position) => {
                         const maxDefLimit = position === 'DEF' ? 29 : 15;
                         const maxValue = position === 'DEF' ? maxDefLimit : position === 'KEEPERS' ? getMaxKeepers() : 15;
@@ -1690,14 +1774,12 @@ export default function LeagueSettings() {
                               onChange={(e) => handlePositionLimitChange(position, e.target.value)}
                               onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                               className="bg-secondary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              disabled={isRookieOnlyLeague}
+                              disabled={isRookieOnlyLeague || !canEditLeague}
                             />
                           </div>
                         );
                       })}
                     </div>
-                  </>
-                )}
                 {isRookieOnlyLeague ? (
                   <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
                     <p className="font-medium text-foreground mb-2">Minimum requirements (full-roster drafts only)</p>
@@ -1723,120 +1805,65 @@ export default function LeagueSettings() {
           </TabsContent>
 
           <TabsContent value="teams" className="relative">
-            <Card className={cn("glass-card", !user && "opacity-90")}>
+            <Card className="glass-card">
               <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     Team Names
                     {!user && (
-                      <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Preview</span>
+                      <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Local</span>
                     )}
                   </CardTitle>
                   <CardDescription>
                     Customize the names for each team in your league{selectedLeague ? ` (Team ${selectedLeague.user_pick_position} is your team)` : ''}
                   </CardDescription>
                 </div>
-                {user && (
-                  <Button onClick={saveTeamNames} disabled={saving} className="shrink-0">
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Team Names
-                  </Button>
-                )}
+                  <Button onClick={saveTeamNames} disabled={saving || !canEditLeague} className="shrink-0">
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Team Names
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4 relative">
-                {!user && (
-                  <>
-                    {/* Overlay that blocks interaction */}
-                    <div className="absolute inset-0 bg-background/60 backdrop-blur-sm z-20 rounded-lg flex items-center justify-center">
-                      <div className="text-center p-6 bg-background/90 rounded-lg border-2 border-primary/30 max-w-md">
-                        <Users className="w-12 h-12 mx-auto mb-4 text-primary/60" />
-                        <h3 className="font-display text-xl mb-2">Sign In to Customize Team Names</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Give each team in your league a custom name. Sign in to unlock this feature and personalize your draft experience.
-                        </p>
-                        <Button variant="hero" onClick={() => navigate('/auth')} className="w-full">
-                          Sign In to Unlock
-                        </Button>
-                      </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
+                  {teamNames.map((team) => (
+                    <div key={team.team_number} className="space-y-2">
+                      <Label htmlFor={`team-${team.team_number}`} className="text-sm font-medium flex items-center gap-2">
+                        Team {team.team_number}
+                        {((selectedLeague && team.team_number === selectedLeague.user_pick_position) ||
+                          (!selectedLeague && team.team_number === (typeof userPickPosition === 'number' ? userPickPosition : parseInt(String(userPickPosition)) || 1))) && (
+                          <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">You</span>
+                        )}
+                      </Label>
+                      <Input
+                        id={`team-${team.team_number}`}
+                        name={`team-${team.team_number}`}
+                        placeholder={`Team ${team.team_number}`}
+                        value={team.team_name}
+                        onChange={(e) => handleTeamNameChange(team.team_number, e.target.value)}
+                        className="bg-secondary/50"
+                        maxLength={50}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        disabled={!canEditLeague}
+                      />
                     </div>
-                    {/* Preview content behind overlay */}
-                    <div className="opacity-50 pointer-events-none">
-                      <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                        <p className="text-sm text-primary/80">
-                          💡 <strong>Preview Mode:</strong> Customize team names to personalize your league.
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
-                        {teamNames.map((team) => (
-                          <div key={team.team_number} className="space-y-2">
-                            <Label htmlFor={`team-${team.team_number}`} className="text-sm font-medium flex items-center gap-2">
-                              Team {team.team_number}
-                              {selectedLeague && team.team_number === selectedLeague.user_pick_position && (
-                                <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">You</span>
-                              )}
-                            </Label>
-                            <Input
-                              id={`team-${team.team_number}`}
-                              name={`team-${team.team_number}`}
-                              placeholder={`Team ${team.team_number}`}
-                              value={team.team_name}
-                              onChange={(e) => handleTeamNameChange(team.team_number, e.target.value)}
-                              className="bg-secondary/50"
-                              maxLength={50}
-                              autoComplete="off"
-                              autoCorrect="off"
-                              autoCapitalize="off"
-                              spellCheck="false"
-                              disabled
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-                {user && (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
-                      {teamNames.map((team) => (
-                        <div key={team.team_number} className="space-y-2">
-                          <Label htmlFor={`team-${team.team_number}`} className="text-sm font-medium flex items-center gap-2">
-                            Team {team.team_number}
-                            {selectedLeague && team.team_number === selectedLeague.user_pick_position && (
-                              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">You</span>
-                            )}
-                          </Label>
-                          <Input
-                            id={`team-${team.team_number}`}
-                            name={`team-${team.team_number}`}
-                            placeholder={`Team ${team.team_number}`}
-                            value={team.team_name}
-                            onChange={(e) => handleTeamNameChange(team.team_number, e.target.value)}
-                            className="bg-secondary/50"
-                            maxLength={50}
-                            autoComplete="off"
-                            autoCorrect="off"
-                            autoCapitalize="off"
-                            spellCheck="false"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="keepers" className="relative">
-            <Card className={cn("glass-card", !user && "opacity-90")}>
+            <Card className="glass-card">
               <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <CardTitle className="flex items-center gap-2">
                       Keepers
                       {!user && (
-                        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Sign in</span>
+                        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Local</span>
                       )}
                     </CardTitle>
                     <Popover>
@@ -1858,31 +1885,25 @@ export default function LeagueSettings() {
                     Assign keepers per team. Use Add keeper for more slots (up to roster rounds); saving updates the Keepers limit.
                   </CardDescription>
                 </div>
-                {user && selectedLeague && (
-                  <Button onClick={saveKeepers} disabled={saving} className="shrink-0">
+                {(!user || selectedLeague) && (
+                  <Button onClick={saveKeepers} disabled={saving || !canEditLeague} className="shrink-0">
                     <Save className="w-4 h-4 mr-2" />
                     Save Keepers
                   </Button>
                 )}
               </CardHeader>
               <CardContent className="space-y-4 relative">
-                {!user ? (
-                  <div className="absolute inset-0 bg-background/60 backdrop-blur-sm z-20 rounded-lg flex items-center justify-center">
-                    <div className="text-center p-6 bg-background/90 rounded-lg border-2 border-primary/30 max-w-md">
-                      <BookmarkPlus className="w-12 h-12 mx-auto mb-4 text-primary/60" />
-                      <h3 className="font-display text-xl mb-2">Sign In to Configure Keepers</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Keepers let you carry players from last year into specific rounds. Sign in and select a league to get started.
-                      </p>
-                      <Button variant="hero" onClick={() => navigate('/auth')} className="w-full">
-                        Sign In to Unlock
-                      </Button>
-                    </div>
-                  </div>
-                ) : selectedLeague ? (
+                {!user || selectedLeague ? (
                   <>
                     {(() => {
-                      const teamCount = selectedLeague.num_teams;
+                      const teamCount =
+                        selectedLeague?.num_teams ??
+                        (typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || 12);
+                      const yourPick =
+                        selectedLeague?.user_pick_position ??
+                        (typeof userPickPosition === 'number'
+                          ? userPickPosition
+                          : parseInt(String(userPickPosition)) || 1);
                       const numRounds = calculateNumRounds();
                       const allKeeperPlayerIds = new Set<string>();
                       Object.values(keepersByTeam || {}).flat().forEach((s) => s.player?.id && allKeeperPlayerIds.add(s.player.id));
@@ -1892,7 +1913,7 @@ export default function LeagueSettings() {
                       return Array.from({ length: teamCount }, (_, i) => i + 1).map((teamNum) => {
                         const slots = keepersByTeam[teamNum] ?? (keeperLimit >= 1 ? [{ player: null, round: 1 }] : []);
                         const teamName = teamNames.find((t) => t.team_number === teamNum)?.team_name || `Team ${teamNum}`;
-                        const isUserTeam = teamNum === selectedLeague.user_pick_position;
+                        const isUserTeam = teamNum === yourPick;
 
                         return (
                           <div key={teamNum} className="space-y-3 p-4 rounded-lg border border-border bg-secondary/20">
@@ -1914,11 +1935,13 @@ export default function LeagueSettings() {
                                       onChange={(p) => updateKeeperSlot(teamNum, idx, { player: p })}
                                       excludePlayerIds={new Set([...allKeeperPlayerIds].filter((id) => id !== slot.player?.id))}
                                       placeholder="Search player..."
+                                      disabled={!canEditLeague}
                                     />
                                   </div>
                                   <Select
                                     value={String(slot.round)}
                                     onValueChange={(v) => updateKeeperSlot(teamNum, idx, { round: parseInt(v) })}
+                                    disabled={!canEditLeague}
                                   >
                                     <SelectTrigger className="w-24">
                                       <SelectValue placeholder="Round" />
@@ -1935,6 +1958,7 @@ export default function LeagueSettings() {
                                     className="h-9 w-9 shrink-0"
                                     onClick={() => removeKeeperSlot(teamNum, idx)}
                                     title="Remove keeper slot"
+                                    disabled={!canEditLeague}
                                   >
                                     <Trash2 className="w-4 h-4 text-muted-foreground" />
                                   </Button>
@@ -1946,6 +1970,7 @@ export default function LeagueSettings() {
                                   size="sm"
                                   className="gap-2"
                                   onClick={() => addKeeperSlot(teamNum)}
+                                  disabled={!canEditLeague}
                                 >
                                   <Plus className="w-4 h-4" /> Add keeper
                                 </Button>

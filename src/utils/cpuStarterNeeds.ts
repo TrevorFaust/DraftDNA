@@ -7,6 +7,7 @@ import type { RankedPlayer } from '@/types/database';
 import {
   DEFAULT_STARTERS,
   STARTER_POSITION_ORDER,
+  normalizeRosterPos,
   starterNeedsFromCounts,
   type StarterCounts,
   type StarterPosition,
@@ -15,9 +16,7 @@ import {
 export type ScoredPlayer = { player: RankedPlayer; adjustedScore: number };
 
 function normalizePos(pos: string | null | undefined): string {
-  const p = (pos || '').toUpperCase();
-  if (p === 'D/ST' || p === 'DST') return 'DEF';
-  return p;
+  return normalizeRosterPos(pos);
 }
 
 export function countTeamPositions(players: RankedPlayer[]): Record<string, number> {
@@ -182,14 +181,24 @@ export function applyStarterAwarePoolFilter(
     roundNumber: number;
     numRounds: number;
     teamCounts: Record<string, number>;
+    rosterSize?: number;
   }
 ): RankedPlayer[] {
   if (available.length === 0) return available;
   const starters = opts.starters ?? DEFAULT_STARTERS;
   const draftPct = opts.numRounds > 0 ? opts.roundNumber / opts.numRounds : 0;
+  const rosterSize =
+    opts.rosterSize ??
+    Object.values(opts.teamCounts).reduce((sum, n) => sum + n, 0);
+  const remaining = Math.max(0, opts.numRounds - rosterSize);
+  const needed = starterNeedsFromCounts(opts.teamCounts, starters);
+  const lateForce = needed.length > 0 && remaining <= needed.length;
 
   return available.filter((p) => {
     const pos = normalizePos(p.position);
+    if (lateForce) {
+      return needed.includes(pos);
+    }
     if (!isStarterPos(pos)) return true;
     const need = starters[pos];
 

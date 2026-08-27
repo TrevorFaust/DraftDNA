@@ -418,6 +418,7 @@ const MockDraft = () => {
           K: 1,
           FLEX: isSuperflex ? 2 : 1,
           BENCH: 6,
+          starters: { QB: 1, RB: 2, WR: 2, TE: 1, DEF: 1, K: 1 },
         };
 
         const created = await mpCreateDraft({
@@ -1053,7 +1054,7 @@ const MockDraft = () => {
             </Button>
             {!user && draftMode === 'solo' && (
               <p className="text-xs text-muted-foreground mt-2 text-center">
-                Note: Drafts created without signing in will not be saved when you leave the page.
+                Drafts stay on this device and are not saved to an account.
               </p>
             )}
           </div>

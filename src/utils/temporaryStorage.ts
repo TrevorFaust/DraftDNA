@@ -225,6 +225,7 @@ export const tempSettingsStorage = {
       K?: number;
       DEF?: number;
       BENCH?: number;
+      IR?: number;
       KEEPERS?: number;
       starters?: {
         QB?: number;
@@ -240,6 +241,9 @@ export const tempSettingsStorage = {
     draftOrder?: string;
     scoringFormat?: string;
     leagueType?: string;
+    leagueName?: string;
+    teamNames?: Array<{ team_number: number; team_name: string }>;
+    keepers?: Array<{ team_number: number; player_id: string; round_number: number }>;
   }): void => {
     localStorage.setItem(TEMP_SETTINGS_KEY, JSON.stringify(settings));
   },

@@ -2600,32 +2600,12 @@ const Rankings = () => {
 
   const finalizeRankings = async () => {
     if (!user) {
-      const guestSessionId = getOrCreateGuestSessionId();
-      // Only include players with valid UUIDs (exclude synthetic ids like defense-arizona-cardinals)
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const rankingsPayload = players.filter((p) => uuidRegex.test(p.id)).map((p) => ({ id: p.id }));
-      const { error } = await supabase.rpc('save_guest_rankings', {
-        p_guest_session_id: guestSessionId,
-        p_scoring_format: displayBucket.scoringFormat,
-        p_league_type: displayBucket.leagueType,
-        p_is_superflex: displayBucket.isSuperflex,
-        p_rookies_only: displayBucket.rookiesOnly ?? false,
-        p_rankings: rankingsPayload,
-      });
-      if (error) {
-        console.error('Failed to save guest rankings to community:', error);
-        toast.error('Could not submit rankings to community. Your rankings are saved locally.');
-      }
       tempRankingsStorage.save(players, bucketKey);
       rankingsDraftSessionStorage.clear(rankingsSessionDraftKey);
       void persistPositionTierCuts(positionTierCuts);
       setHasExistingRankings(true);
       setIsEditMode(false);
-      toast.success(
-        error
-          ? 'Rankings saved locally. Sign in to have them count toward community.'
-          : 'Rankings finalized! Your rankings now count toward the community consensus.'
-      );
+      toast.success('Rankings saved on this device. They do not count toward community consensus.');
       return;
     }
 

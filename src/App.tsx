@@ -34,6 +34,9 @@ const Badges = lazy(() => import("./pages/Badges").then((m) => ({ default: m.def
 const NewsTeamDirectory = lazy(() => import("./pages/NewsTeamDirectory"));
 const NewsTeamWeeklies = lazy(() => import("./pages/NewsTeamWeeklies"));
 const NewsTeamIssue = lazy(() => import("./pages/NewsTeamIssue"));
+const LeagueRanker = lazy(() => import("./pages/LeagueRanker"));
+const Pickem = lazy(() => import("./pages/Pickem"));
+const JoinLeague = lazy(() => import("./pages/JoinLeague"));
 
 function PageFallback() {
   return (
@@ -95,6 +98,9 @@ const App = () => (
                     <Route path="/prediction-challenge" element={<PredictionChallenge />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/league-settings" element={<LeagueSettings />} />
+                    <Route path="/league-ranker" element={<Suspense fallback={<PageFallback />}><LeagueRanker /></Suspense>} />
+                    <Route path="/pickem" element={<Suspense fallback={<PageFallback />}><Pickem /></Suspense>} />
+                    <Route path="/join/:inviteCode" element={<Suspense fallback={<PageFallback />}><JoinLeague /></Suspense>} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </main>

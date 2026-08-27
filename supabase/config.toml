@@ -15,3 +15,7 @@ verify_jwt = false
 # Pick Six first-time rules flow (and any caller): verification uses Google siteverify + RECAPTCHA_SECRET_KEY.
 [functions.verify-recaptcha]
 verify_jwt = false
+
+# NFL scoreboard sync for weekly pick'em. Auth is checked inside the function.
+[functions.sync-nfl-scoreboard]
+verify_jwt = false

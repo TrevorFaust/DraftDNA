@@ -42,9 +42,17 @@ import {
 } from '@/utils/communityRankingsMerge';
 import { deduplicatePlayersByIdentity, mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
 import { fetchMergedPlayerPool } from '@/utils/playerPoolFetch';
+import { mergeMissingRankedPlayers } from '@/utils/fetchPlayersByIds';
 import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { useStickScrollToBottom } from '@/hooks/useStickScrollToBottom';
 import { selectCpuPick, assignRandomNamedArchetypesForDraft } from '@/utils/cpuDraftLogic';
+import { countTeamPositions } from '@/utils/cpuStarterNeeds';
+import {
+  mpCanDraftPosition,
+  mpNormalizePos,
+  mpStarterNeeds,
+  selectNeedAwareBpa,
+} from '@/utils/multiplayerDraftMath';
 import {
   detectArchetypeName,
   detectArchetypeIndex,
@@ -74,6 +82,7 @@ import {
   getBenchCount,
   getFlexCount,
   getPositionMax,
+  getRosterRounds,
   parseStarters,
   toNumericPositionLimits,
 } from '@/utils/rosterSlots';
@@ -205,6 +214,9 @@ const DraftRoom = () => {
     try {
       let draftData: MockDraft;
       let existingPicks: DraftPick[] = [];
+      let loadedKeepers: Array<{ team_number: number; player_id: string; round_number: number }> = [];
+      let limitsForRounds: Parameters<typeof getRosterRounds>[0] = { BENCH: 6 };
+      let superflexForRounds = false;
 
       // Check if this is a temporary draft
       if (isTempDraft) {
@@ -221,11 +233,28 @@ const DraftRoom = () => {
         const tempSettings = tempSettingsStorage.get();
         if (tempSettings) {
           if (tempSettings.positionLimits) {
+            limitsForRounds = tempSettings.positionLimits;
             setPositionLimits(tempSettings.positionLimits);
           }
           if (tempSettings.isSuperflex !== undefined) {
+            superflexForRounds = !!tempSettings.isSuperflex;
             setIsSuperflex(tempSettings.isSuperflex);
           }
+          if (Array.isArray(tempSettings.teamNames)) {
+            const namesMap = new Map<number, string>();
+            tempSettings.teamNames.forEach((team: { team_number: number; team_name: string }) => {
+              if (team.team_name) namesMap.set(team.team_number, team.team_name);
+            });
+            setTeamNames(namesMap);
+          }
+          if (Array.isArray(tempSettings.keepers) && tempSettings.keepers.length > 0) {
+            loadedKeepers = tempSettings.keepers;
+            setKeepers(tempSettings.keepers);
+          } else {
+            setKeepers([]);
+          }
+        } else {
+          setKeepers([]);
         }
       } else {
         // Fetch draft from database (requires user)
@@ -283,10 +312,12 @@ const DraftRoom = () => {
             DEF?: number;
             BENCH?: number;
           };
+          limitsForRounds = leagueData.position_limits;
           setPositionLimits(limits);
         }
         
         if (leagueData?.is_superflex !== undefined) {
+          superflexForRounds = !!leagueData.is_superflex;
           setIsSuperflex(leagueData.is_superflex as boolean);
         }
 
@@ -315,11 +346,12 @@ const DraftRoom = () => {
           .order('team_number')
           .order('round_number');
         if (keepersData && keepersData.length > 0) {
+          loadedKeepers = keepersData;
           setKeepers(keepersData);
         } else {
           setKeepers([]);
         }
-      } else {
+      } else if (!isTempDraft) {
         setKeepers([]);
       }
 
@@ -622,8 +654,29 @@ const DraftRoom = () => {
       }
 
       let finalNumRounds = draftWithDefaults.num_rounds;
-      if (finalNumRounds > maxRoundsByLoadedPool) {
-        finalNumRounds = maxRoundsByLoadedPool;
+      if (isRookiesOnly) {
+        if (finalNumRounds > maxRoundsByLoadedPool) {
+          finalNumRounds = maxRoundsByLoadedPool;
+        }
+      } else {
+        const rosterRounds = getRosterRounds(limitsForRounds, superflexForRounds);
+        if (maxRoundsByLoadedPool < rosterRounds) {
+          toast.error(
+            `Not enough players in the pool (${poolSize}) for ${numTeamsCap} teams to fill a ${rosterRounds}-round roster.`
+          );
+          setLoading(false);
+          navigate('/mock-draft');
+          return;
+        }
+        if (finalNumRounds < rosterRounds) {
+          finalNumRounds = rosterRounds;
+        }
+        if (finalNumRounds > maxRoundsByLoadedPool) {
+          finalNumRounds = maxRoundsByLoadedPool;
+        }
+      }
+
+      if (finalNumRounds !== draftWithDefaults.num_rounds) {
         if (isTempDraft) {
           const stored = tempDraftStorage.getDraft(draftId!);
           if (stored) {
@@ -644,10 +697,15 @@ const DraftRoom = () => {
         );
       }
 
+      const playersWithPicks = await mergeMissingRankedPlayers(sortedRankedPlayers, [
+        ...loadedPicks.map((p) => p.player_id),
+        ...loadedKeepers.map((k) => k.player_id),
+      ]);
+
       setDraft(finalDraft);
       setDraftBucket(draftBucket);
       setDraftLeagueId((draftData as { league_id?: string | null }).league_id ?? null);
-      setPlayers(sortedRankedPlayers);
+      setPlayers(playersWithPicks);
       setPicks(loadedPicks);
       setCurrentPick(loadedPicks.length + 1);
     } catch (error: any) {
@@ -794,6 +852,30 @@ const DraftRoom = () => {
       return false; // Reached position limit (applies to both starters and bench)
     }
 
+    if (draft && !isRookiesOnlyDraft) {
+      const counts = countTeamPositions(draftedPlayers);
+      if (opts && keepers.length > 0) {
+        for (const k of keepers) {
+          if (k.team_number !== opts.teamNumber || k.round_number <= opts.currentRound) continue;
+          const keeperPlayer = players.find((pl) => pl.id === k.player_id);
+          if (!keeperPlayer) continue;
+          const keeperPos = mpNormalizePos(keeperPlayer.position);
+          counts[keeperPos] = (counts[keeperPos] ?? 0) + 1;
+        }
+      }
+      if (
+        !mpCanDraftPosition({
+          position: pos,
+          positionCounts: counts,
+          rosterSize: draftedPlayers.length,
+          numRounds: draft.num_rounds,
+          positionLimits: positionLimits as Record<string, number | undefined>,
+        })
+      ) {
+        return false;
+      }
+    }
+
     const startingSlots = getStartingSlots();
     const benchCount = getBenchCount(positionLimits);
 
@@ -807,18 +889,17 @@ const DraftRoom = () => {
       // In superflex, only one FLEX slot can hold a QB; once we've placed a QB in a FLEX, treat remaining FLEX as RB/WR/TE only
       const effectivePositions = isFlexSlot && isSuperflex && qbPlacedInFlex
         ? ['RB', 'WR', 'TE']
-        : slot.positions.map(p => (p === 'D/ST' ? 'DEF' : p.toUpperCase()));
+        : slot.positions.map((slotPos) => mpNormalizePos(slotPos));
       const canAcceptPosition = effectivePositions.includes(pos);
 
       const availablePlayer = draftedPlayers.find((p) => {
         if (assignedPlayerIds.has(p.id)) return false;
-        const pPos = p.position === 'D/ST' ? 'DEF' : p.position.toUpperCase();
-        return effectivePositions.includes(pPos);
+        return effectivePositions.includes(mpNormalizePos(p.position));
       });
 
       if (availablePlayer) {
         assignedPlayerIds.add(availablePlayer.id);
-        if (isFlexSlot && (availablePlayer.position === 'QB' || availablePlayer.position === 'qb')) {
+        if (isFlexSlot && mpNormalizePos(availablePlayer.position) === 'QB') {
           qbPlacedInFlex = true;
         }
       } else if (canAcceptPosition) {
@@ -976,7 +1057,14 @@ const DraftRoom = () => {
       if (limit !== undefined && currentCount >= limit) {
         toast.error(`You have reached the limit for ${playerPos} (${limit} players)`);
       } else {
-        toast.error(`You have no more roster spots available for ${playerPos}`);
+        const remaining = draft.num_rounds - userDraftedPlayers.length;
+        const needCounts = countTeamPositions(userDraftedPlayers);
+        const needed = mpStarterNeeds(needCounts, positionLimits);
+        if (needed.length > 0 && remaining <= needed.length && !needed.includes(playerPos)) {
+          toast.error(`You still need ${needed.join(', ')} before the draft ends`);
+        } else {
+          toast.error(`You have no more roster spots available for ${playerPos}`);
+        }
       }
       return;
     }
@@ -1106,6 +1194,11 @@ const DraftRoom = () => {
         const teamDraftedPlayers = teamPicks
           .map((pick) => players.find((p) => p.id === pick.player_id))
           .filter((p): p is RankedPlayer => !!p);
+        const futureKeeperPlayers = keepers
+          .filter((k) => k.team_number === currentTeam && k.round_number > currentRound)
+          .map((k) => players.find((pl) => pl.id === k.player_id))
+          .filter((p): p is RankedPlayer => !!p);
+        const teamRosterForNeeds = [...teamDraftedPlayers, ...futureKeeperPlayers];
         
         // Filter out players where this team has no available roster spots (account for future keepers)
         const spotOpts = { teamNumber: currentTeam, currentRound: getCurrentRound() };
@@ -1136,14 +1229,19 @@ const DraftRoom = () => {
         // If no players available after filtering by position limits, allow drafting any available player
         // This prevents the draft from getting stuck in large leagues where position limits might be restrictive
         if (available.length === 0) {
-          console.warn('No available players matching position limits, falling back to any available player');
-          // Fallback: allow drafting any undrafted player to prevent draft from stalling
-          const draftedIds = new Set(picks.map((p) => p.player_id));
-          available = players
-            .filter((p) => p && p.id && !draftedIds.has(p.id))
+          console.warn('No available players matching position limits, falling back to need-aware pool');
+          const draftedIdsFallback = new Set(picks.map((p) => p.player_id));
+          const unfiltered = players
+            .filter((p) => p && p.id && !draftedIdsFallback.has(p.id) && !keeperIds.has(p.id))
             .sort((a, b) => a.rank - b.rank);
+          const needPick = selectNeedAwareBpa(unfiltered, {
+            positionCounts: countTeamPositions(teamRosterForNeeds),
+            rosterSize: teamDraftedPlayers.length,
+            numRounds: draft.num_rounds,
+            positionLimits,
+          });
+          available = needPick ? [needPick, ...unfiltered.filter((p) => p.id !== needPick.id)] : unfiltered;
           
-          // If still no players available, the draft is truly stuck (all players drafted)
           if (available.length === 0) {
             console.error('No players available at all - draft may be complete or stuck');
             setIsDrafting(false);
@@ -1166,7 +1264,7 @@ const DraftRoom = () => {
           roundNumber: getCurrentRound(),
           numRounds: draft.num_rounds,
           numTeams: draft.num_teams,
-          teamDraftedPlayers,
+          teamDraftedPlayers: teamRosterForNeeds,
           positionLimits: toNumericPositionLimits(positionLimits),
           scoringFormat: (draft as any).scoring_format,
           pickNumber: currentPick,
@@ -1456,7 +1554,17 @@ const DraftRoom = () => {
         return;
       }
       
-      const topPlayer = available[0];
+      const futureKeepers = keepers
+        .filter((k) => k.team_number === draft.user_pick_position && k.round_number > getCurrentRound())
+        .map((k) => players.find((pl) => pl.id === k.player_id))
+        .filter((p): p is RankedPlayer => !!p);
+      const rosterForNeeds = [...userDraftedPlayersForAuto, ...futureKeepers];
+      const topPlayer = selectNeedAwareBpa(available, {
+        positionCounts: countTeamPositions(rosterForNeeds),
+        rosterSize: userDraftedPlayersForAuto.length,
+        numRounds: draft.num_rounds,
+        positionLimits,
+      }) ?? available[0];
       toast.info(`Time's up! Auto-drafting ${topPlayer.name}`);
       
       await handleUserDraft(topPlayer, true);
@@ -1514,30 +1622,24 @@ const DraftRoom = () => {
     userPositionCounts[pos] = (userPositionCounts[pos] || 0) + 1;
   });
 
-  // Check if a team has a complete roster (all starting positions filled)
+  // Check if a team has a complete roster (all starting positions filled with real players)
   const isTeamRosterComplete = (teamNumber: number): boolean => {
+    if (!draft) return false;
     const teamPicks = picks.filter((p) => p.team_number === teamNumber);
+    if (isRookiesOnlyDraft) {
+      return teamPicks.length >= draft.num_rounds && teamPicks.every((p) => players.some((pl) => pl.id === p.player_id));
+    }
     const teamDraftedPlayers = teamPicks
       .map((pick) => players.find((p) => p.id === pick.player_id))
       .filter((p): p is RankedPlayer => !!p);
+    if (teamDraftedPlayers.length !== teamPicks.length) return false;
 
     const teamStartingSlots = getStartingSlots();
-    const teamAssignedPlayerIds = new Set<string>();
-    const teamFilledSlots: boolean[] = [];
-
-    teamStartingSlots.forEach((slot) => {
-      const availablePlayer = teamDraftedPlayers.find(
-        (p) => slot.positions.includes(p.position) && !teamAssignedPlayerIds.has(p.id)
-      );
-      if (availablePlayer) {
-        teamAssignedPlayerIds.add(availablePlayer.id);
-        teamFilledSlots.push(true);
-      } else {
-        teamFilledSlots.push(false);
-      }
+    const benchCount = getBenchCount(positionLimits);
+    const { filledSlots } = fillDraftTeamLineup(teamDraftedPlayers, teamStartingSlots, benchCount, {
+      isSuperflex,
     });
-
-    return teamFilledSlots.every(filled => filled);
+    return filledSlots.length === teamStartingSlots.length && filledSlots.every((p) => p != null);
   };
 
   // Check if all teams have complete rosters
@@ -1607,7 +1709,7 @@ const DraftRoom = () => {
       : undefined;
     return availablePlayers.filter((p) => {
       if (positionFilter !== 'ALL') {
-        const playerPos = p.position === 'D/ST' ? 'DEF' : p.position;
+        const playerPos = mpNormalizePos(p.position);
         if (playerPos !== positionFilter) return false;
       }
       const matchesSearch =
@@ -1631,6 +1733,12 @@ const DraftRoom = () => {
     userDraftedPlayers,
     isRookiesOnlyDraft,
   ]);
+
+  useEffect(() => {
+    if (positionFilter === 'ALL' || !draft) return;
+    const stillOpen = filteredPlayers.some((p) => mpNormalizePos(p.position) === positionFilter);
+    if (!stillOpen) setPositionFilter('ALL');
+  }, [draft, positionFilter, filteredPlayers]);
 
   const personalMetaById = personalBoard?.metaById;
   const visibleBoardRank = (p: RankedPlayer) => {
@@ -1967,6 +2075,9 @@ const DraftRoom = () => {
   // Handle showing completion screen when draft was already completed
   useEffect(() => {
     if (!draft || picks.length < totalPicks || totalPicks <= 0 || draft.status === 'completed') return;
+    if (!isRookiesOnlyDraft && !areAllTeamsComplete()) {
+      console.warn('Draft pick count reached with unfilled starter slots');
+    }
     const flexCount = getFlexCount(positionLimits, isSuperflex);
     const benchCount = getBenchCount(positionLimits);
     const baseStarters = countBaseStarters(parseStarters(positionLimits));
@@ -2668,7 +2779,7 @@ const DraftRoom = () => {
             )}
             {!user && (
               <p className="mb-1 text-[11px] text-muted-foreground px-0.5 shrink-0 leading-snug line-clamp-2 sm:line-clamp-none">
-                Guest board uses Consensus unless you pick another board. Sign in for your personal rankings.
+                Your board uses rankings from this device if you finalized them; otherwise Consensus.
               </p>
             )}
 

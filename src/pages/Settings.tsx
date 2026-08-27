@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Palette, HelpCircle, MessageSquare, User, Mail, ArrowLeft, Trophy, Plus, Trash2, GripVertical, Lock, Eye, EyeOff, AlertTriangle, Database } from 'lucide-react';
+import { Bell, Palette, HelpCircle, MessageSquare, User, Mail, ArrowLeft, Trophy, Plus, Trash2, GripVertical, Lock, Eye, EyeOff, AlertTriangle, Database, LogOut } from 'lucide-react';
 import { SyncPlayersButton } from '@/components/admin/SyncPlayersButton';
 import { isSyncAdminUser } from '@/constants/adminSync';
 import { BrandedLoader } from '@/components/BrandedLoader';
@@ -56,6 +56,8 @@ import { Tables } from '@/integrations/supabase/types';
 import { useRampUpAutoScroll } from '@/hooks/useRampUpAutoScroll';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
 import { SUPPORT_EMAIL, supportMailto } from '@/constants/contest';
+import { leagueLeave } from '@/utils/leagueSocialApi';
+import { isLeagueOwner } from '@/utils/leagueAccess';
 
 type League = Tables<'leagues'>;
 
@@ -150,6 +152,7 @@ const Settings = () => {
   const [newLeagueRookiesOnly, setNewLeagueRookiesOnly] = useState(false);
   const [isCreatingLeague, setIsCreatingLeague] = useState(false);
   const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null);
+  const [leavingLeagueId, setLeavingLeagueId] = useState<string | null>(null);
   const [orderedLeagues, setOrderedLeagues] = useState<League[]>([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const yourLeaguesScrollRef = useRef<HTMLDivElement | null>(null);
@@ -210,9 +213,9 @@ const Settings = () => {
 
   // Initialize ordered leagues when leagues change
   useEffect(() => {
-    if (leagues.length > 0) {
-      // Sort leagues by display_order, then by created_at as fallback
-      const sorted = [...leagues].sort((a, b) => {
+    const owned = user ? leagues.filter((l) => isLeagueOwner(l, user.id)) : leagues;
+    if (owned.length > 0) {
+      const sorted = [...owned].sort((a, b) => {
         const orderA = a.display_order ?? (a.created_at ? new Date(a.created_at).getTime() : 0);
         const orderB = b.display_order ?? (b.created_at ? new Date(b.created_at).getTime() : 0);
         return orderA - orderB;
@@ -221,7 +224,7 @@ const Settings = () => {
     } else {
       setOrderedLeagues([]);
     }
-  }, [leagues]);
+  }, [leagues, user]);
 
   const handleSaveUsername = async () => {
     if (!user?.id) return;
@@ -599,6 +602,31 @@ const Settings = () => {
     }
   };
 
+  const handleLeaveLeague = async (leagueId: string, leagueName: string) => {
+    setLeavingLeagueId(leagueId);
+    try {
+      const isCurrentlySelected = selectedLeague?.id === leagueId;
+      await leagueLeave(leagueId);
+      toast({
+        title: 'Left league',
+        description: `You left ${leagueName}`,
+      });
+      if (isCurrentlySelected) {
+        setSelectedLeague(null);
+        localStorage.setItem('selectedLeagueId', 'null');
+      }
+      await refreshLeagues();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: userFacingErrorMessage(error, "Couldn't leave that league."),
+        variant: 'destructive',
+      });
+    } finally {
+      setLeavingLeagueId(null);
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -622,7 +650,7 @@ const Settings = () => {
             variant: 'destructive',
           });
           // Revert to original order
-          setOrderedLeagues(leagues);
+          setOrderedLeagues(user ? leagues.filter((l) => isLeagueOwner(l, user.id)) : leagues);
           return;
         }
 
@@ -652,7 +680,7 @@ const Settings = () => {
           variant: 'destructive',
         });
         // Revert to original order on error
-        setOrderedLeagues(leagues);
+        setOrderedLeagues(user ? leagues.filter((l) => isLeagueOwner(l, user.id)) : leagues);
       } finally {
         setIsSavingOrder(false);
       }
@@ -722,13 +750,13 @@ const Settings = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="w-5 h-5 text-primary" />
-                  Sign In for Full Features
+                  Sign in to keep your work
                 </CardTitle>
-                <CardDescription>Create an account to access all settings and save your data</CardDescription>
+                <CardDescription>Account settings, password, and saved leagues live here</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Sign in to access league management, account settings, and more. Your current settings will not be saved.
+                  Guests can rank, draft, and view stats on this device. Sign in to keep that data on your account and across devices.
                 </p>
                 <Button onClick={() => navigate('/auth')} className="w-full sm:w-auto">
                   Sign In
@@ -998,6 +1026,42 @@ const Settings = () => {
                   </DndContext>
                 )}
               </div>
+
+              {user && leagues.some((l) => !isLeagueOwner(l, user.id)) && (
+                <div className="space-y-3 pt-2">
+                  <Separator />
+                  <h4 className="font-medium">Joined leagues</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Leagues someone invited you to. You can leave anytime; that does not delete their league.
+                  </p>
+                  <div className="space-y-2">
+                    {leagues
+                      .filter((l) => !isLeagueOwner(l, user.id))
+                      .map((league) => (
+                        <div
+                          key={league.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-secondary/30 px-3 py-2.5"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{league.name}</p>
+                            <p className="text-xs text-muted-foreground">{league.num_teams} teams</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            disabled={leavingLeagueId === league.id}
+                            onClick={() => void handleLeaveLeague(league.id, league.name)}
+                          >
+                            <LogOut className="h-4 w-4" />
+                            Leave
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
           )}

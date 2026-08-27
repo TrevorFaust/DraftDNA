@@ -8,7 +8,7 @@ import { Navbar } from '@/components/Navbar';
 import { PlayerDetailDialog } from '@/components/PlayerDetailDialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { BarChart3, Lock, HelpCircle } from 'lucide-react';
+import { BarChart3, HelpCircle } from 'lucide-react';
 import type { RankedPlayer, Player, MockDraft, DraftPick } from '@/types/database';
 import { tempDraftStorage, tempRankingsStorage, getOrCreateGuestSessionId, getRankingsDraftSessionStorageKey, rankingsDraftSessionStorage, allLeaguesBucketStorage } from '@/utils/temporaryStorage';
 import { mergeRankingsWithDraftOrder } from '@/utils/rankingsCommunityMerge';
@@ -1552,22 +1552,7 @@ const Statistics = () => {
 
                 return (
                   <div className="space-y-3 relative">
-                    {/* Blur overlay for guests when viewing specific rounds */}
-                    {!user && (
-                      <div className="absolute inset-0 bg-background/60 backdrop-blur-sm z-20 rounded-lg flex items-center justify-center">
-                        <div className="text-center p-6 bg-card/90 rounded-lg shadow-xl border border-primary/30 max-w-sm mx-auto">
-                          <Lock className="w-12 h-12 mx-auto mb-4 text-primary" />
-                          <h3 className="font-display text-xl mb-2">Sign In to View Round-by-Round Stats</h3>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Round-by-round breakdowns are available for signed-in users. Sign in to unlock detailed statistics for each round.
-                          </p>
-                          <Button variant="hero" onClick={() => navigate('/auth')} className="w-full">
-                            Sign In to Unlock
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    <div className={cn("space-y-3", !user && "opacity-50 pointer-events-none")}>
+                    <div className="space-y-3">
                       <p className="text-sm text-muted-foreground mb-4">
                         Most drafted players in Round {round}
                         {isAllLeagues ? ' (all leagues)' : ` (${selectedLeague?.name || 'league'})`}
@@ -1939,22 +1924,7 @@ const Statistics = () => {
 
                 return (
                   <div className="space-y-3 relative">
-                    {/* Blur overlay for guests when viewing specific rounds */}
-                    {!user && (
-                      <div className="absolute inset-0 bg-background/60 backdrop-blur-sm z-20 rounded-lg flex items-center justify-center">
-                        <div className="text-center p-6 bg-card/90 rounded-lg shadow-xl border border-primary/30 max-w-sm mx-auto">
-                          <Lock className="w-12 h-12 mx-auto mb-4 text-primary" />
-                          <h3 className="font-display text-xl mb-2">Sign In to View Round-by-Round Stats</h3>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Round-by-round breakdowns are available for signed-in users. Sign in to unlock detailed statistics for each round.
-                          </p>
-                          <Button variant="hero" onClick={() => navigate('/auth')} className="w-full">
-                            Sign In to Unlock
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    <div className={cn("space-y-3", !user && "opacity-50 pointer-events-none")}>
+                    <div className="space-y-3">
                       <p className="text-sm text-muted-foreground mb-4">
                         Players you consistently pass on in Round {round}
                         {isAllLeagues ? ' (all leagues)' : ` (${selectedLeague?.name || 'league'})`}

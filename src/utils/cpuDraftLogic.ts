@@ -34,7 +34,7 @@ import {
   applyStarterLineupNeedToScores,
   countTeamPositions,
 } from '@/utils/cpuStarterNeeds';
-import { DEFAULT_STARTERS, type StarterCounts } from '@/utils/rosterSlots';
+import { DEFAULT_STARTERS, normalizeRosterPos, starterNeedsFromCounts, type StarterCounts } from '@/utils/rosterSlots';
 
 export interface CpuDraftContext {
   roundNumber: number;
@@ -138,12 +138,25 @@ export function selectCpuPick(
   const config = buildDraftConfig(flexSlots, benchSize, context.numTeams, baseStarters);
   const constraints = getHardConstraints(config);
   const teamCounts = countTeamPositions(context.teamDraftedPlayers ?? []);
+  const rosterSize = context.teamDraftedPlayers?.length ?? 0;
+  const remaining = Math.max(0, context.numRounds - rosterSize);
+  const needed = context.rookieFlexDraft ? [] : starterNeedsFromCounts(teamCounts, starters);
+  const lateForce = needed.length > 0 && remaining <= needed.length;
 
   const strategies = resolveStrategies(archetypeIdOrIds);
   const phase = getPhaseIndex(context.roundNumber, config);
   const weights = strategies
     ? getCombinedWeights(strategies, config, context.roundNumber)
     : null;
+
+  // When starter holes would otherwise stay empty, fill them even if DST/K timing
+  // or ADP windows would have preferred a closer skill player.
+  if (lateForce) {
+    const forced = available.filter((p) => needed.includes(normalizeRosterPos(p.position)));
+    if (forced.length > 0) {
+      return [...forced].sort((a, b) => a.rank - b.rank)[0];
+    }
+  }
 
   // Hard: DST not before dstEarliestRound; K only in final round (skipped for rookie flex mocks)
   const filtered = context.rookieFlexDraft
@@ -162,6 +175,7 @@ export function selectCpuPick(
       roundNumber: context.roundNumber,
       numRounds: context.numRounds,
       teamCounts,
+      rosterSize,
     });
     if (starterFiltered.length > 0) pool = starterFiltered;
   }
@@ -209,7 +223,7 @@ export function selectCpuPick(
       roundNumber: context.roundNumber,
       numRounds: context.numRounds,
       numTeams: context.numTeams,
-      rosterSize: context.teamDraftedPlayers?.length ?? 0,
+      rosterSize,
       isSuperflex: context.isSuperflex,
     });
   }

@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MyRoster } from '@/components/MyRoster';
+import { fillDraftTeamLineup } from '@/components/DraftTeamResultDialog';
 import { cn } from '@/lib/utils';
 import { getArchetypeForTeam } from '@/utils/archetypeDetection';
 import { ArchetypeBadge } from '@/components/ArchetypeBadge';
@@ -745,11 +746,18 @@ const History = () => {
   const toggleFavorite = async (draftId: string, currentFavorite: boolean) => {
     if (drafts.find((d) => d.id === draftId)?.isMultiplayer) return;
     try {
-      await supabase
-        .from('mock_drafts')
-        .update({ is_favorite: !currentFavorite })
-        .eq('id', draftId);
-      
+      if (!user || draftId.startsWith('temp_')) {
+        const temp = tempDraftStorage.getDraft(draftId);
+        if (temp) {
+          tempDraftStorage.saveDraft({ ...temp.draft, is_favorite: !currentFavorite }, temp.picks);
+        }
+      } else {
+        await supabase
+          .from('mock_drafts')
+          .update({ is_favorite: !currentFavorite })
+          .eq('id', draftId);
+      }
+
       setDrafts((prev) =>
         prev.map((d) => (d.id === draftId ? { ...d, is_favorite: !currentFavorite } : d))
       );
@@ -873,7 +881,7 @@ const History = () => {
 
   const getLeagueById = (id: string | null) => leagues.find((l) => l.id === id);
 
-  if (authLoading || (user && loading)) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -884,246 +892,6 @@ const History = () => {
     );
   }
 
-  // Show preview/teaser for non-authenticated users
-  if (!user) {
-    // Show temporary drafts if they exist, otherwise show preview
-    const tempDrafts = drafts.filter(d => d.id.startsWith('temp_'));
-    
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <main className="max-w-4xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="font-display text-4xl tracking-wide">DRAFT HISTORY</h1>
-              <p className="text-muted-foreground">View your past mock drafts</p>
-            </div>
-          </div>
-
-          {/* Teaser Banner */}
-          <div className="glass-card p-6 mb-6 bg-gradient-to-r from-primary/10 to-accent/10 border-2 border-primary/20 relative overflow-hidden">
-            <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" />
-            <div className="relative z-10 flex items-center justify-between">
-              <div>
-                <h3 className="font-display text-xl mb-2">Unlock Full Draft History</h3>
-                <p className="text-sm text-muted-foreground">
-                  Sign in to save all your drafts permanently, organize by league, and access advanced analytics
-                </p>
-              </div>
-              <Button variant="hero" onClick={() => navigate('/auth')} className="shrink-0">
-                Sign In to Unlock
-              </Button>
-            </div>
-          </div>
-
-          {/* Show temporary drafts with preview overlay */}
-          {tempDrafts.length > 0 ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Preview: {tempDrafts.length} temporary draft{tempDrafts.length !== 1 ? 's' : ''} (will be saved when you sign in)
-                </p>
-              </div>
-              {tempDrafts.map((draft) => (
-                <div 
-                  key={draft.id} 
-                  className={cn(
-                    "glass-card p-4 relative group",
-                    draft.status === 'completed' ? 'opacity-75' : 'opacity-100 cursor-pointer'
-                  )}
-                  onClick={() => {
-                    if (draft.status === 'in_progress') {
-                      navigate(`/draft/${draft.id}`);
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-display text-xl">{getDraftDisplayName(draft)}</h3>
-                        <span className={cn(
-                          'px-2 py-0.5 rounded text-xs font-medium',
-                          draft.status === 'completed'
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-accent/20 text-accent'
-                        )}>
-                          {draft.status === 'completed' ? 'Completed' : 'In Progress'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {formatDate(draft.created_at)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="w-4 h-4" />
-                          {draft.num_teams} teams
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Layers className="w-4 h-4" />
-                          {draft.num_rounds} rounds
-                        </span>
-                      </div>
-                      {/* User's team preview - same as logged-in view */}
-                      {draft.status === 'completed' && (() => {
-                        const userPicks = getUserTeamPicks(draft);
-                        // Filter to only show picks with valid player data
-                        const picksWithPlayers = userPicks.filter(p => p.player && p.player.name);
-                        
-                        // If we have picks but no player data loaded yet, show a loading message
-                        if (userPicks.length > 0 && picksWithPlayers.length === 0) {
-                          return (
-                            <div className="flex items-center gap-2 mt-3 flex-wrap">
-                              <span className="text-xs text-muted-foreground">Your team:</span>
-                              <span className="text-xs text-muted-foreground">
-                                {userPicks.length} player{userPicks.length !== 1 ? 's' : ''} (loading player data...)
-                              </span>
-                            </div>
-                          );
-                        }
-                        
-                        return picksWithPlayers.length > 0 && (
-                          <div className="flex items-center gap-2 mt-3 flex-wrap">
-                            <span className="text-xs text-muted-foreground">Your team:</span>
-                            {picksWithPlayers.slice(0, 5).map((pick) => (
-                              <div key={pick.id} className="flex items-center gap-1">
-                                <span className="text-xs">{pick.player?.name}</span>
-                                {pick.player?.position && (
-                                  <PositionBadge
-                                    position={pick.player.position}
-                                    className="text-[10px]"
-                                  />
-                                )}
-                              </div>
-                            ))}
-                            {picksWithPlayers.length > 5 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{picksWithPlayers.length - 5} more
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  
-                  {/* Action buttons for guest drafts - positioned in corner to avoid overlay */}
-                  <div className="absolute top-3 right-3 flex items-center gap-2 z-30">
-                    {draft.status === 'in_progress' && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/draft/${draft.id}`);
-                        }}
-                      >
-                        Continue
-                      </Button>
-                    )}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={(e) => e.stopPropagation()}
-                          className="relative z-30"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete "{draft.name}" and all its picks. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => deleteDraft(draft.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                  
-                  {/* Only show overlay for completed drafts - covers ~90% but leaves rightmost 10% for delete button */}
-                  {draft.status === 'completed' && (
-                    <>
-                      {/* Overlay that covers left 90% of the card */}
-                      <div 
-                        className="absolute inset-0 bg-background/40 backdrop-blur-[2px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg z-10 pointer-events-none"
-                        style={{
-                          right: '10%',
-                        }}
-                      >
-                        <div className="pointer-events-auto z-20">
-                          <Button variant="hero" onClick={() => navigate('/auth')} className="shadow-lg">
-                            Sign In to View Full Details
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            /* Preview of what they'll see */
-            <div className="space-y-4">
-              <div className="glass-card p-4 opacity-60 relative">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-display text-xl">My First Mock Draft</h3>
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
-                        Completed
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        Jan 15, 2025
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users className="w-4 h-4" />
-                        12 teams
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Layers className="w-4 h-4" />
-                        15 rounds
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      <span className="text-xs text-muted-foreground">Your team preview:</span>
-                      <span className="text-xs">C.J. Stroud</span>
-                      <PositionBadge position="QB" className="text-[10px]" />
-                      <span className="text-xs">Bijan Robinson</span>
-                      <PositionBadge position="RB" className="text-[10px]" />
-                      <span className="text-xs">+13 more</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center rounded-lg">
-                  <div className="text-center">
-                    <p className="text-sm font-medium mb-2">Preview Mode</p>
-            <Button variant="hero" onClick={() => navigate('/auth')}>
-                      Sign In to View Your Drafts
-            </Button>
-          </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -1136,15 +904,28 @@ const History = () => {
             <div className="text-muted-foreground space-y-0.5">
               <p>
                 {getCompletedDraftsCount()} draft{getCompletedDraftsCount() !== 1 ? 's' : ''} completed
-                {globalSelectedLeague ? ` in ${globalSelectedLeague.name}` : ' across all leagues'}
+                {!user
+                  ? ' on this device'
+                  : globalSelectedLeague
+                    ? ` in ${globalSelectedLeague.name}`
+                    : ' across all leagues'}
               </p>
               {getIncompleteDraftsCount() > 0 && (
                 <p>
                   {getIncompleteDraftsCount()} draft{getIncompleteDraftsCount() !== 1 ? 's' : ''} in progress
-                  {globalSelectedLeague ? ` in ${globalSelectedLeague.name}` : ' across all leagues'}
+                  {!user
+                    ? ' on this device'
+                    : globalSelectedLeague
+                      ? ` in ${globalSelectedLeague.name}`
+                      : ' across all leagues'}
                 </p>
               )}
             </div>
+            {!user && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Drafts on this device are not saved to an account.
+              </p>
+            )}
           </div>
           <Button variant="hero" onClick={() => navigate('/mock-draft')}>
             New Draft
@@ -1371,7 +1152,7 @@ const History = () => {
                     })()}
 
                     {/* Move to league dropdown (solo mocks only) */}
-                    {!draft.isMultiplayer && (
+                    {user && !draft.isMultiplayer && (
                       <div className="mt-3 flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">Move to:</span>
                         <select
@@ -1806,27 +1587,12 @@ const History = () => {
                                 isSuperflex
                               );
                               const benchCount = getBenchCount(draftLeagueSettings?.positionLimits);
-                              const assignedPlayerIds = new Set<string>();
-                              const filledSlots: (Player | null)[] = [];
-                              let qbPlacedInFlex = false;
-                              
-                              startingSlots.forEach((slot) => {
-                                const isFlex = slot.label === 'FLEX';
-                                const effectivePositions = isFlex && isSuperflex && qbPlacedInFlex ? ['RB', 'WR', 'TE'] : slot.positions;
-                                const posMatch = (p: Player) => effectivePositions.includes(p.position);
-                                const availablePlayer = teamPlayers.find(
-                                  (p) => posMatch(p) && !assignedPlayerIds.has(p.id)
-                                );
-                                if (availablePlayer) {
-                                  assignedPlayerIds.add(availablePlayer.id);
-                                  filledSlots.push(availablePlayer);
-                                  if (isFlex && availablePlayer.position === 'QB') qbPlacedInFlex = true;
-                                } else {
-                                  filledSlots.push(null);
-                                }
-                              });
-                              
-                              const benchPlayers = teamPlayers.filter((p) => !assignedPlayerIds.has(p.id));
+                              const { filledSlots, benchPlayers } = fillDraftTeamLineup(
+                                teamPlayers.map((p) => ({ ...p, rank: 0 })),
+                                startingSlots,
+                                benchCount,
+                                { isSuperflex }
+                              );
                               
                               return (
                                 <>

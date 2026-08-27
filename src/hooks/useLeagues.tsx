@@ -160,7 +160,6 @@ export const LeaguesProvider = ({ children }: { children: React.ReactNode }) => 
       const { data, error } = await supabase
         .from('leagues')
         .select('*')
-        .eq('user_id', user.id)
         .order('display_order', { ascending: true, nullsLast: true })
         .order('created_at', { ascending: false });
 
@@ -277,7 +276,6 @@ export const LeaguesProvider = ({ children }: { children: React.ReactNode }) => 
       const { data: refreshedLeagues } = await supabase
         .from('leagues')
         .select('*')
-        .eq('user_id', user.id)
         .order('display_order', { ascending: true, nullsLast: true })
         .order('created_at', { ascending: false });
       

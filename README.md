@@ -16,7 +16,11 @@ Rank and mock without an account if you want to kick the tires. Make one when yo
 
 **Pick Six Challenge.** Pick the top 6 fantasy scorers at each position (QB, RB, WR, TE, K, D/ST) in order. Nail a perfect board and you win $6,000 for that position. Six positions, up to $36,000. Partial-credit scoring and a leaderboard once the season starts. Free to enter. Official rules on the site. Deadline is NFL kickoff, Wednesday September 9, 2026.
 
-**Leagues.** Multiple leagues, custom scoring, lineup slots, position limits, keepers. Guest mode keeps rankings and mocks in the browser until you sign in.
+**Leagues.** Invite friends with a link. Each person claims a team. Shared scoring, lineup slots, keepers. The commissioner can reassign or remove people. Guest mode still keeps rankings and mocks in the browser until you sign in.
+
+**Team Rankings.** Rank every team's rooms, 1st at the top. Paste a full roster or search a player. Members only swap the lineup on the team they claimed.
+
+**Weekly Pick'em.** Pick NFL winners each week and keep a record against the rest of the league.
 
 ## Stack
 
@@ -50,8 +54,9 @@ Data setup: `HOW_TO_SYNC_DATA.md`, `sync_instructions.md`. Pick Six notes: `PICK
 src/
 ├── components/     # UI, PlayerCard, Navbar, Pick Six share card, etc.
 ├── constants/      # Archetypes, scoring, NFL/contest data
+├── features/       # Team Rankings board
 ├── hooks/          # Auth, leagues, community rankings, Pick Six live stats
-├── pages/          # Rankings, MockDraft, DraftRoom, PredictionChallenge, etc.
+├── pages/          # Rankings, MockDraft, DraftRoom, LeagueRanker, Pickem, etc.
 ├── utils/          # CPU draft logic, draft grades, Pick Six scoring
 └── types/          # Database types
 supabase/migrations/  # Schema migrations (apply to your Supabase project)

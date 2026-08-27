@@ -38,6 +38,11 @@ import {
   ChevronRight,
   ChevronLeft,
   Newspaper,
+  Layers,
+  CalendarDays,
+  Medal,
+  ListChecks,
+  Target,
 } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
 import { NewsTeamPicker } from '@/components/news/NewsTeamPicker';
@@ -45,16 +50,33 @@ import { cn } from '@/lib/utils';
 
 type NavItem = { path: string; label: string; icon: LucideIcon };
 
-const navItems: NavItem[] = [
-  { path: '/dashboard', label: 'Home', icon: Home },
+const homeItem: NavItem = { path: '/dashboard', label: 'Home', icon: Home };
+const pickSixItem: NavItem = { path: '/prediction-challenge', label: 'Pick Six', icon: Target };
+const leagueSettingsItem: NavItem = {
+  path: '/league-settings',
+  label: 'League Settings',
+  icon: Settings2,
+};
+const newsItem: NavItem = { path: '/news', label: 'News', icon: Newspaper };
+
+const preSeasonItems: NavItem[] = [
+  { path: '/mock-draft', label: 'Mock Draft', icon: ClipboardList },
   { path: '/rankings', label: 'Rankings', icon: ListOrdered },
   { path: '/players', label: 'Player Stats', icon: Table2 },
   { path: '/statistics', label: 'Draft Stats', icon: BarChart3 },
-  { path: '/mock-draft', label: 'Mock Draft', icon: ClipboardList },
   { path: '/history', label: 'History', icon: History },
   { path: '/badges', label: 'Badges', icon: Award },
-  { path: '/league-settings', label: 'League Settings', icon: Settings2 },
 ];
+
+const inSeasonItems: NavItem[] = [
+  { path: '/pickem', label: "Pick'em", icon: ListChecks },
+  { path: '/league-ranker', label: 'Team Rankings', icon: Medal },
+];
+
+function pathMatches(pathname: string, path: string) {
+  if (path === '/news') return pathname.startsWith('/news');
+  return pathname === path;
+}
 
 function NavTabScrollArea({
   children,
@@ -158,6 +180,25 @@ function useTabLabelsVisible() {
   return tabLabelsVisible;
 }
 
+function NavLinkButton({
+  item,
+  className,
+  current,
+}: {
+  item: NavItem;
+  className: string;
+  current?: boolean;
+}) {
+  return (
+    <Link to={item.path} className="shrink-0">
+      <Button variant="ghost" size="sm" className={className} aria-current={current ? 'page' : undefined}>
+        <item.icon className="h-4 w-4" />
+        <span className="hidden lg:inline">{item.label}</span>
+      </Button>
+    </Link>
+  );
+}
+
 export const Navbar = () => {
   const { user, signOut } = useAuth();
   const { leagues, selectedLeague, setSelectedLeague } = useLeagues();
@@ -165,6 +206,8 @@ export const Navbar = () => {
   const navigate = useNavigate();
   const tabLabelsVisible = useTabLabelsVisible();
   const [tabsOverflow, setTabsOverflow] = useState(false);
+  const [preSeasonMenuOpen, setPreSeasonMenuOpen] = useState(false);
+  const [inSeasonMenuOpen, setInSeasonMenuOpen] = useState(false);
   const showPagesMenu = !tabLabelsVisible && tabsOverflow;
 
   const handleLeagueChange = (leagueId: string) => {
@@ -176,6 +219,7 @@ export const Navbar = () => {
         setSelectedLeague(league);
       }
     }
+    if (location.pathname === '/league-ranker') return;
     navigate('/rankings', { replace: true, state: {} });
   };
 
@@ -184,17 +228,32 @@ export const Navbar = () => {
     navigate('/auth', { replace: true });
   };
 
-  const isActivePath = (path: string) =>
-    path === '/news' ? location.pathname.startsWith('/news') : location.pathname === path;
+  const isActivePath = (path: string) => pathMatches(location.pathname, path);
+  const preSeasonActive = preSeasonItems.some((item) => isActivePath(item.path));
+  const inSeasonActive = inSeasonItems.some((item) => isActivePath(item.path));
 
   const navLinkClass = (path: string) =>
     cn('gap-2', isActivePath(path) && 'bg-secondary text-primary');
+
+  const groupTriggerClass = (active: boolean) =>
+    cn('gap-2', active && 'bg-secondary text-primary');
 
   const menuItemClass = (path: string) =>
     cn(
       'cursor-pointer gap-2',
       isActivePath(path) && 'bg-secondary text-primary focus:bg-secondary focus:text-primary'
     );
+
+  const renderMenuItem = (item: NavItem, className?: string) => (
+    <DropdownMenuItem
+      key={item.path}
+      onClick={() => navigate(item.path)}
+      className={cn(menuItemClass(item.path), className)}
+    >
+      <item.icon className="h-4 w-4" />
+      {item.label}
+    </DropdownMenuItem>
+  );
 
   return (
     <nav className="sticky top-0 z-50 glass-card border-b border-border/50 py-3 pl-5 pr-4 sm:pl-6 sm:pr-5">
@@ -224,33 +283,17 @@ export const Navbar = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 border-border bg-card">
                 <DropdownMenuLabel className="text-xs text-muted-foreground">Go to</DropdownMenuLabel>
-                {navItems.slice(0, 3).map((item) => (
-                  <DropdownMenuItem
-                    key={item.path}
-                    onClick={() => navigate(item.path)}
-                    className={menuItemClass(item.path)}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuItem
-                  onClick={() => navigate('/news')}
-                  className={menuItemClass('/news')}
-                >
-                  <Newspaper className="h-4 w-4" />
-                  News
-                </DropdownMenuItem>
-                {navItems.slice(3).map((item) => (
-                  <DropdownMenuItem
-                    key={item.path}
-                    onClick={() => navigate(item.path)}
-                    className={menuItemClass(item.path)}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </DropdownMenuItem>
-                ))}
+                {renderMenuItem(homeItem)}
+                {renderMenuItem(pickSixItem)}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Pre Season</DropdownMenuLabel>
+                {preSeasonItems.map((item) => renderMenuItem(item, 'pl-4'))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">In Season</DropdownMenuLabel>
+                {inSeasonItems.map((item) => renderMenuItem(item, 'pl-4'))}
+                <DropdownMenuSeparator />
+                {renderMenuItem(newsItem)}
+                {renderMenuItem(leagueSettingsItem)}
                 <DropdownMenuSeparator />
                 {user ? (
                   <>
@@ -308,23 +351,75 @@ export const Navbar = () => {
                 <div className="hidden h-6 w-px shrink-0 bg-border sm:block" />
               </>
             )}
-            {navItems.slice(0, 3).map((item) => (
-              <Link key={item.path} to={item.path} className="shrink-0">
-                <Button variant="ghost" size="sm" className={navLinkClass(item.path)}>
-                  <item.icon className="h-4 w-4" />
-                  <span className="hidden lg:inline">{item.label}</span>
+            <NavLinkButton item={homeItem} className={navLinkClass(homeItem.path)} current={isActivePath(homeItem.path)} />
+            <NavLinkButton item={pickSixItem} className={navLinkClass(pickSixItem.path)} current={isActivePath(pickSixItem.path)} />
+
+            <DropdownMenu open={preSeasonMenuOpen} onOpenChange={setPreSeasonMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={groupTriggerClass(preSeasonActive)}
+                  aria-current={preSeasonActive ? 'true' : undefined}
+                >
+                  <Layers className="h-4 w-4" />
+                  <span className="hidden lg:inline">Pre Season</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
                 </Button>
-              </Link>
-            ))}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52 border-border bg-card">
+                {preSeasonItems.map((item) => (
+                  <DropdownMenuItem
+                    key={item.path}
+                    onClick={() => {
+                      setPreSeasonMenuOpen(false);
+                      navigate(item.path);
+                    }}
+                    className={menuItemClass(item.path)}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu open={inSeasonMenuOpen} onOpenChange={setInSeasonMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={groupTriggerClass(inSeasonActive)}
+                  aria-current={inSeasonActive ? 'true' : undefined}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  <span className="hidden lg:inline">In Season</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52 border-border bg-card">
+                {inSeasonItems.map((item) => (
+                  <DropdownMenuItem
+                    key={item.path}
+                    onClick={() => {
+                      setInSeasonMenuOpen(false);
+                      navigate(item.path);
+                    }}
+                    className={menuItemClass(item.path)}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <NewsTeamPicker />
-            {navItems.slice(3).map((item) => (
-              <Link key={item.path} to={item.path} className="shrink-0">
-                <Button variant="ghost" size="sm" className={navLinkClass(item.path)}>
-                  <item.icon className="h-4 w-4" />
-                  <span className="hidden lg:inline">{item.label}</span>
-                </Button>
-              </Link>
-            ))}
+            <NavLinkButton
+              item={leagueSettingsItem}
+              className={navLinkClass(leagueSettingsItem.path)}
+              current={isActivePath(leagueSettingsItem.path)}
+            />
           </div>
         </NavTabScrollArea>
 

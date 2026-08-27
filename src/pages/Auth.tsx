@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,17 @@ const signUpSchema = z.object({
   });
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [searchParams] = useSearchParams();
+  const nextRaw = searchParams.get('next');
+  const modeRaw = searchParams.get('mode');
+  const nextPath =
+    nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : '/dashboard';
+  const isJoinInvite = nextPath.startsWith('/join/');
+  const [isLogin, setIsLogin] = useState(() => {
+    if (modeRaw === 'signin') return true;
+    if (modeRaw === 'signup' || isJoinInvite) return false;
+    return true;
+  });
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -71,9 +81,9 @@ const Auth = () => {
   useEffect(() => {
     if (authLoading) return;
     if (user && !passwordRecoveryActive) {
-      navigate('/dashboard');
+      navigate(nextPath);
     }
-  }, [user, navigate, authLoading, passwordRecoveryActive]);
+  }, [user, navigate, authLoading, passwordRecoveryActive, nextPath]);
 
   const checkUsernameTaken = useCallback(async (value: string) => {
     const trimmed = value.trim();
@@ -381,7 +391,13 @@ const Auth = () => {
           </div>
           <h1 className="font-display text-4xl tracking-wide text-gradient">Draft DNA</h1>
           <p className="text-muted-foreground mt-2">
-            {isLogin ? 'Welcome back!' : 'Create your account'}
+            {isJoinInvite
+              ? isLogin
+                ? 'Sign in to join the league'
+                : 'Create an account to join the league'
+              : isLogin
+                ? 'Welcome back!'
+                : 'Create your account'}
           </p>
         </div>
 

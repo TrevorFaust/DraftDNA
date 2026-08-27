@@ -1,6 +1,8 @@
 /** Shared snake-draft math for multiplayer drafts (mirrors SQL helpers). */
 
+import type { RankedPlayer } from '@/types/database';
 import {
+  normalizeRosterPos,
   parseStarters,
   starterNeedsFromCounts,
   type PositionLimitsLike,
@@ -26,9 +28,7 @@ export function mpRoundForPick(pickNumber: number, numTeams: number): number {
 }
 
 export function mpNormalizePos(pos: string | null | undefined): string {
-  const p = (pos || '').toUpperCase();
-  if (p === 'D/ST' || p === 'DST' || p === 'DEF') return 'DEF';
-  return p;
+  return normalizeRosterPos(pos);
 }
 
 function resolveStarters(
@@ -82,4 +82,36 @@ export function mpCanDraftPosition(opts: {
   }
 
   return true;
+}
+
+/** Best remaining player that still fits roster rules, filling starter holes first. */
+export function selectNeedAwareBpa(
+  available: RankedPlayer[],
+  opts: {
+    positionCounts: Record<string, number>;
+    rosterSize: number;
+    numRounds: number;
+    positionLimits: Record<string, number | undefined> | PositionLimitsLike | null | undefined;
+  }
+): RankedPlayer | undefined {
+  const limits = (opts.positionLimits ?? {}) as Record<string, number | undefined>;
+  const eligible = available.filter((p) =>
+    mpCanDraftPosition({
+      position: p.position,
+      positionCounts: opts.positionCounts,
+      rosterSize: opts.rosterSize,
+      numRounds: opts.numRounds,
+      positionLimits: limits,
+    })
+  );
+  if (eligible.length === 0) return undefined;
+
+  const needed = mpStarterNeeds(opts.positionCounts, opts.positionLimits as PositionLimitsLike);
+  const remaining = Math.max(0, opts.numRounds - opts.rosterSize);
+  const forced =
+    needed.length > 0 && remaining <= needed.length
+      ? eligible.filter((p) => needed.includes(mpNormalizePos(p.position)))
+      : [];
+  const pool = forced.length > 0 ? forced : eligible;
+  return [...pool].sort((a, b) => (a.rank ?? 9999) - (b.rank ?? 9999))[0];
 }

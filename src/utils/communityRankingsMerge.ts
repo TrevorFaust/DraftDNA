@@ -23,7 +23,7 @@ const SCORING_FALLBACKS: Array<'ppr' | 'half_ppr' | 'standard'> = ['ppr', 'half_
 
 /**
  * Fetch community consensus for a league bucket. CPUs should exclude the drafter's own
- * user_rankings / guest_rankings so opponents draft from league consensus, not your board.
+ * user_rankings so opponents draft from league consensus, not your board.
  */
 export async function fetchCommunityRankingsForDraft(
   supabase: SupabaseClient,

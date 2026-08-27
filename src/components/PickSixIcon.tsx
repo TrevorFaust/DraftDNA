@@ -7,7 +7,10 @@ type PickSixIconProps = {
   decorative?: boolean;
 };
 
-export function PickSixIcon({ className, decorative = true }: PickSixIconProps) {
+export function PickSixIcon({
+  className,
+  decorative = true,
+}: PickSixIconProps) {
   return (
     <img
       src={PICK_SIX_ICON_PATH}

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { displayTeamAbbrevOrFa } from '@/utils/teamMapping';
 import type { DraftGradeResult } from '@/utils/draftGrade';
 import type { RankedPlayer } from '@/types/database';
+import { normalizeRosterPos } from '@/utils/rosterSlots';
 
 export type DraftTeamSlot = { label: string; positions: string[] };
 
@@ -18,8 +19,8 @@ export type FillDraftTeamLineupOptions = {
 };
 
 function playerMatchesSlotPositions(player: RankedPlayer, positions: string[]): boolean {
-  const pos = player.position === 'D/ST' ? 'DEF' : player.position;
-  return positions.includes(player.position) || positions.includes(pos);
+  const pos = normalizeRosterPos(player.position);
+  return positions.some((slotPos) => normalizeRosterPos(slotPos) === pos);
 }
 
 /**
@@ -56,7 +57,7 @@ export function fillDraftTeamLineup(
     if (availablePlayer) {
       assignedPlayerIds.add(availablePlayer.id);
       filledSlots.push(availablePlayer);
-      if (isFlex && availablePlayer.position.toUpperCase() === 'QB') {
+      if (isFlex && normalizeRosterPos(availablePlayer.position) === 'QB') {
         qbPlacedInFlex = true;
       }
     } else {
