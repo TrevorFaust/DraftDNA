@@ -55,7 +55,7 @@ export function Board({
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <h2 className="font-display text-3xl tracking-wide">The board</h2>
         <p className="max-w-sm text-xs text-muted-foreground">
-          {formula} − gut bump. Lower total wins; tied totals share a place; WR room is the tie-break.
+          {formula} − gut bump. Lower total wins. Equal totals go to the better RB room.
         </p>
       </div>
       <ol className="grid gap-2">
@@ -105,7 +105,7 @@ export function Board({
                 </div>
                 {row.tied ? (
                   <p className="mt-1 text-xs uppercase tracking-wide text-accent sm:pl-[3.75rem]">
-                    Tied on total · WR {formatPlace(row.roomPlace.WR)}
+                    Tied on total · RB {formatPlace(row.roomPlace.RB)}
                   </p>
                 ) : null}
               </button>

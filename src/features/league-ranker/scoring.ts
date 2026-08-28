@@ -101,14 +101,13 @@ export function scoreLeague(league: League): ScoredTeam[] {
 
   scored.sort((a, b) => {
     if (a.total !== b.total) return a.total - b.total
-    if (a.roomPoints.WR !== b.roomPoints.WR) return a.roomPoints.WR - b.roomPoints.WR
+    if (a.roomPoints.RB !== b.roomPoints.RB) return a.roomPoints.RB - b.roomPoints.RB
     return a.team.name.localeCompare(b.team.name)
   })
 
-  const ranks = competitionPlaces(scored.map((row) => row.total))
   scored.forEach((row, i) => {
-    row.rank = ranks[i]
-    row.tied = scored.filter((other) => other.total === row.total).length > 1
+    row.rank = i + 1
+    row.tied = scored.some((other) => other.team.id !== row.team.id && other.total === row.total)
   })
 
   return scored

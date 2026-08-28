@@ -303,7 +303,7 @@ function RankerBoard({
       ) : null}
 
       <div className="grid min-h-0 gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="rounded-lg border border-border/60 bg-card/40 p-4 max-h-[min(75dvh,720px)] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
+        <div className="rounded-lg border border-border/60 bg-card/40 p-4 overflow-x-hidden pr-2 scrollbar-thin lg:max-h-[min(75dvh,720px)] lg:overflow-y-auto">
           <Board
             board={api.board}
             weights={api.league.weights}
@@ -321,7 +321,8 @@ function RankerBoard({
             onSwapLineup={api.swapLineup}
           />
         </div>
-        <div className="rounded-lg border border-border/60 bg-card/40 p-4 max-h-[min(75dvh,720px)] overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin">
+        <div className="rounded-lg border border-border/60 bg-card/40 p-4 overflow-x-hidden pr-2 scrollbar-thin lg:max-h-[min(75dvh,720px)] lg:overflow-y-auto">
+
           <Tabs value={panel} onValueChange={(value) => setPanel(value as Panel)}>
             <TabsList
               className={cn('mb-3 grid w-full', canManageRosters ? 'grid-cols-3' : 'grid-cols-2')}
