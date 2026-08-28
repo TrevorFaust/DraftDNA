@@ -1,15 +1,60 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { LeagueInvitePreview, LeagueJoinResult, LeagueMember, LeagueSeat } from '@/types/leagueSocial';
+import type {
+  LeagueInvitePreview,
+  LeagueJoinResult,
+  LeagueMember,
+  LeagueMemberRole,
+  LeagueSeat,
+} from '@/types/leagueSocial';
+
+function asJsonArray(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && ('user_id' in data || 'team_number' in data)) {
+    return [data];
+  }
+  if (typeof data === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : asJsonArray(parsed);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function asUserId(value: unknown): string | null {
+  if (typeof value === 'string' && value.length > 0) return value;
+  return null;
+}
+
+function asTeamNumber(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
 
 function asSeats(data: unknown): LeagueSeat[] {
-  if (!Array.isArray(data)) return [];
-  return data.map((row) => {
+  return asJsonArray(data).map((row) => {
     const item = row as Record<string, unknown>;
     return {
       team_number: Number(item.team_number),
       team_name: String(item.team_name ?? `Team ${item.team_number}`),
-      user_id: typeof item.user_id === 'string' ? item.user_id : null,
+      user_id: asUserId(item.user_id),
       username: typeof item.username === 'string' ? item.username : null,
+    };
+  });
+}
+
+function asMembers(data: unknown): LeagueMember[] {
+  return asJsonArray(data).map((row) => {
+    const item = row as Record<string, unknown>;
+    return {
+      user_id: asUserId(item.user_id) ?? '',
+      username: String(item.username ?? 'Member'),
+      role: item.role === 'owner' ? 'owner' : 'member',
+      joined_at: String(item.joined_at ?? ''),
+      team_number: asTeamNumber(item.team_number),
     };
   });
 }
@@ -35,7 +80,47 @@ export async function leagueListMembers(leagueId: string): Promise<LeagueMember[
     p_league_id: leagueId,
   });
   if (error) throw error;
-  return (data ?? []) as LeagueMember[];
+  return asMembers(data);
+}
+
+export async function leagueMyMembership(
+  leagueId: string,
+  userId: string,
+): Promise<{ team_number: number | null; role: LeagueMemberRole } | null> {
+  try {
+    const { data, error } = await supabase.rpc('league_my_seat' as never, {
+      p_league_id: leagueId,
+    });
+    if (!error && data && typeof data === 'object') {
+      const row = data as Record<string, unknown>;
+      return {
+        team_number: asTeamNumber(row.team_number),
+        role: row.role === 'owner' ? 'owner' : 'member',
+      };
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
+  try {
+    const me = (await leagueListMembers(leagueId)).find((member) => member.user_id === userId);
+    if (me) return { team_number: me.team_number, role: me.role };
+  } catch (err) {
+    console.error(err);
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('league_members')
+    .select('team_number, role')
+    .eq('league_id', leagueId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    team_number: asTeamNumber(data.team_number),
+    role: data.role === 'owner' ? 'owner' : 'member',
+  };
 }
 
 export async function leagueAddMemberByUsername(
@@ -108,6 +193,19 @@ export async function leagueListSeats(leagueId: string): Promise<LeagueSeat[]> {
   });
   if (error) throw error;
   return asSeats(data);
+}
+
+export async function leagueSetTeamName(
+  leagueId: string,
+  teamNumber: number,
+  teamName: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('league_set_team_name' as never, {
+    p_league_id: leagueId,
+    p_team_number: teamNumber,
+    p_team_name: teamName,
+  });
+  if (error) throw error;
 }
 
 export async function leaguePreviewInvite(code: string): Promise<LeagueInvitePreview> {

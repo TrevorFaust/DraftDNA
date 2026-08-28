@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +23,8 @@ import { BrandedLoader } from '@/components/BrandedLoader';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
 import { LeagueMembersPanel } from '@/components/league/LeagueMembersPanel';
 import { isLeagueOwner } from '@/utils/leagueAccess';
+import { leagueListSeats, leagueMyMembership, leagueSetTeamName } from '@/utils/leagueSocialApi';
+import type { LeagueMemberRole, LeagueSeat } from '@/types/leagueSocial';
 import {
   DEFAULT_STARTERS,
   STARTER_MAX,
@@ -123,6 +125,11 @@ export default function LeagueSettings() {
     return Math.max(0, Math.min(4, Number(positionLimits.IR) || 0));
   };
   const [teamNames, setTeamNames] = useState<TeamName[]>([]);
+  const [seats, setSeats] = useState<LeagueSeat[]>([]);
+  const [myMembership, setMyMembership] = useState<{
+    team_number: number | null;
+    role: LeagueMemberRole;
+  } | null>(null);
   const [leagueName, setLeagueName] = useState('');
   const [numTeams, setNumTeams] = useState<number | string>(12);
   const [userPickPosition, setUserPickPosition] = useState<number | string>(1);
@@ -336,6 +343,46 @@ export default function LeagueSettings() {
       if (user) loadKeepers();
     }
   }, [selectedLeague, loadTeamNames, loadKeepers, user]);
+
+  useEffect(() => {
+    const userId = user?.id ?? null;
+    const leagueId = selectedLeague?.id ?? null;
+    if (!userId || !leagueId) {
+      setSeats([]);
+      setMyMembership(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [membership, rows] = await Promise.all([
+          leagueMyMembership(leagueId, userId),
+          leagueListSeats(leagueId).catch((err) => {
+            console.error(err);
+            return [] as LeagueSeat[];
+          }),
+        ]);
+        if (cancelled) return;
+        setMyMembership(membership);
+        setSeats(rows);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setMyMembership(null);
+          setSeats([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, selectedLeague?.id]);
+
+  const mySeatTeamNumber = useMemo(() => {
+    if (myMembership?.team_number != null) return myMembership.team_number;
+    if (!user) return null;
+    return seats.find((seat) => seat.user_id === user.id)?.team_number ?? null;
+  }, [myMembership, user, seats]);
 
   // Initialize team names for guests if not already set or when numTeams changes
   useEffect(() => {
@@ -1215,37 +1262,54 @@ export default function LeagueSettings() {
     
     if (!selectedLeague) return;
 
+    const saveAsOwner = myMembership?.role === 'owner';
+
     setSaving(true);
-    
-    // Delete existing team names and insert new ones
-    await supabase
-      .from('league_teams')
-      .delete()
-      .eq('league_id', selectedLeague.id);
-
-    const teamsToInsert = teamNames
-      .filter(t => t.team_name.trim())
-      .map(t => ({
-        league_id: selectedLeague.id,
-        team_number: t.team_number,
-        team_name: t.team_name.trim()
-      }));
-
-    if (teamsToInsert.length > 0) {
-      const { error } = await supabase
-        .from('league_teams')
-        .insert(teamsToInsert);
-
-      if (error) {
-        toast.error('Failed to save team names');
-        console.error(error);
-        setSaving(false);
+    try {
+      if (myMembership?.role === 'member' || !saveAsOwner) {
+        if (mySeatTeamNumber == null) {
+          toast.error('Claim a team on Home before you can rename it');
+          return;
+        }
+        const row = teamNames.find((t) => t.team_number === mySeatTeamNumber);
+        await leagueSetTeamName(selectedLeague.id, mySeatTeamNumber, row?.team_name ?? '');
+        toast.success('Team name saved');
+        await loadTeamNames();
         return;
       }
-    }
 
-    toast.success('Team names saved');
-    setSaving(false);
+      await supabase
+        .from('league_teams')
+        .delete()
+        .eq('league_id', selectedLeague.id);
+
+      const teamsToInsert = teamNames
+        .filter(t => t.team_name.trim())
+        .map(t => ({
+          league_id: selectedLeague.id,
+          team_number: t.team_number,
+          team_name: t.team_name.trim()
+        }));
+
+      if (teamsToInsert.length > 0) {
+        const { error } = await supabase
+          .from('league_teams')
+          .insert(teamsToInsert);
+
+        if (error) {
+          toast.error('Failed to save team names');
+          console.error(error);
+          return;
+        }
+      }
+
+      toast.success('Team names saved');
+    } catch (err) {
+      toast.error(userFacingErrorMessage(err, 'Failed to save team names'));
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // All hooks must be called before any early returns
@@ -1288,7 +1352,24 @@ export default function LeagueSettings() {
   }
 
   const isRookieOnlyLeague = leagueType === 'dynasty' && rookiesOnly;
-  const canEditLeague = !user || isLeagueOwner(selectedLeague, user.id);
+  const isMember = myMembership?.role === 'member';
+  const canEditLeague =
+    !user ||
+    myMembership?.role === 'owner' ||
+    (myMembership == null && Boolean(user && isLeagueOwner(selectedLeague, user.id)));
+  const ownerOrGuestPick =
+    typeof userPickPosition === 'number' ? userPickPosition : parseInt(String(userPickPosition)) || 1;
+  // Logged-in members: claimed seat only. Never the commissioner's draft slot.
+  const myTeamNumber = user && selectedLeague
+    ? mySeatTeamNumber ?? (isMember ? null : myMembership?.role === 'owner' ? ownerOrGuestPick : null)
+    : ownerOrGuestPick;
+  const mySeatTeamName =
+    mySeatTeamNumber != null
+      ? teamNames.find((t) => t.team_number === mySeatTeamNumber)?.team_name?.trim() || ''
+      : '';
+  const canSaveTeamNames = canEditLeague || mySeatTeamNumber != null;
+  const canEditTeamName = (teamNumber: number) =>
+    !user || canEditLeague || teamNumber === mySeatTeamNumber;
 
   return (
     <div className="min-h-screen bg-background">
@@ -1312,12 +1393,13 @@ export default function LeagueSettings() {
           </p>
         )}
 
-        {user && selectedLeague && !canEditLeague && (
+        {user && selectedLeague && isMember && (
           <Alert className="mb-6">
             <Info className="h-4 w-4" />
             <AlertDescription>
-              You joined this league. You can use rankings, mocks, team boards, and pick&apos;em.
-              Settings here are view-only; only the commissioner can change them.
+              {mySeatTeamNumber != null
+                ? `Your team is Team ${mySeatTeamNumber}. Rename it on Team Names. League rules and keepers stay with the commissioner.`
+                : 'Claim a team on Home, then you can rename it on Team Names. League rules stay with the commissioner.'}
             </AlertDescription>
           </Alert>
         )}
@@ -1471,26 +1553,38 @@ export default function LeagueSettings() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="userPickPosition" className="text-sm font-medium">
-                      Your Draft Pick Position
+                      {canEditLeague ? 'Your Draft Pick Position' : 'Your team'}
                     </Label>
-                    <Select 
-                      value={String(userPickPosition)} 
-                      onValueChange={(value) => setUserPickPosition(parseInt(value))}
-                      disabled={!canEditLeague}
-                    >
-                      <SelectTrigger className="bg-secondary/50">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || 12 }, (_, i) => i + 1).map(
-                          (n) => (
-                            <SelectItem key={n} value={n.toString()}>
-                              Pick #{n}
-                            </SelectItem>
-                          )
-                        )}
-                      </SelectContent>
-                    </Select>
+                    {canEditLeague ? (
+                      <Select 
+                        value={String(userPickPosition)} 
+                        onValueChange={(value) => setUserPickPosition(parseInt(value))}
+                      >
+                        <SelectTrigger id="userPickPosition" className="bg-secondary/50">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || 12 }, (_, i) => i + 1).map(
+                            (n) => (
+                              <SelectItem key={n} value={n.toString()}>
+                                Pick #{n}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="userPickPosition"
+                        readOnly
+                        className="bg-secondary/50"
+                        value={
+                          mySeatTeamNumber != null
+                            ? `Team ${mySeatTeamNumber}${mySeatTeamName ? ` · ${mySeatTeamName}` : ''}`
+                            : 'Claim a team on Home to set your seat'
+                        }
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -1815,12 +1909,16 @@ export default function LeagueSettings() {
                     )}
                   </CardTitle>
                   <CardDescription>
-                    Customize the names for each team in your league{selectedLeague ? ` (Team ${selectedLeague.user_pick_position} is your team)` : ''}
+                    {myTeamNumber != null
+                      ? `Customize team names. Team ${myTeamNumber} is your team.`
+                      : user && selectedLeague && !canEditLeague
+                        ? 'Claim a team on Home before you can rename yours here.'
+                        : 'Customize the names for each team in your league'}
                   </CardDescription>
                 </div>
-                  <Button onClick={saveTeamNames} disabled={saving || !canEditLeague} className="shrink-0">
+                  <Button onClick={saveTeamNames} disabled={saving || !canSaveTeamNames} className="shrink-0">
                   <Save className="w-4 h-4 mr-2" />
-                  Save Team Names
+                  {canEditLeague || !mySeatTeamNumber ? 'Save Team Names' : 'Save Team Name'}
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4 relative">
@@ -1829,8 +1927,7 @@ export default function LeagueSettings() {
                     <div key={team.team_number} className="space-y-2">
                       <Label htmlFor={`team-${team.team_number}`} className="text-sm font-medium flex items-center gap-2">
                         Team {team.team_number}
-                        {((selectedLeague && team.team_number === selectedLeague.user_pick_position) ||
-                          (!selectedLeague && team.team_number === (typeof userPickPosition === 'number' ? userPickPosition : parseInt(String(userPickPosition)) || 1))) && (
+                        {myTeamNumber != null && team.team_number === myTeamNumber && (
                           <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">You</span>
                         )}
                       </Label>
@@ -1846,7 +1943,7 @@ export default function LeagueSettings() {
                         autoCorrect="off"
                         autoCapitalize="off"
                         spellCheck="false"
-                        disabled={!canEditLeague}
+                        disabled={!canEditTeamName(team.team_number)}
                       />
                     </div>
                   ))}
@@ -1899,11 +1996,7 @@ export default function LeagueSettings() {
                       const teamCount =
                         selectedLeague?.num_teams ??
                         (typeof numTeams === 'number' ? numTeams : parseInt(String(numTeams)) || 12);
-                      const yourPick =
-                        selectedLeague?.user_pick_position ??
-                        (typeof userPickPosition === 'number'
-                          ? userPickPosition
-                          : parseInt(String(userPickPosition)) || 1);
+                      const yourPick = myTeamNumber;
                       const numRounds = calculateNumRounds();
                       const allKeeperPlayerIds = new Set<string>();
                       Object.values(keepersByTeam || {}).flat().forEach((s) => s.player?.id && allKeeperPlayerIds.add(s.player.id));

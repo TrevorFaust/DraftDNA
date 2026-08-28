@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LeaguesProvider } from "@/hooks/useLeagues";
+import { PendingTeamClaimProvider } from "@/hooks/usePendingTeamClaim";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -25,6 +26,7 @@ import NotFound from "./pages/NotFound";
 import { Footer } from "./components/Footer";
 import { BrandedLoader } from "./components/BrandedLoader";
 import { Navbar } from "./components/Navbar";
+import { RequireTeamSeat } from "@/components/league/RequireTeamSeat";
 import { FantasyDepthProvider } from "@/contexts/FantasyDepthContext";
 import { NflTeamContextProvider } from "@/contexts/NflTeamContext";
 
@@ -71,6 +73,7 @@ const App = () => (
         <ScrollToTop />
         <AuthProvider>
           <LeaguesProvider>
+            <PendingTeamClaimProvider>
             <TooltipProvider>
               <FantasyDepthProvider>
               <NflTeamContextProvider>
@@ -78,6 +81,7 @@ const App = () => (
               <Sonner />
               <div className="min-h-screen flex flex-col">
                 <main className="flex-1">
+                  <RequireTeamSeat>
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
@@ -103,12 +107,14 @@ const App = () => (
                     <Route path="/join/:inviteCode" element={<Suspense fallback={<PageFallback />}><JoinLeague /></Suspense>} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
+                  </RequireTeamSeat>
                 </main>
                 <Footer />
               </div>
               </NflTeamContextProvider>
               </FantasyDepthProvider>
             </TooltipProvider>
+            </PendingTeamClaimProvider>
           </LeaguesProvider>
         </AuthProvider>
       </BrowserRouter>

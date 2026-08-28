@@ -264,8 +264,8 @@ function RankerBoard({
           {leagueId && canManageRosters
             ? ' You can swap any lineup. Members only swap the team they claimed.'
             : null}
-          {leagueId && !canManageRosters && mySeat
-            ? ` Swap starters on ${mySeat.team_name} only.`
+            {leagueId && !canManageRosters && mySeat
+            ? ` Swap starters on ${api.league.teams[mySeat.team_number - 1]?.name ?? mySeat.team_name} only.`
             : null}
         </p>
       </div>
@@ -354,6 +354,14 @@ function RankerBoard({
                 onRemovePlayer={api.removePlayer}
                 onResetTeam={api.resetTeam}
                 onSwapLineup={api.swapLineup}
+                canRename={
+                  !leagueId ||
+                  canManageRosters ||
+                  Boolean(
+                    yourTeamId &&
+                      (activeTeamId || api.league.teams[0]?.id) === yourTeamId,
+                  )
+                }
               />
             </TabsContent>
             {canManageRosters ? (

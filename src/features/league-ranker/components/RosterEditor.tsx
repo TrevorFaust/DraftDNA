@@ -6,7 +6,10 @@ import {
   type LineupSlotKey,
 } from '../lineupRooms';
 import {
+  describeTakenPlayer,
+  describeTakenPlayers,
   describeUnresolved,
+  findRosterOwner,
   isOnRoster,
   playerFromPoolRow,
   resolveAgainstPool,
@@ -48,6 +51,7 @@ type Props = {
   teams: Team[];
   activeTeamId: string;
   canEdit?: boolean;
+  canRename?: boolean;
   canSwap?: boolean;
   yourTeamId?: string | null;
   lineupLimits?: PositionLimitsLike | null;
@@ -64,6 +68,7 @@ export function RosterEditor({
   teams,
   activeTeamId,
   canEdit = true,
+  canRename,
   canSwap = false,
   yourTeamId,
   lineupLimits,
@@ -76,6 +81,7 @@ export function RosterEditor({
   onSwapLineup,
 }: Props) {
   const team = teams.find((item) => item.id === activeTeamId) ?? teams[0];
+  const allowRename = canRename ?? canEdit;
   const [paste, setPaste] = useState('');
   const [message, setMessage] = useState('');
   const [pick, setPick] = useState<PoolPlayer | null>(null);
@@ -106,6 +112,11 @@ export function RosterEditor({
     return isSuperflex ? `${summary} · Superflex` : summary;
   }, [isSuperflex, lineupLimits]);
 
+  const starterSlots = useMemo(
+    () => countBaseStarters(parseStarters(lineupLimits)) + getFlexCount(lineupLimits, isSuperflex),
+    [isSuperflex, lineupLimits],
+  );
+
   const preview = useMemo(() => {
     if (!paste.trim()) return null;
     const parsed = parseRosterPaste(paste);
@@ -120,14 +131,29 @@ export function RosterEditor({
 
   const capLabel = formatBenchCapLabel(lineupLimits);
 
+  function takenOnOtherTeams(players: Player[]) {
+    return players.flatMap((player) => {
+      const owner = findRosterOwner(teams, player, team.id);
+      return owner ? [{ name: player.name, teamName: owner.name }] : [];
+    });
+  }
+
   function commitPlayers(incoming: Player[], mode: 'replace' | 'append') {
     const existing = mode === 'append' ? team.players : [];
-    const unique = incoming.filter((player) => !isOnRoster(existing, player));
+    const takenElsewhere = takenOnOtherTeams(
+      incoming.filter((player) => !isOnRoster(existing, player)),
+    );
+    const unique = incoming.filter(
+      (player) => !isOnRoster(existing, player) && !findRosterOwner(teams, player, team.id),
+    );
     const rosterDupes = incoming.filter((player) => isOnRoster(existing, player)).map((player) => player.name);
+    if (!unique.length) {
+      return { players: existing, dropped: [] as Player[], rosterDupes, takenElsewhere, applied: false };
+    }
     const merged = mode === 'append' ? [...team.players, ...unique] : unique;
     const { players, dropped } = applyLineupRoster(merged, lineupLimits, isSuperflex);
     onSetRoster(team.id, players, 'replace');
-    return { players, dropped, rosterDupes };
+    return { players, dropped, rosterDupes, takenElsewhere, applied: true };
   }
 
   function applyPaste() {
@@ -145,24 +171,42 @@ export function RosterEditor({
       setMessage(describeUnresolved(resolved) ?? 'None of those names are in the NFL player list.');
       return;
     }
-    const starterSlots =
-      countBaseStarters(parseStarters(lineupLimits)) + getFlexCount(lineupLimits, isSuperflex);
     const mode = pasteRosterMode(resolved.matched.length, team.players.length, starterSlots);
-    const { players, dropped, rosterDupes } = commitPlayers(resolved.matched, mode);
+    const { players, dropped, rosterDupes, takenElsewhere, applied } = commitPlayers(resolved.matched, mode);
     const unresolved = describeUnresolved({
       ...resolved,
-      duplicates: [...resolved.duplicates, ...rosterDupes],
+      duplicates: resolved.duplicates,
     });
+    const takenNote = describeTakenPlayers(takenElsewhere);
+    const sameRosterNote = rosterDupes.length
+      ? `You can't add ${rosterDupes.join(', ')}. Already on this roster`
+      : null;
+    if (!applied) {
+      setMessage(
+        takenNote
+          ? `${takenNote}.`
+          : sameRosterNote
+            ? `${sameRosterNote}.`
+            : unresolved ?? 'No new players to add.',
+      );
+      return;
+    }
     const notes = [
       dropped.length
         ? `Bench is full (${capLabel}), left off: ${dropped.map((player) => player.name).join(', ')}`
         : null,
       unresolved,
+      takenNote,
+      sameRosterNote,
     ].filter(Boolean);
+    const addedCount =
+      mode === 'replace'
+        ? players.length
+        : resolved.matched.length - rosterDupes.length - takenElsewhere.length;
     const summary =
       mode === 'replace'
         ? `Replaced this roster with ${players.length} player${players.length === 1 ? '' : 's'}`
-        : `Added ${resolved.matched.length} player${resolved.matched.length === 1 ? '' : 's'}`;
+        : `Added ${addedCount} player${addedCount === 1 ? '' : 's'}`;
     setMessage(notes.length ? `${summary}. ${notes.join('. ')}.` : `${summary}. Starters filled first, extras on the bench.`);
     setPaste('');
   }
@@ -179,8 +223,9 @@ export function RosterEditor({
   }
 
   function addResolved(incoming: Player) {
-    if (isOnRoster(team.players, incoming)) {
-      setMessage(`${incoming.name} is already on this roster.`);
+    const owner = findRosterOwner(teams, incoming);
+    if (owner) {
+      setMessage(describeTakenPlayer(incoming.name, owner, team.id));
       return;
     }
     const { players, dropped } = applyLineupRoster([...team.players, incoming], lineupLimits, isSuperflex);
@@ -198,6 +243,23 @@ export function RosterEditor({
     if (!pick) return;
     addResolved(playerFromPoolRow(pick, manualIr));
   }
+
+  const previewTakenNote = preview?.players.length
+    ? describeTakenPlayers(takenOnOtherTeams(preview.players))
+    : null;
+  const previewSameRosterNote =
+    preview?.players.length &&
+    pasteRosterMode(preview.players.length, team.players.length, starterSlots) === 'append'
+      ? describeTakenPlayers(
+          preview.players
+            .filter((player) => isOnRoster(team.players, player))
+            .map((player) => ({ name: player.name, teamName: 'this roster' })),
+        )
+      : null;
+  const messageIsError =
+    /can't add|already on this roster|already on |bench is full|not in the nfl|could not|no player names|no new players|none of those names|still loading/i.test(
+      message,
+    );
 
   return (
     <section className="space-y-4" aria-label="Roster editor">
@@ -246,18 +308,30 @@ export function RosterEditor({
           </Button>
         ))}
       </div>
-      {canEdit ? (
+      {allowRename || canEdit ? (
         <div className="space-y-3 rounded-lg border border-border/60 bg-card p-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="team-name">Team name</Label>
-            <Input
-              id="team-name"
-              value={team.name}
-              onChange={(event) => onRename(team.id, event.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="roster-paste">Paste players</Label>
+          {allowRename ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="team-name">Team name</Label>
+              <Input
+                id="team-name"
+                value={team.name}
+                onChange={(event) => onRename(team.id, event.target.value)}
+                maxLength={50}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+              />
+              <p className="text-sm text-muted-foreground">
+                Everyone in the league sees this name.
+              </p>
+            </div>
+          ) : null}
+          {canEdit ? (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="roster-paste">Paste players</Label>
             <p className="text-sm text-muted-foreground">
               Paste a whole ESPN roster or extra names. Starters fill first, extras go to the bench.
             </p>
@@ -296,6 +370,12 @@ export function RosterEditor({
                 {'resolved' in preview && preview.resolved && describeUnresolved(preview.resolved) ? (
                   <p className="mt-2 text-xs text-destructive">{describeUnresolved(preview.resolved)}</p>
                 ) : null}
+                {previewTakenNote ? (
+                  <p className="mt-2 text-xs text-destructive">{previewTakenNote}.</p>
+                ) : null}
+                {previewSameRosterNote ? (
+                  <p className="mt-2 text-xs text-destructive">{previewSameRosterNote}.</p>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -326,6 +406,8 @@ export function RosterEditor({
               Reset team
             </Button>
           </div>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -369,7 +451,12 @@ export function RosterEditor({
       ) : null}
 
       {message ? (
-        <p className={cn('text-sm', message.startsWith('No ') || message.includes('full') || message.includes('not in the NFL') || message.includes('Could not') ? 'text-destructive' : 'text-muted-foreground')}>{message}</p>
+        <p
+          className={cn('text-sm', messageIsError ? 'text-destructive' : 'text-muted-foreground')}
+          role={messageIsError ? 'alert' : undefined}
+        >
+          {message}
+        </p>
       ) : null}
 
       {unsorted.length ? (

@@ -219,8 +219,6 @@ export const Navbar = () => {
         setSelectedLeague(league);
       }
     }
-    if (location.pathname === '/league-ranker') return;
-    navigate('/rankings', { replace: true, state: {} });
   };
 
   const handleSignOut = async () => {

@@ -4,10 +4,13 @@ import {
   normalizeWeights,
   scoreLeague,
 } from './scoring'
-import { loadLeague, sanitizeLeague, saveLeague, alignLeagueToSeed, overlaySharedRosters, type LeagueSeed } from './storage'
+import { loadLeague, sanitizeLeague, saveLeague, alignLeagueToSeed, applySeedNames, overlaySharedRosters, type LeagueSeed } from './storage'
 import { applyLineupRoster, capBenchAndIr, swapLineupSlots, type LineupSlotKey } from './lineupRooms'
 import { parseManualPlayer } from './parser'
+import { isOnRoster } from './matchRoster'
 import { fetchLeagueRankings, fetchSharedRankerRosters, saveLeagueRankings, saveSharedRankerRosters } from './remote'
+import { leagueSetTeamName } from '@/utils/leagueSocialApi'
+import { tempSettingsStorage } from '@/utils/temporaryStorage'
 import {
   ROOMS,
   type League,
@@ -47,17 +50,23 @@ function withLineupRooms(
 
 export function useLeague(storageKey: string, seed: LeagueSeed, options: RankerOptions) {
   const seedRef = useRef(seed)
-  seedRef.current = seed
   const keyRef = useRef(storageKey)
   const optionsRef = useRef(options)
   optionsRef.current = options
   const skipRemoteSave = useRef(true)
   const skipSharedSave = useRef(true)
   const lastLineupKey = useRef<string | null>(null)
+  const pendingNames = useRef(new Map<number, string>())
+  const nameSaveTimer = useRef<number>(0)
   const [league, setLeague] = useState<League>(() => loadLeague(storageKey, seed))
   const [hydrated, setHydrated] = useState(!options.leagueId)
   const shaped = useMemo(() => sanitizeLeague(league) ?? league, [league])
   const lineupKey = `${JSON.stringify(options.lineupLimits ?? null)}|${Boolean(options.isSuperflex)}`
+  const seedNamesKey = seed.names.join('\0')
+
+  useEffect(() => {
+    seedRef.current = { teamCount: seed.teamCount, names: seed.names }
+  }, [seed.teamCount, seedNamesKey])
 
   useEffect(() => {
     if (ROOMS.some((room) => typeof league.weights?.[room] !== 'number')) {
@@ -128,7 +137,7 @@ export function useLeague(storageKey: string, seed: LeagueSeed, options: RankerO
       const next = alignLeagueToSeed(prev, seedRef.current)
       return next === prev ? prev : next
     })
-  }, [hydrated, seed.teamCount])
+  }, [hydrated, seed.teamCount, seedNamesKey])
 
   useEffect(() => {
     if (!options.canEdit || !hydrated) return
@@ -206,6 +215,52 @@ export function useLeague(storageKey: string, seed: LeagueSeed, options: RankerO
     }
   }, [options.leagueId, options.userId])
 
+  useEffect(() => {
+    const leagueId = options.leagueId
+    const userId = options.userId
+    if (!leagueId || !userId) return
+    let timer = 0
+    const applyRemoteNames = async () => {
+      const { data } = await supabase
+        .from('league_teams')
+        .select('team_number, team_name')
+        .eq('league_id', leagueId)
+      if (!data) return
+      const count = seedRef.current.teamCount
+      const names = Array.from({ length: count }, (_, index) => {
+        const pending = pendingNames.current.get(index + 1)
+        if (pending != null) return pending
+        const row = data.find((team) => team.team_number === index + 1)
+        return row?.team_name?.trim() || `Team ${index + 1}`
+      })
+      seedRef.current = { ...seedRef.current, names }
+      setLeague((prev) => applySeedNames(prev, seedRef.current))
+    }
+    const schedule = () => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        void applyRemoteNames()
+      }, 80)
+    }
+    const channel = supabase
+      .channel(`league-team-names-${leagueId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'league_teams',
+          filter: `league_id=eq.${leagueId}`,
+        },
+        schedule,
+      )
+      .subscribe()
+    return () => {
+      window.clearTimeout(timer)
+      void supabase.removeChannel(channel)
+    }
+  }, [options.leagueId, options.userId])
+
   const displayLeague = useMemo(() => {
     if (options.canEdit) return shaped
     return withLineupRooms(shaped, options.lineupLimits, Boolean(options.isSuperflex))
@@ -225,11 +280,55 @@ export function useLeague(storageKey: string, seed: LeagueSeed, options: RankerO
   }, [])
 
   const renameTeam = useCallback((id: string, name: string) => {
-    applyIfRoster((prev) => ({
-      ...prev,
-      teams: prev.teams.map((team) => (team.id === id ? { ...team, name } : team)),
-    }))
-  }, [applyIfRoster])
+    const { canManageRosters, lineupTeamIndex, leagueId } = optionsRef.current
+    setLeague((prev) => {
+      const index = prev.teams.findIndex((team) => team.id === id)
+      if (index < 0) return prev
+      const allowed =
+        !leagueId ||
+        Boolean(canManageRosters) ||
+        (typeof lineupTeamIndex === 'number' && index === lineupTeamIndex)
+      if (!allowed) return prev
+      const names = [...(seedRef.current.names ?? [])]
+      names[index] = name
+      seedRef.current = { ...seedRef.current, names }
+      pendingNames.current.set(index + 1, name)
+      return {
+        ...prev,
+        teams: prev.teams.map((team) => (team.id === id ? { ...team, name } : team)),
+      }
+    })
+    window.clearTimeout(nameSaveTimer.current)
+    nameSaveTimer.current = window.setTimeout(() => {
+      const { leagueId: id } = optionsRef.current
+      const pending = [...pendingNames.current.entries()]
+      if (!pending.length) return
+      if (!id) {
+        const cur = tempSettingsStorage.get() || {}
+        const existing = Array.isArray(cur.teamNames) ? [...cur.teamNames] : []
+        pending.forEach(([team_number, team_name]) => {
+          const row = existing.findIndex((item: { team_number?: number }) => item.team_number === team_number)
+          if (row >= 0) existing[row] = { team_number, team_name }
+          else existing.push({ team_number, team_name })
+        })
+        tempSettingsStorage.save({ ...cur, teamNames: existing })
+        pendingNames.current.clear()
+        return
+      }
+      void Promise.all(
+        pending.map(async ([teamNumber, teamName]) => {
+          try {
+            await leagueSetTeamName(id, teamNumber, teamName)
+            if (pendingNames.current.get(teamNumber) === teamName) {
+              pendingNames.current.delete(teamNumber)
+            }
+          } catch {
+            // Keep pending so the next edit retries.
+          }
+        }),
+      )
+    }, 800)
+  }, [])
 
   const setGutBump = useCallback((id: string, value: number) => {
     const gutBump = Math.min(5, Math.max(-5, Math.round(value * 10) / 10))
@@ -245,7 +344,13 @@ export function useLeague(storageKey: string, seed: LeagueSeed, options: RankerO
       ...prev,
       teams: prev.teams.map((team) => {
         if (team.id !== id) return team
-        const merged = mode === 'append' ? [...team.players, ...players] : players
+        const available = players.filter(
+          (player) => !prev.teams.some((other) => other.id !== id && isOnRoster(other.players, player)),
+        )
+        const merged =
+          mode === 'append'
+            ? [...team.players, ...available.filter((player) => !isOnRoster(team.players, player))]
+            : available
         return {
           ...team,
           players: applyLineupRoster(merged, lineupLimits, Boolean(isSuperflex)).players,
@@ -314,21 +419,24 @@ export function useLeague(storageKey: string, seed: LeagueSeed, options: RankerO
     const incoming = parseManualPlayer(name, room)
     if (!incoming) return
     const { lineupLimits, isSuperflex } = optionsRef.current
-    applyIfRoster((prev) => ({
-      ...prev,
-      teams: prev.teams.map((team) =>
-        team.id === teamId
-          ? {
-              ...team,
-              players: applyLineupRoster(
-                [...team.players, incoming],
-                lineupLimits,
-                Boolean(isSuperflex),
-              ).players,
-            }
-          : team,
-      ),
-    }))
+    applyIfRoster((prev) => {
+      if (prev.teams.some((team) => isOnRoster(team.players, incoming))) return prev
+      return {
+        ...prev,
+        teams: prev.teams.map((team) =>
+          team.id === teamId
+            ? {
+                ...team,
+                players: applyLineupRoster(
+                  [...team.players, incoming],
+                  lineupLimits,
+                  Boolean(isSuperflex),
+                ).players,
+              }
+            : team,
+        ),
+      }
+    })
   }, [applyIfRoster])
 
   const setOrdinalOrder = useCallback((room: Room, ids: string[]) => {

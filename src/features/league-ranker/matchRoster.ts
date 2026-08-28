@@ -3,7 +3,7 @@ import type { PlayerPoolRow } from '@/utils/playerPoolFetch';
 import { matchImportRows } from '@/utils/rankingsSpreadsheet/matchPlayers';
 import { playerNameMatchKeys } from '@/utils/playerNameMatch';
 import { roomFromNflPosition } from './parser';
-import type { Player } from './types';
+import type { Player, Team } from './types';
 
 const POOL_MAPPING = {
   hasHeaderRow: false,
@@ -47,6 +47,30 @@ export function isOnRoster(players: Player[], candidate: { id: string; name: str
   if (players.some((player) => player.id === candidate.id)) return true;
   const keys = new Set(playerNameMatchKeys(candidate.name));
   return players.some((player) => playerNameMatchKeys(player.name).some((key) => keys.has(key)));
+}
+
+/** The team that already has this player, if any. Pass exceptTeamId to ignore that roster (replace / same-team edits). */
+export function findRosterOwner(
+  teams: Team[],
+  candidate: { id: string; name: string },
+  exceptTeamId?: string,
+): Team | undefined {
+  return teams.find((team) => team.id !== exceptTeamId && isOnRoster(team.players, candidate));
+}
+
+export function describeTakenPlayers(owned: { name: string; teamName: string }[]): string | null {
+  if (!owned.length) return null;
+  if (owned.length === 1) {
+    return `You can't add ${owned[0].name}. Already on ${owned[0].teamName}`;
+  }
+  return `You can't add these players: ${owned.map((row) => `${row.name} (${row.teamName})`).join(', ')}`;
+}
+
+export function describeTakenPlayer(name: string, owner: Team, currentTeamId: string): string {
+  if (owner.id === currentTeamId) {
+    return `You can't add ${name}. Already on this roster.`;
+  }
+  return `You can't add ${name}. Already on ${owner.name}.`;
 }
 
 export function resolveAgainstPool(

@@ -197,9 +197,22 @@ export function sanitizeLeague(input: unknown): League | null {
   return { teams, weights, roomMode, ordinalRanks, customScores }
 }
 
+/** League Settings / claimed-seat names win over names stored on a personal board. */
+export function applySeedNames(league: League, seed: LeagueSeed): League {
+  const names = seed.names ?? []
+  let changed = false
+  const teams = league.teams.map((team, index) => {
+    const name = names[index]?.trim() || `Team ${index + 1}`
+    if (team.name === name) return team
+    changed = true
+    return { ...team, name }
+  })
+  return changed ? { ...league, teams } : league
+}
+
 export function alignLeagueToSeed(league: League, seed: LeagueSeed): League {
   const count = clampTeamCount(seed.teamCount)
-  if (league.teams.length === count) return league
+  if (league.teams.length === count) return applySeedNames(league, seed)
 
   const names = seed.names ?? []
   const teams =
@@ -242,7 +255,7 @@ export function alignLeagueToSeed(league: League, seed: LeagueSeed): League {
     }),
   ) as League['customScores']
 
-  return { ...league, teams, ordinalRanks, customScores }
+  return applySeedNames({ ...league, teams, ordinalRanks, customScores }, seed)
 }
 
 /** Shared league rosters overlay personal boards by team index. */

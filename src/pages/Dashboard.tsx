@@ -19,10 +19,14 @@ import { PICK_SIX_TOTAL_PRIZE_POOL_USD } from '@/constants/contest';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickSixMark } from '@/components/PickSixIcon';
 import { PickSixDashboardLeaderboard } from '@/components/PickSixDashboardLeaderboard';
+import { ClaimTeamPanel } from '@/components/league/ClaimTeamPanel';
+import { usePendingTeamClaim } from '@/hooks/usePendingTeamClaim';
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { leagues, loading: leaguesLoading, setSelectedLeague } = useLeagues();
+  const { claim, loading: claimLoading, saving, error, pickedTeam, setPickedTeam, submit } =
+    usePendingTeamClaim();
   const navigate = useNavigate();
   const [teamNamesByLeagueId, setTeamNamesByLeagueId] = useState<Record<string, string>>({});
   const [draftCountByLeagueId, setDraftCountByLeagueId] = useState<Record<string, number>>({});
@@ -77,12 +81,31 @@ const Dashboard = () => {
     fetchLeagueDetails();
   }, [fetchLeagueDetails]);
 
-  if (authLoading || (user && leaguesLoading)) {
+  if (authLoading || (user && (leaguesLoading || claimLoading))) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="flex min-h-[70vh] items-center justify-center px-4">
           <BrandedLoader />
+        </main>
+      </div>
+    );
+  }
+
+  if (claim) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="mx-auto max-w-6xl px-4 py-8">
+          <ClaimTeamPanel
+            leagueName={claim.leagueName}
+            seats={claim.seats}
+            pickedTeam={pickedTeam}
+            saving={saving}
+            error={error}
+            onPick={setPickedTeam}
+            onClaim={() => void submit()}
+          />
         </main>
       </div>
     );
@@ -250,7 +273,6 @@ const Dashboard = () => {
                     type="button"
                     onClick={() => {
                       setSelectedLeague(league);
-                      navigate('/rankings');
                     }}
                     className="w-full cursor-pointer p-4 text-left"
                   >
