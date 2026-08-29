@@ -29,6 +29,7 @@ type Props = {
   league: League;
   activeRoom: Room;
   canEdit?: boolean;
+  contributorCount?: number;
   onRoomChange: (room: Room) => void;
   onReorder: (room: Room, ids: string[]) => void;
 };
@@ -165,6 +166,7 @@ export function RoomRanker({
   league,
   activeRoom,
   canEdit = true,
+  contributorCount,
   onRoomChange,
   onReorder,
 }: Props) {
@@ -208,12 +210,14 @@ export function RoomRanker({
       <div>
         <h2 className="font-display text-3xl tracking-wide">{ROOM_LABELS[activeRoom]}</h2>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground md:hidden">
-          Tap the arrows to move a team. 1st stays at the top, {formatPlace(league.teams.length)} at the
-          bottom.
+          {canEdit
+            ? `Tap the arrows to move a team. 1st stays at the top, ${formatPlace(league.teams.length)} at the bottom.`
+            : `League crowd order for this room. ${contributorCount ?? 0} members ranked; your self-rank is excluded from each team's crowd score.`}
         </p>
         <p className="mt-1 hidden max-w-prose text-sm text-muted-foreground md:block">
-          Drag the handle so 1st is at the top and {formatPlace(league.teams.length)} is at the bottom.
-          Lower room scores win the board.
+          {canEdit
+            ? `Drag the handle so 1st is at the top and ${formatPlace(league.teams.length)} is at the bottom. Lower room scores win the board.`
+            : `League crowd order for this room. ${contributorCount ?? 0} members ranked; your self-rank is excluded from each team's crowd score.`}
         </p>
       </div>
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Position rooms">

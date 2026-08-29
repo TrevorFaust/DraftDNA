@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { accessTokenIsPasswordRecovery } from '@/lib/passwordRecoveryToken';
 import { PasswordRecoveryForm } from '@/components/PasswordRecoveryForm';
@@ -11,10 +12,16 @@ import { BrandedLoader } from '@/components/BrandedLoader';
  */
 const RecoverPassword = () => {
   const { user, session, loading, passwordRecoveryActive } = useAuth();
+  const navigate = useNavigate();
   const jwtRecovery = !!session?.access_token && accessTokenIsPasswordRecovery(session.access_token);
   const showForm = !!user && (jwtRecovery || passwordRecoveryActive);
 
-  if (loading) {
+  useEffect(() => {
+    if (loading || !user || showForm) return;
+    navigate('/dashboard', { replace: true });
+  }, [loading, user, showForm, navigate]);
+
+  if (loading || (user && !showForm)) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <BrandedLoader />
@@ -32,26 +39,6 @@ const RecoverPassword = () => {
           </p>
           <Button asChild variant="hero" className="w-full">
             <Link to="/auth">Go to sign in</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!showForm) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsl(190_95%_50%/0.15),transparent_50%)]" />
-        <div className="glass-card p-8 w-full max-w-md relative text-center space-y-4">
-          <p className="text-muted-foreground">
-            This page is only for links from a password-reset email. If you need to change your password, send a new reset
-            email from the live site while signed out.
-          </p>
-          <Button asChild variant="hero" className="w-full">
-            <Link to="/dashboard">Go to dashboard</Link>
-          </Button>
-          <Button asChild variant="outline" className="w-full">
-            <Link to="/auth">Sign in</Link>
           </Button>
         </div>
       </div>

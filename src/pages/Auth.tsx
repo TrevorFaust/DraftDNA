@@ -149,8 +149,22 @@ const Auth = () => {
     }
   };
 
+  const switchToSignInForExistingEmail = () => {
+    setIsLogin(true);
+    setShowForgotPassword(false);
+    setUsername('');
+    setConfirmPassword('');
+    setUsernameTaken(null);
+    toast.error('That email already has an account. Sign in, or use Forgot password.');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (showForgotPassword) {
+      await handleForgotPassword(e);
+      return;
+    }
 
     if (isLogin) {
       const validation = loginSchema.safeParse({ email: email.trim(), password });
@@ -208,7 +222,7 @@ const Auth = () => {
         email_to_check: email.trim().toLowerCase(),
       });
       if (!emailCheckError && emailExists) {
-        toast.error('You already have an account with this email. Sign in instead, or reset your password if you\'ve forgotten it.');
+        switchToSignInForExistingEmail();
         setLoading(false);
         return;
       }
@@ -223,7 +237,7 @@ const Auth = () => {
           msg.includes('already registered') ||
           msg.includes('already exists')
         ) {
-          toast.error('You already have an account with this email. Sign in instead, or reset your password if you\'ve forgotten it.');
+          switchToSignInForExistingEmail();
         } else if (
           status === 504 ||
           status === 522 ||
@@ -320,10 +334,10 @@ const Auth = () => {
     setIsLogin(true);
   };
 
-  if (authLoading) {
+  if (authLoading || (user && !passwordRecoveryActive)) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <BrandedLoader size={40} label="Checking session…" />
+        <BrandedLoader size={40} label={user ? 'Signing you in…' : 'Checking session…'} />
       </div>
     );
   }
@@ -563,11 +577,10 @@ const Auth = () => {
                     Back to Sign In
                   </Button>
                   <Button
-                    type="button"
+                    type="submit"
                     variant="hero"
                     className="w-full"
                     size="lg"
-                    onClick={handleForgotPassword}
                     disabled={resetLoading || !email.trim()}
                   >
                     {resetLoading ? (

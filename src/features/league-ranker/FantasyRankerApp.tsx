@@ -5,6 +5,7 @@ import { RoomRanker } from './components/RoomRanker';
 import { RosterEditor } from './components/RosterEditor';
 import { WeightsPanel } from './components/WeightsPanel';
 import { useLeague } from './useLeague';
+import { useCrowdRankings } from './useCrowdRankings';
 import type { Room } from './types';
 import { clampTeamCount, storageKeyForLeague, type LeagueSeed } from './storage';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import type { LeagueSeat } from '@/types/leagueSocial';
 import type { PositionLimitsLike } from '@/utils/rosterSlots';
 
 type Panel = 'rooms' | 'rosters' | 'weights';
+type RankingsView = 'mine' | 'crowd';
 
 export function FantasyRankerApp() {
   const { user } = useAuth();
@@ -196,6 +198,7 @@ function RankerBoard({
     isSuperflex,
   });
   const [panel, setPanel] = useState<Panel>('rooms');
+  const [rankingsView, setRankingsView] = useState<RankingsView>('mine');
   const [activeRoom, setActiveRoom] = useState<Room>('WR');
   const [activeTeamId, setActiveTeamId] = useState(api.league.teams[0]?.id ?? '');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -210,6 +213,25 @@ function RankerBoard({
     },
     [lineupTeamIndex, yourTeamId],
   );
+
+  const showCrowdRankings = Boolean(leagueId && userId && !needsSeat);
+  const rankingsRefreshKey = JSON.stringify({
+    ordinalRanks: api.league.ordinalRanks,
+    weights: api.league.weights,
+    gutBumps: api.league.teams.map((team) => team.gutBump),
+  });
+  const crowd = useCrowdRankings(
+    leagueId,
+    userId,
+    api.league,
+    rankingsRefreshKey,
+    showCrowdRankings,
+  );
+  const activeBoard = rankingsView === 'crowd' ? crowd.crowdBoard : api.board;
+  const activeLeague =
+    rankingsView === 'crowd' && crowd.crowdLeague ? crowd.crowdLeague : api.league;
+  const boardCanEdit = rankingsView === 'mine';
+  const crowdReady = Boolean(crowd.crowdLeague);
 
   useEffect(() => {
     if (!api.league.teams.some((team) => team.id === activeTeamId)) {
@@ -260,7 +282,10 @@ function RankerBoard({
         </p>
         <h1 className="font-display text-4xl tracking-wide md:text-5xl">Team Rankings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Rank each position room, 1st at the top. The board on the left updates from those ranks.
+          Rank each position room, 1st at the top. The board updates from those ranks.
+          {showCrowdRankings
+            ? ' Switch between your board and the league crowd. Your self-rank never counts toward how others see your team.'
+            : null}
           {leagueId && canManageRosters
             ? ' You can swap any lineup. Members only swap the team they claimed.'
             : null}
@@ -268,6 +293,28 @@ function RankerBoard({
             ? ` Swap starters on ${api.league.teams[mySeat.team_number - 1]?.name ?? mySeat.team_name} only.`
             : null}
         </p>
+        {showCrowdRankings ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Tabs
+              value={rankingsView}
+              onValueChange={(value) => setRankingsView(value as RankingsView)}
+            >
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="mine">Your rankings</TabsTrigger>
+                <TabsTrigger value="crowd">League crowd</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {rankingsView === 'crowd' && crowd.contributorCount > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {crowd.contributorCount} member{crowd.contributorCount === 1 ? '' : 's'} ranked.
+                Each owner&apos;s self-rank is excluded from their team&apos;s crowd score.
+              </p>
+            ) : null}
+            {rankingsView === 'crowd' && crowd.loading ? (
+              <p className="text-xs text-muted-foreground">Loading crowd rankings…</p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {needsSeat ? (
@@ -304,22 +351,36 @@ function RankerBoard({
 
       <div className="grid min-h-0 gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="rounded-lg border border-border/60 bg-card/40 p-4 overflow-x-hidden pr-2 scrollbar-thin lg:max-h-[min(75dvh,720px)] lg:overflow-y-auto">
-          <Board
-            board={api.board}
-            weights={api.league.weights}
-            expandedId={expandedId}
-            canEdit
-            canSwapTeam={canSwapTeam}
-            yourTeamId={yourTeamId}
-            lineupLimits={lineupLimits}
-            isSuperflex={isSuperflex}
-            onToggle={(id) => {
-              setExpandedId((current) => (current === id ? null : id));
-              setActiveTeamId(id);
-            }}
-            onGutBump={api.setGutBump}
-            onSwapLineup={api.swapLineup}
-          />
+          {rankingsView === 'crowd' && !crowd.loading && !crowdReady ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              No crowd board yet. League members need to save their rankings first.
+            </div>
+          ) : (
+            <Board
+              board={activeBoard}
+              weights={activeLeague.weights}
+              expandedId={expandedId}
+              canEdit={boardCanEdit}
+              canSwapTeam={canSwapTeam}
+              yourTeamId={yourTeamId}
+              lineupLimits={lineupLimits}
+              isSuperflex={isSuperflex}
+              boardTitle={rankingsView === 'crowd' ? 'League crowd board' : 'The board'}
+              boardCaption={
+                rankingsView === 'crowd'
+                  ? 'Avg place is how members rank that team overall. Your self-rank is excluded from your team\'s crowd score. RB room breaks ties.'
+                  : undefined
+              }
+              showAverage={rankingsView === 'crowd'}
+              averageLabel="Avg place"
+              onToggle={(id) => {
+                setExpandedId((current) => (current === id ? null : id));
+                setActiveTeamId(id);
+              }}
+              onGutBump={api.setGutBump}
+              onSwapLineup={api.swapLineup}
+            />
+          )}
         </div>
         <div className="rounded-lg border border-border/60 bg-card/40 p-4 overflow-x-hidden pr-2 scrollbar-thin lg:max-h-[min(75dvh,720px)] lg:overflow-y-auto">
 
@@ -332,13 +393,20 @@ function RankerBoard({
               {canManageRosters ? <TabsTrigger value="weights">Weights</TabsTrigger> : null}
             </TabsList>
             <TabsContent value="rooms">
-              <RoomRanker
-                league={api.league}
-                activeRoom={activeRoom}
-                canEdit
-                onRoomChange={setActiveRoom}
-                onReorder={api.setOrdinalOrder}
-              />
+              {rankingsView === 'crowd' && !crowd.loading && !crowdReady ? (
+                <p className="text-sm text-muted-foreground">
+                  Rank rooms will appear here once league members start ranking teams.
+                </p>
+              ) : (
+                <RoomRanker
+                  league={activeLeague}
+                  activeRoom={activeRoom}
+                  canEdit={boardCanEdit}
+                  contributorCount={crowd.contributorCount}
+                  onRoomChange={setActiveRoom}
+                  onReorder={api.setOrdinalOrder}
+                />
+              )}
             </TabsContent>
             <TabsContent value="rosters">
               <RosterEditor

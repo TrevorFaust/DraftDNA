@@ -103,7 +103,7 @@ Deno.serve(async (req: Request) => {
     }
     if (emailExists) {
       return json(409, {
-        error: 'You already have an account with this email. Sign in instead, or reset your password.',
+        error: 'You already have an account with this email. Sign in instead.',
       });
     }
 
@@ -118,7 +118,7 @@ Deno.serve(async (req: Request) => {
       const msg = (createError.message ?? '').toLowerCase();
       if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
         return json(409, {
-          error: 'You already have an account with this email. Sign in instead, or reset your password.',
+          error: 'You already have an account with this email. Sign in instead.',
         });
       }
       console.error('create-account createUser:', createError);

@@ -18,7 +18,7 @@ Rank and mock without an account if you want to kick the tires. Make one when yo
 
 **Leagues.** Invite friends with a link. Each person claims a team. Shared scoring, lineup slots, keepers. The commissioner can reassign or remove people. Guest mode still keeps rankings and mocks in the browser until you sign in.
 
-**Team Rankings.** Rank every team's rooms, 1st at the top. Paste a full roster or search a player. Members only swap the lineup on the team they claimed.
+**Team Rankings.** Rank every team's rooms, 1st at the top. Each league member keeps their own board; switch to **League crowd** to see how the room ranks teams on average (e.g. 1.5 when most people have you 1st). Your self-rank never counts toward your team's crowd score. RB room breaks ties on the board. Paste a full roster or search a player. On mobile, use the arrows to reorder rooms. Members only swap the lineup on the team they claimed.
 
 **Weekly Pick'em.** Pick NFL winners each week and keep a record against the rest of the league.
 
@@ -54,7 +54,7 @@ Data setup: `HOW_TO_SYNC_DATA.md`, `sync_instructions.md`. Pick Six notes: `PICK
 src/
 ├── components/     # UI, PlayerCard, Navbar, Pick Six share card, etc.
 ├── constants/      # Archetypes, scoring, NFL/contest data
-├── features/       # Team Rankings board
+├── features/       # Team Rankings board and league crowd aggregation
 ├── hooks/          # Auth, leagues, community rankings, Pick Six live stats
 ├── pages/          # Rankings, MockDraft, DraftRoom, LeagueRanker, Pickem, etc.
 ├── utils/          # CPU draft logic, draft grades, Pick Six scoring

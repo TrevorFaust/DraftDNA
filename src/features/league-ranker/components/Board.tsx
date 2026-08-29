@@ -15,6 +15,11 @@ type Props = {
   yourTeamId?: string | null;
   lineupLimits?: PositionLimitsLike | null;
   isSuperflex?: boolean;
+  boardTitle?: string;
+  boardCaption?: string;
+  /** When true, show the numeric avg (e.g. crowd overall place). */
+  showAverage?: boolean;
+  averageLabel?: string;
   onToggle: (teamId: string) => void;
   onGutBump: (teamId: string, value: number) => void;
   onSwapLineup?: (teamId: string, from: LineupSlotKey, to: LineupSlotKey) => void;
@@ -44,19 +49,24 @@ export function Board({
   yourTeamId,
   lineupLimits,
   isSuperflex = false,
+  boardTitle = 'The board',
+  boardCaption,
+  showAverage = true,
+  averageLabel = 'Avg rank',
   onToggle,
   onGutBump,
   onSwapLineup,
 }: Props) {
   const formula = ROOMS.map((room) => `${ROOM_SHORT[room]}×${weights[room]}%`).join(' + ');
+  const caption =
+    boardCaption ??
+    `Room ranks weighted by ${formula}. Lower place wins. RB room is the tiebreaker.`;
 
   return (
     <section aria-label="Overall board">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <h2 className="font-display text-3xl tracking-wide">The board</h2>
-        <p className="max-w-sm text-xs text-muted-foreground">
-          {formula} − gut bump. Lower total wins. Equal totals go to the better RB room.
-        </p>
+        <h2 className="font-display text-3xl tracking-wide">{boardTitle}</h2>
+        <p className="max-w-sm text-xs text-muted-foreground">{caption}</p>
       </div>
       <ol className="grid gap-2">
         {board.map((row) => {
@@ -76,7 +86,12 @@ export function Board({
                 onClick={() => onToggle(row.team.id)}
                 aria-expanded={open}
               >
-                <div className="grid grid-cols-[3rem_1fr_auto] items-baseline gap-3">
+                <div
+                  className={cn(
+                    'grid items-baseline gap-3',
+                    showAverage ? 'grid-cols-[3rem_1fr_auto]' : 'grid-cols-[3rem_1fr]',
+                  )}
+                >
                   <span className={cn('font-display text-3xl leading-none', rankColor(row.rank))}>
                     {String(row.rank).padStart(2, '0')}
                   </span>
@@ -88,7 +103,16 @@ export function Board({
                       </span>
                     ) : null}
                   </span>
-                  <span className="font-display text-2xl leading-none tabular-nums">{row.total.toFixed(2)}</span>
+                  {showAverage ? (
+                    <span className="text-right">
+                      <span className="font-display text-2xl leading-none tabular-nums">
+                        {row.total.toFixed(2)}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {averageLabel}
+                      </span>
+                    </span>
+                  ) : null}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5 sm:pl-[3.75rem]">
                   {ROOMS.map((room) => (
@@ -103,11 +127,6 @@ export function Board({
                     </span>
                   ))}
                 </div>
-                {row.tied ? (
-                  <p className="mt-1 text-xs uppercase tracking-wide text-accent sm:pl-[3.75rem]">
-                    Tied on total · RB {formatPlace(row.roomPlace.RB)}
-                  </p>
-                ) : null}
               </button>
               {open ? (
                 <div className="space-y-3 border-t border-dashed border-border px-3 pb-4 pt-3 sm:pl-[4.5rem]">
