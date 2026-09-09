@@ -38,7 +38,9 @@ import {
 import {
   clearSeasonPredictionBoard,
   fetchSeasonPredictionBoard,
+  preferRicherSeasonBoard,
   saveSeasonPredictionBoard,
+  seasonBoardPickCount,
 } from '@/utils/seasonPredictionsRemote';
 import {
   clearSeasonPredictionPicks,
@@ -48,6 +50,7 @@ import {
   seasonBoardHasContent,
   seasonPickProgress,
   weekPickProgress,
+  type SeasonPredictionBoardState,
   type SeasonPredictionPicks,
 } from '@/utils/seasonPredictionsStorage';
 import { cn } from '@/lib/utils';
@@ -104,7 +107,7 @@ function lockedToast() {
 }
 
 export default function SeasonPredictions() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const initial = loadSeasonPredictionState();
   const initialProgress = seasonPickProgress(initial.picks);
   const seasonLocked = isSeasonPredictionsLocked();
@@ -117,11 +120,30 @@ export default function SeasonPredictions() {
   const [picks, setPicks] = useState<SeasonPredictionPicks>(() => initial.picks);
   const [bracket, setBracket] = useState<PlayoffBracketPicks>(() => initial.bracket);
   const [awards, setAwards] = useState<SeasonAwardsPicks>(() => initial.awards);
-  /** When signed in, wait for cloud hydrate before writing remote (avoids wiping account with empty local). */
-  const [cloudReady, setCloudReady] = useState(() => !user);
-  const cloudUserIdRef = useRef<string | null>(user?.id ?? null);
+  /** Wait for auth + cloud hydrate before writing remote. */
+  const [cloudReady, setCloudReady] = useState(false);
+  const cloudUserIdRef = useRef<string | null>(null);
+  const applyingRemoteRef = useRef(false);
+
+  const applyBoard = (board: SeasonPredictionBoardState, nextView?: SeasonPredictionView) => {
+    applyingRemoteRef.current = true;
+    setPicks(board.picks);
+    setBracket(board.bracket);
+    setAwards(board.awards);
+    saveSeasonPredictionState(board.picks, board.bracket, board.awards, PICKEM_SEASON);
+    if (nextView) setView(nextView);
+    else {
+      const remoteProgress = seasonPickProgress(board.picks);
+      setView(remoteProgress.complete ? 'records' : 'picks');
+    }
+    queueMicrotask(() => {
+      applyingRemoteRef.current = false;
+    });
+  };
 
   useEffect(() => {
+    if (authLoading) return;
+
     cloudUserIdRef.current = user?.id ?? null;
     if (!user) {
       setCloudReady(true);
@@ -135,24 +157,40 @@ export default function SeasonPredictions() {
       const remote = await fetchSeasonPredictionBoard(user.id, PICKEM_SEASON);
       if (cancelled) return;
 
-      if (remote) {
-        setPicks(remote.picks);
-        setBracket(remote.bracket);
-        setAwards(remote.awards);
-        saveSeasonPredictionState(remote.picks, remote.bracket, remote.awards, PICKEM_SEASON);
-        const remoteProgress = seasonPickProgress(remote.picks);
-        setView(remoteProgress.complete ? 'records' : 'picks');
-      } else {
-        const local = loadSeasonPredictionState(PICKEM_SEASON);
-        if (seasonBoardHasContent(local)) {
+      if (!remote.ok) {
+        toast.error('Could not load synced Season Predictions. Using this device only for now.');
+        if (!cancelled) setCloudReady(true);
+        return;
+      }
+
+      const local = loadSeasonPredictionState(PICKEM_SEASON);
+      const remoteBoard = remote.board;
+      const remoteHasPicks = remoteBoard ? seasonBoardPickCount(remoteBoard) > 0 : false;
+      const localHasPicks = seasonBoardPickCount(local) > 0;
+
+      if (remoteBoard && remoteHasPicks && localHasPicks) {
+        const chosen = preferRicherSeasonBoard(remoteBoard, local);
+        applyBoard(chosen);
+        if (seasonBoardPickCount(chosen) > seasonBoardPickCount(remoteBoard)) {
           await saveSeasonPredictionBoard(
             user.id,
-            local.picks,
-            local.bracket,
-            local.awards,
+            chosen.picks,
+            chosen.bracket,
+            chosen.awards,
             PICKEM_SEASON
           );
         }
+      } else if (remoteBoard && (remoteHasPicks || seasonBoardHasContent(remoteBoard))) {
+        applyBoard(remoteBoard);
+      } else if (seasonBoardHasContent(local)) {
+        applyBoard(local, seasonPickProgress(local.picks).complete ? 'records' : 'picks');
+        await saveSeasonPredictionBoard(
+          user.id,
+          local.picks,
+          local.bracket,
+          local.awards,
+          PICKEM_SEASON
+        );
       }
 
       if (!cancelled) setCloudReady(true);
@@ -161,15 +199,18 @@ export default function SeasonPredictions() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, authLoading]);
 
   useEffect(() => {
     saveSeasonPredictionState(picks, bracket, awards, PICKEM_SEASON);
     const userId = cloudUserIdRef.current;
-    if (!userId || !cloudReady) return;
+    if (!userId || !cloudReady || applyingRemoteRef.current) return;
+    if (!seasonBoardHasContent({ picks, bracket, awards })) return;
 
     const timer = window.setTimeout(() => {
-      void saveSeasonPredictionBoard(userId, picks, bracket, awards, PICKEM_SEASON);
+      void saveSeasonPredictionBoard(userId, picks, bracket, awards, PICKEM_SEASON).then((ok) => {
+        if (!ok) toast.error('Could not sync Season Predictions to your account.');
+      });
     }, 400);
 
     return () => window.clearTimeout(timer);
