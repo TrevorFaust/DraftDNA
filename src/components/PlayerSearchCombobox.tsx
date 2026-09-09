@@ -23,6 +23,8 @@ import {
   PLAYER_POOL_CURRENT_SEASON,
 } from '@/constants/playerPoolSeason';
 import { mergePlayerPoolAcrossSeasons } from '@/utils/playerDeduplication';
+import { fetchRookiesRankings } from '@/utils/rookiesFilter';
+import { playerSearchIlikeVariants, playerSearchMatches } from '@/utils/playerNameMatch';
 import { Button } from '@/components/ui/button';
 
 const VALID_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'D/ST']);
@@ -55,11 +57,20 @@ interface PlayerSearchComboboxProps {
   excludePositions?: string[];
   /** When set, only players with this position are shown (e.g. 'QB', 'WR', 'D/ST'). */
   positionFilter?: string;
+  /**
+   * Limit results to the same rookies-only pool as dynasty drafts
+   * (`get_rookies_rankings` / baseline rookies).
+   */
+  rookiesOnly?: boolean;
   /** Use modal popover when rendered inside a dialog/focus trap. */
   popoverModal?: boolean;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  /** Show full selected name without truncating (awards UI). */
+  wrapSelectedName?: boolean;
+  /** When false, selected trigger shows name only (meta rendered elsewhere). */
+  showSelectedMeta?: boolean;
 }
 
 export function PlayerSearchCombobox({
@@ -68,15 +79,59 @@ export function PlayerSearchCombobox({
   excludePlayerIds = new Set(),
   excludePositions = [],
   positionFilter,
+  rookiesOnly = false,
   popoverModal = false,
   disabled = false,
   placeholder = 'Search player...',
   className,
+  wrapSelectedName = false,
+  showSelectedMeta = true,
 }: PlayerSearchComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
+  const [rookiePool, setRookiePool] = useState<Player[] | null>(null);
+  const [rookiesLoading, setRookiesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!rookiesOnly) {
+      setRookiePool(null);
+      setRookiesLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRookiesLoading(true);
+    (async () => {
+      const rows = await fetchRookiesRankings({
+        scoringFormat: 'ppr',
+        leagueType: 'dynasty',
+        isSuperflex: false,
+      });
+      if (cancelled) return;
+      if (rows.length === 0) {
+        setRookiePool([]);
+        setRookiesLoading(false);
+        return;
+      }
+      const rankMap = new Map(rows.map((r) => [r.player_id, Number(r.rank)]));
+      const ids = rows.map((r) => r.player_id);
+      const { data, error } = await supabase.from('players').select('*').in('id', ids);
+      if (cancelled) return;
+      if (error || !data) {
+        setRookiePool([]);
+      } else {
+        const sorted = (data as Player[])
+          .map((p) => ({ ...p, adp: rankMap.get(p.id) ?? p.adp ?? 999 }))
+          .sort((a, b) => (rankMap.get(a.id) ?? 999) - (rankMap.get(b.id) ?? 999));
+        setRookiePool(sorted);
+      }
+      setRookiesLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [rookiesOnly]);
 
   const fetchPlayers = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -85,13 +140,36 @@ export function PlayerSearchCombobox({
     }
     setLoading(true);
     const searchLower = query.toLowerCase().trim();
+
+    if (rookiesOnly) {
+      const pool = rookiePool ?? [];
+      const matched = pool
+        .filter((p) => {
+          return (
+            playerSearchMatches(p.name || '', searchLower) ||
+            playerSearchMatches(p.team || '', searchLower)
+          );
+        })
+        .filter((p) => !positionFilter || p.position === positionFilter)
+        .slice(0, 25);
+      setPlayers(matched);
+      setLoading(false);
+      return;
+    }
+
+    const variants = playerSearchIlikeVariants(searchLower);
+    const nameClauses = variants.map((v) => `name.ilike.%${v}%`).join(',');
+    const orFilter = nameClauses
+      ? `${nameClauses},team.ilike.%${searchLower}%`
+      : `name.ilike.%${searchLower}%,team.ilike.%${searchLower}%`;
+
     let queryBuilder = supabase
       .from('players')
       .select('*')
       .in('season', [PLAYER_POOL_PRIOR_SEASON, PLAYER_POOL_CURRENT_SEASON])
-      .or(`name.ilike.%${searchLower}%,team.ilike.%${searchLower}%`)
+      .or(orFilter)
       .order('adp', { ascending: true })
-      .limit(60);
+      .limit(80);
     if (positionFilter) {
       queryBuilder = queryBuilder.eq('position', positionFilter);
     } else {
@@ -108,10 +186,17 @@ export function PlayerSearchCombobox({
         PLAYER_POOL_PRIOR_SEASON,
         PLAYER_POOL_CURRENT_SEASON
       );
-      setPlayers(dedupeDefenses(merged).slice(0, 25));
+      const punctFiltered = dedupeDefenses(merged)
+        .filter(
+          (p) =>
+            playerSearchMatches(p.name || '', searchLower) ||
+            playerSearchMatches(p.team || '', searchLower)
+        )
+        .slice(0, 25);
+      setPlayers(punctFiltered);
     }
     setLoading(false);
-  }, [positionFilter]);
+  }, [positionFilter, rookiesOnly, rookiePool]);
 
   useEffect(() => {
     const debounce = setTimeout(() => {
@@ -133,6 +218,13 @@ export function PlayerSearchCombobox({
     return !excludedPositionsSet.has(normalizePosition(p.position));
   });
 
+  const emptyMessage = (() => {
+    if (loading || (rookiesOnly && rookiesLoading)) return 'Searching...';
+    if (rookiesOnly && rookiePool && rookiePool.length === 0) return 'No rookies available';
+    if (filteredPlayers.length === 0) return rookiesOnly ? 'No rookies found' : 'No players found';
+    return '';
+  })();
+
   return (
     <Popover open={open} onOpenChange={setOpen} modal={popoverModal}>
       <PopoverTrigger asChild>
@@ -142,41 +234,51 @@ export function PlayerSearchCombobox({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'w-full justify-between font-normal min-h-11 py-2 h-auto px-2 sm:px-2.5',
+            'h-auto min-h-11 w-full px-2 py-2 font-normal sm:px-2.5',
+            wrapSelectedName ? 'justify-start gap-2' : 'justify-between',
             !value && 'text-muted-foreground',
             className
           )}
         >
-          <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <span className="flex min-w-0 items-center gap-2 text-left">
             {value ? (
               <>
-                <span className="min-w-0 flex-1 truncate text-base font-semibold leading-tight">
+                <span
+                  className={cn(
+                    'text-base font-semibold leading-tight',
+                    wrapSelectedName
+                      ? 'max-w-full whitespace-normal break-words'
+                      : 'min-w-0 flex-1 truncate'
+                  )}
+                >
                   {value.name}
                 </span>
-                <PositionBadge position={value.position} className="shrink-0 text-[10px]" />
-                {!isDefense(value.position) && value.team && (
-                  <span className="shrink-0 text-xs text-muted-foreground">({value.team})</span>
+                {showSelectedMeta && (
+                  <>
+                    <PositionBadge position={value.position} className="shrink-0 text-[10px]" />
+                    {!isDefense(value.position) && value.team && (
+                      <span className="shrink-0 text-xs text-muted-foreground">({value.team})</span>
+                    )}
+                  </>
                 )}
               </>
             ) : (
               <span className="text-sm">{placeholder}</span>
             )}
           </span>
-          <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Type to search..."
+            placeholder={rookiesOnly ? 'Search rookies...' : 'Type to search...'}
             value={search}
             onValueChange={setSearch}
           />
           {search.trim() ? (
             <CommandList className="scrollbar-thin">
-              <CommandEmpty>
-                {loading ? 'Searching...' : filteredPlayers.length === 0 ? 'No players found' : ''}
-              </CommandEmpty>
+              <CommandEmpty>{emptyMessage}</CommandEmpty>
               <CommandGroup>
                 {filteredPlayers.map((player) => (
                   <CommandItem

@@ -1,8 +1,8 @@
-import { Check, Shield, Table2, Trophy } from 'lucide-react';
+import { Award, Check, Shield, Table2, Trophy } from 'lucide-react';
 import { PICKEM_WEEKS } from '@/constants/pickem';
 import { cn } from '@/lib/utils';
 
-export type SeasonPredictionView = 'picks' | 'byTeam' | 'records' | 'playoffs';
+export type SeasonPredictionView = 'picks' | 'byTeam' | 'records' | 'playoffs' | 'awards';
 
 type Props = {
   selectedWeek: number | null;
@@ -13,6 +13,7 @@ type Props = {
   onSelectByTeam: () => void;
   onSelectRecords: () => void;
   onSelectPlayoffs: () => void;
+  onSelectAwards: () => void;
 };
 
 const bubbleClass = (selected: boolean) =>
@@ -33,6 +34,7 @@ export function SeasonPredictionWeekBubbles({
   onSelectByTeam,
   onSelectRecords,
   onSelectPlayoffs,
+  onSelectAwards,
 }: Props) {
   const weeks = Array.from({ length: PICKEM_WEEKS }, (_, i) => i + 1);
 
@@ -104,6 +106,23 @@ export function SeasonPredictionWeekBubbles({
       >
         <Trophy className="h-3.5 w-3.5" aria-hidden />
         Playoffs
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeView === 'awards'}
+        aria-label={recordsReady ? 'Awards' : 'Awards (finish all weeks first)'}
+        aria-disabled={!recordsReady}
+        disabled={!recordsReady}
+        onClick={onSelectAwards}
+        className={cn(
+          bubbleClass(activeView === 'awards'),
+          'gap-1.5 px-3.5',
+          !recordsReady && 'cursor-not-allowed opacity-45 hover:border-border/70 hover:text-muted-foreground'
+        )}
+      >
+        <Award className="h-3.5 w-3.5" aria-hidden />
+        Awards
       </button>
     </div>
   );

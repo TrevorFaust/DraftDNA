@@ -4,6 +4,7 @@ import { Dices, Lock, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Navbar } from '@/components/Navbar';
 import { PickemMatchupRow } from '@/components/pickem/PickemMatchupRow';
+import { SeasonAwardsPanel } from '@/components/season-predictions/SeasonAwardsPanel';
 import { SeasonPlayoffBracketBoard } from '@/components/season-predictions/SeasonPlayoffBracket';
 import {
   SeasonPredictionWeekBubbles,
@@ -12,6 +13,12 @@ import {
 import { SeasonStandingsBoard } from '@/components/season-predictions/SeasonStandingsBoard';
 import { SeasonTeamEditor } from '@/components/season-predictions/SeasonTeamEditor';
 import { Button } from '@/components/ui/button';
+import {
+  emptySeasonAwardsPicks,
+  type SeasonAwardId,
+  type SeasonAwardPick,
+  type SeasonAwardsPicks,
+} from '@/constants/seasonAwards';
 import {
   isSeasonPredictionsLocked,
   PICKEM_SEASON,
@@ -101,10 +108,11 @@ export default function SeasonPredictions() {
   const [editTeamAbbr, setEditTeamAbbr] = useState<string | null>(null);
   const [picks, setPicks] = useState<SeasonPredictionPicks>(() => initial.picks);
   const [bracket, setBracket] = useState<PlayoffBracketPicks>(() => initial.bracket);
+  const [awards, setAwards] = useState<SeasonAwardsPicks>(() => initial.awards);
 
   useEffect(() => {
-    saveSeasonPredictionState(picks, bracket);
-  }, [picks, bracket]);
+    saveSeasonPredictionState(picks, bracket, awards);
+  }, [picks, bracket, awards]);
 
   const progress = useMemo(() => seasonPickProgress(picks), [picks]);
   const playoffSeeds = useMemo(
@@ -151,6 +159,22 @@ export default function SeasonPredictions() {
       return;
     }
     setView('playoffs');
+  };
+
+  const selectAwards = () => {
+    if (!progress.complete) {
+      toast.message('Finish every week to unlock awards.');
+      return;
+    }
+    setView('awards');
+  };
+
+  const handleAwardChange = (awardId: SeasonAwardId, pick: SeasonAwardPick | null) => {
+    if (seasonLocked) {
+      lockedToast();
+      return;
+    }
+    setAwards((prev) => ({ ...prev, [awardId]: pick }));
   };
 
   const handlePick = (key: string, abbr: string) => {
@@ -230,6 +254,7 @@ export default function SeasonPredictions() {
     clearSeasonPredictionPicks();
     setPicks({});
     setBracket(emptyPlayoffBracketPicks());
+    setAwards(emptySeasonAwardsPicks());
     setWeek(1);
     setEditTeamAbbr(null);
     setView('picks');
@@ -304,7 +329,10 @@ export default function SeasonPredictions() {
                 Random fill
               </Button>
             )}
-            {!seasonLocked && (progress.picked > 0 || playoffsComplete) && (
+            {!seasonLocked &&
+              (progress.picked > 0 ||
+                playoffsComplete ||
+                Object.values(awards).some(Boolean)) && (
               <Button type="button" variant="outline" className="gap-2" onClick={handleReset}>
                 <RotateCcw className="h-4 w-4" />
                 Reset
@@ -317,8 +345,8 @@ export default function SeasonPredictions() {
           <div className="mb-4 flex items-start gap-2 rounded-xl border border-border/60 bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <p>
-              Predictions locked after September 11, 2026. You can still view your standings and
-              bracket, but picks can no longer change.
+              Predictions locked after September 11, 2026. You can still view standings, bracket,
+              and awards, but picks can no longer change.
             </p>
           </div>
         )}
@@ -334,7 +362,7 @@ export default function SeasonPredictions() {
 
         <section className="mb-4" aria-labelledby="season-week-heading">
           <h2 id="season-week-heading" className="sr-only">
-            Select week, team editor, records, or playoffs
+            Select week, team editor, records, playoffs, or awards
           </h2>
           <SeasonPredictionWeekBubbles
             selectedWeek={week}
@@ -345,6 +373,7 @@ export default function SeasonPredictions() {
             onSelectByTeam={selectByTeam}
             onSelectRecords={selectRecords}
             onSelectPlayoffs={selectPlayoffs}
+            onSelectAwards={selectAwards}
           />
         </section>
 
@@ -355,7 +384,7 @@ export default function SeasonPredictions() {
                 <h2 className="font-display text-xl tracking-wide">Projected records</h2>
                 <p className="text-sm text-muted-foreground">
                   {seasonLocked
-                    ? 'Your locked standings and playoff seeds.'
+                    ? 'Your locked standings, playoff seeds, and awards.'
                     : "Tap a team to edit that club's games, or use week bubbles / By team."}
                 </p>
               </div>
@@ -370,6 +399,9 @@ export default function SeasonPredictions() {
                     </Button>
                   </>
                 )}
+                <Button type="button" variant="outline" onClick={selectAwards}>
+                  Awards
+                </Button>
                 <Button type="button" onClick={selectPlayoffs}>
                   Playoff bracket
                 </Button>
@@ -377,7 +409,23 @@ export default function SeasonPredictions() {
             </div>
             <SeasonStandingsBoard
               picks={picks}
+              awards={awards}
+              awardsLocked={seasonLocked}
+              onAwardChange={handleAwardChange}
               onSelectTeam={seasonLocked ? undefined : selectTeamEditor}
+            />
+          </section>
+        ) : view === 'awards' ? (
+          <section>
+            <div className="mb-4 flex justify-end">
+              <Button type="button" variant="outline" onClick={selectRecords}>
+                View records
+              </Button>
+            </div>
+            <SeasonAwardsPanel
+              awards={awards}
+              locked={seasonLocked}
+              onChange={handleAwardChange}
             />
           </section>
         ) : view === 'playoffs' && playoffSeeds ? (

@@ -18,8 +18,17 @@ export const PositionBadge = ({ position, className }: PositionBadgeProps) => {
         return 'position-te';
       case 'K':
         return 'position-k';
+      case 'HC':
+      case 'COACH':
+        return 'bg-secondary text-secondary-foreground';
       case 'DEF':
       case 'D/ST':
+      case 'DL':
+      case 'EDGE':
+      case 'LB':
+      case 'DB':
+      case 'CB':
+      case 'S':
         return 'position-def';
       default:
         return 'bg-muted text-muted-foreground';

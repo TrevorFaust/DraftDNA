@@ -17,7 +17,7 @@ export interface RookiesFilterParams {
 /**
  * Fetches rookies-only rankings via get_rookies_rankings RPC.
  * Returns players that exist in the DB and match baseline_rookies for the bucket.
- * Excludes D/ST and K.
+ * Excludes D/ST (kickers are included when present in baseline_rookies).
  */
 export async function fetchRookiesRankings(
   params: RookiesFilterParams

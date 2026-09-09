@@ -765,7 +765,9 @@ const Rankings = () => {
     return buildPositionAdpRankMap([...byId.values()]);
   }, [players, communityPlayers]);
   const positionsAlphabetical = useMemo(() => {
-    const base = displayBucket.rookiesOnly ? ['QB', 'RB', 'WR', 'TE'] : ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
+    const base = displayBucket.rookiesOnly
+      ? ['QB', 'RB', 'WR', 'TE', 'K']
+      : ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
     return [...base].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   }, [displayBucket.rookiesOnly]);
 
@@ -1773,7 +1775,7 @@ const Rankings = () => {
       allPlayersData = updatedPlayersData;
       allPlayersDataRef.current = allPlayersData;
 
-      // When rookies-only, filter to rookies and exclude D/ST, K
+      // When rookies-only, filter to rookies (includes K; excludes D/ST)
       if (effectiveBucket.rookiesOnly) {
         const rookiesRows = await fetchRookiesRankings({
           scoringFormat: effectiveBucket.scoringFormat,

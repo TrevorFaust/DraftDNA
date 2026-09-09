@@ -1,5 +1,10 @@
 import { PICKEM_SEASON } from '@/constants/pickem';
 import {
+  emptySeasonAwardsPicks,
+  normalizeSeasonAwardsPicks,
+  type SeasonAwardsPicks,
+} from '@/constants/seasonAwards';
+import {
   allScheduleGames,
   canonScheduleAbbr,
   scheduleGameKey,
@@ -18,6 +23,7 @@ type StoredPayload = {
   season: number;
   picks: SeasonPredictionPicks;
   bracket?: PlayoffBracketPicks;
+  awards?: SeasonAwardsPicks;
 };
 
 function storageKey(season: number): string {
@@ -73,18 +79,27 @@ function normalizeAbbr(value: unknown): string | null {
 export function loadSeasonPredictionState(season: number = PICKEM_SEASON): {
   picks: SeasonPredictionPicks;
   bracket: PlayoffBracketPicks;
+  awards: SeasonAwardsPicks;
 } {
   try {
     const raw = localStorage.getItem(storageKey(season));
     if (!raw) {
       const legacyPicks = loadLegacyV1Picks(season);
-      return { picks: legacyPicks, bracket: emptyPlayoffBracketPicks() };
+      return {
+        picks: legacyPicks,
+        bracket: emptyPlayoffBracketPicks(),
+        awards: emptySeasonAwardsPicks(),
+      };
     }
 
     const parsed = JSON.parse(raw) as StoredPayload;
     if (parsed?.season !== season || !parsed.picks || typeof parsed.picks !== 'object') {
       const legacyPicks = loadLegacyV1Picks(season);
-      return { picks: legacyPicks, bracket: emptyPlayoffBracketPicks() };
+      return {
+        picks: legacyPicks,
+        bracket: emptyPlayoffBracketPicks(),
+        awards: emptySeasonAwardsPicks(),
+      };
     }
 
     const picks: SeasonPredictionPicks = {};
@@ -97,9 +112,14 @@ export function loadSeasonPredictionState(season: number = PICKEM_SEASON): {
     return {
       picks,
       bracket: normalizeBracket(parsed.bracket),
+      awards: normalizeSeasonAwardsPicks(parsed.awards),
     };
   } catch {
-    return { picks: {}, bracket: emptyPlayoffBracketPicks() };
+    return {
+      picks: {},
+      bracket: emptyPlayoffBracketPicks(),
+      awards: emptySeasonAwardsPicks(),
+    };
   }
 }
 
@@ -110,9 +130,10 @@ export function loadSeasonPredictionPicks(season: number = PICKEM_SEASON): Seaso
 export function saveSeasonPredictionState(
   picks: SeasonPredictionPicks,
   bracket: PlayoffBracketPicks,
+  awards: SeasonAwardsPicks = emptySeasonAwardsPicks(),
   season: number = PICKEM_SEASON
 ): void {
-  const payload: StoredPayload = { season, picks, bracket };
+  const payload: StoredPayload = { season, picks, bracket, awards };
   localStorage.setItem(storageKey(season), JSON.stringify(payload));
 }
 
@@ -120,8 +141,8 @@ export function saveSeasonPredictionPicks(
   picks: SeasonPredictionPicks,
   season: number = PICKEM_SEASON
 ): void {
-  const { bracket } = loadSeasonPredictionState(season);
-  saveSeasonPredictionState(picks, bracket, season);
+  const { bracket, awards } = loadSeasonPredictionState(season);
+  saveSeasonPredictionState(picks, bracket, awards, season);
 }
 
 export function clearSeasonPredictionPicks(season: number = PICKEM_SEASON): void {

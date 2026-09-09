@@ -1,3 +1,4 @@
+import { SeasonAwardsPanel } from '@/components/season-predictions/SeasonAwardsPanel';
 import {
   buildAllPlayoffSeeds,
   buildSeasonStandings,
@@ -7,11 +8,15 @@ import {
   type DivisionStanding,
   type PlayoffSeed,
 } from '@/utils/seasonPredictionRecords';
+import type { SeasonAwardId, SeasonAwardPick, SeasonAwardsPicks } from '@/constants/seasonAwards';
 import type { SeasonPredictionPicks } from '@/utils/seasonPredictionsStorage';
 import { cn } from '@/lib/utils';
 
 type Props = {
   picks: SeasonPredictionPicks;
+  awards: SeasonAwardsPicks;
+  awardsLocked?: boolean;
+  onAwardChange: (awardId: SeasonAwardId, pick: SeasonAwardPick | null) => void;
   onSelectTeam?: (abbr: string) => void;
 };
 
@@ -154,7 +159,13 @@ function PlayoffSeedList({ seeds }: { seeds: PlayoffSeed[] }) {
   );
 }
 
-export function SeasonStandingsBoard({ picks, onSelectTeam }: Props) {
+export function SeasonStandingsBoard({
+  picks,
+  awards,
+  awardsLocked = false,
+  onAwardChange,
+  onSelectTeam,
+}: Props) {
   const boards = buildSeasonStandings(picks);
   const playoffSeeds = buildAllPlayoffSeeds(picks);
   const playoffAbbrs = new Set([
@@ -211,6 +222,19 @@ export function SeasonStandingsBoard({ picks, onSelectTeam }: Props) {
             <PlayoffSeedList seeds={playoffSeeds.nfc} />
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-col items-center">
+        <h3 className="font-display mb-1 text-center text-xl tracking-wide">Awards</h3>
+        <p className="mb-4 max-w-md text-center text-sm text-muted-foreground">
+          Pick your winners below, or open the Awards tab for the same list.
+        </p>
+        <SeasonAwardsPanel
+          awards={awards}
+          locked={awardsLocked}
+          onChange={onAwardChange}
+          embedded
+        />
       </div>
     </div>
   );
