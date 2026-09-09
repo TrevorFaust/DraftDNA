@@ -14,7 +14,7 @@ import {
   BarChart3,
   Table2,
 } from 'lucide-react';
-import { ClipboardList, Medal, ListChecks } from 'lucide-react';
+import { ClipboardList, Medal, ListChecks, CalendarRange } from 'lucide-react';
 import { PICK_SIX_TOTAL_PRIZE_POOL_USD } from '@/constants/contest';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickSixMark } from '@/components/PickSixIcon';
@@ -148,6 +148,15 @@ const Dashboard = () => {
       gradient: 'bg-gradient-to-br from-[hsl(350_78%_72%)] to-[hsl(28_92%_58%)]',
       hoverBorder: 'hover:border-[hsl(350_50%_50%/0.45)]',
       iconColor: 'text-primary-foreground',
+    },
+    {
+      title: 'Season Predictions',
+      description: 'Pick every NFL game before the season and reveal projected division records',
+      icon: CalendarRange,
+      path: '/season-predictions',
+      gradient: 'bg-gradient-to-br from-orange-500 to-amber-600',
+      hoverBorder: 'hover:border-orange-500/50',
+      iconColor: 'text-white',
     },
     {
       title: "Pick'em",

@@ -43,6 +43,7 @@ import {
   Medal,
   ListChecks,
   Target,
+  CalendarRange,
 } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
 import { NewsTeamPicker } from '@/components/news/NewsTeamPicker';
@@ -64,6 +65,7 @@ const preSeasonItems: NavItem[] = [
   { path: '/rankings', label: 'Rankings', icon: ListOrdered },
   { path: '/players', label: 'Player Stats', icon: Table2 },
   { path: '/statistics', label: 'Draft Stats', icon: BarChart3 },
+  { path: '/season-predictions', label: 'Season Predictions', icon: CalendarRange },
   { path: '/history', label: 'History', icon: History },
   { path: '/badges', label: 'Badges', icon: Award },
 ];

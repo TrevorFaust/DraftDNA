@@ -38,6 +38,7 @@ const NewsTeamWeeklies = lazy(() => import("./pages/NewsTeamWeeklies"));
 const NewsTeamIssue = lazy(() => import("./pages/NewsTeamIssue"));
 const LeagueRanker = lazy(() => import("./pages/LeagueRanker"));
 const Pickem = lazy(() => import("./pages/Pickem"));
+const SeasonPredictions = lazy(() => import("./pages/SeasonPredictions"));
 const JoinLeague = lazy(() => import("./pages/JoinLeague"));
 
 function PageFallback() {
@@ -104,6 +105,7 @@ const App = () => (
                     <Route path="/league-settings" element={<LeagueSettings />} />
                     <Route path="/league-ranker" element={<Suspense fallback={<PageFallback />}><LeagueRanker /></Suspense>} />
                     <Route path="/pickem" element={<Suspense fallback={<PageFallback />}><Pickem /></Suspense>} />
+                    <Route path="/season-predictions" element={<Suspense fallback={<PageFallback />}><SeasonPredictions /></Suspense>} />
                     <Route path="/join/:inviteCode" element={<Suspense fallback={<PageFallback />}><JoinLeague /></Suspense>} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>

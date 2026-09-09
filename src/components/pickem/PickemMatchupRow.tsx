@@ -10,6 +10,8 @@ type Props = {
   matchup: WeekMatchup;
   picked: string | null;
   onPick: (abbr: string) => void;
+  /** Keep picks editable even after kickoff (season predictions). */
+  alwaysUnlocked?: boolean;
 };
 
 function pickCount(matchup: WeekMatchup, abbr: string): number {
@@ -87,8 +89,8 @@ function TeamPick({
   );
 }
 
-export function PickemMatchupRow({ matchup, picked, onPick }: Props) {
-  const locked = isMatchupLocked(matchup);
+export function PickemMatchupRow({ matchup, picked, onPick, alwaysUnlocked = false }: Props) {
+  const locked = alwaysUnlocked ? false : isMatchupLocked(matchup);
   const game = matchup.game;
   const showCounts = Boolean(locked && game && game.member_picks.length > 0);
   const { data: jerseyColors } = useNflTeamJerseyColors();
