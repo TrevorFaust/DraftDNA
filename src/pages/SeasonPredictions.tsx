@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Dices, Lock, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,6 +25,7 @@ import {
   PICKEM_WEEKS,
 } from '@/constants/pickem';
 import { gamesForWeek, scheduleGameKey } from '@/constants/nfl2026ScheduleGrid';
+import { useAuth } from '@/hooks/useAuth';
 import { buildAllPlayoffSeeds } from '@/utils/seasonPredictionRecords';
 import { officialKickoff, type WeekMatchup } from '@/utils/nfl2026Schedule';
 import {
@@ -35,10 +36,16 @@ import {
   type PlayoffBracketPicks,
 } from '@/utils/seasonPlayoffBracket';
 import {
+  clearSeasonPredictionBoard,
+  fetchSeasonPredictionBoard,
+  saveSeasonPredictionBoard,
+} from '@/utils/seasonPredictionsRemote';
+import {
   clearSeasonPredictionPicks,
   fillRemainingRandomPicks,
   loadSeasonPredictionState,
   saveSeasonPredictionState,
+  seasonBoardHasContent,
   seasonPickProgress,
   weekPickProgress,
   type SeasonPredictionPicks,
@@ -97,6 +104,7 @@ function lockedToast() {
 }
 
 export default function SeasonPredictions() {
+  const { user } = useAuth();
   const initial = loadSeasonPredictionState();
   const initialProgress = seasonPickProgress(initial.picks);
   const seasonLocked = isSeasonPredictionsLocked();
@@ -109,10 +117,63 @@ export default function SeasonPredictions() {
   const [picks, setPicks] = useState<SeasonPredictionPicks>(() => initial.picks);
   const [bracket, setBracket] = useState<PlayoffBracketPicks>(() => initial.bracket);
   const [awards, setAwards] = useState<SeasonAwardsPicks>(() => initial.awards);
+  /** When signed in, wait for cloud hydrate before writing remote (avoids wiping account with empty local). */
+  const [cloudReady, setCloudReady] = useState(() => !user);
+  const cloudUserIdRef = useRef<string | null>(user?.id ?? null);
 
   useEffect(() => {
-    saveSeasonPredictionState(picks, bracket, awards);
-  }, [picks, bracket, awards]);
+    cloudUserIdRef.current = user?.id ?? null;
+    if (!user) {
+      setCloudReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    setCloudReady(false);
+
+    (async () => {
+      const remote = await fetchSeasonPredictionBoard(user.id, PICKEM_SEASON);
+      if (cancelled) return;
+
+      if (remote) {
+        setPicks(remote.picks);
+        setBracket(remote.bracket);
+        setAwards(remote.awards);
+        saveSeasonPredictionState(remote.picks, remote.bracket, remote.awards, PICKEM_SEASON);
+        const remoteProgress = seasonPickProgress(remote.picks);
+        setView(remoteProgress.complete ? 'records' : 'picks');
+      } else {
+        const local = loadSeasonPredictionState(PICKEM_SEASON);
+        if (seasonBoardHasContent(local)) {
+          await saveSeasonPredictionBoard(
+            user.id,
+            local.picks,
+            local.bracket,
+            local.awards,
+            PICKEM_SEASON
+          );
+        }
+      }
+
+      if (!cancelled) setCloudReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    saveSeasonPredictionState(picks, bracket, awards, PICKEM_SEASON);
+    const userId = cloudUserIdRef.current;
+    if (!userId || !cloudReady) return;
+
+    const timer = window.setTimeout(() => {
+      void saveSeasonPredictionBoard(userId, picks, bracket, awards, PICKEM_SEASON);
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [picks, bracket, awards, cloudReady]);
 
   const progress = useMemo(() => seasonPickProgress(picks), [picks]);
   const playoffSeeds = useMemo(
@@ -258,6 +319,10 @@ export default function SeasonPredictions() {
     setWeek(1);
     setEditTeamAbbr(null);
     setView('picks');
+    const userId = cloudUserIdRef.current;
+    if (userId) {
+      void clearSeasonPredictionBoard(userId, PICKEM_SEASON);
+    }
     toast.message('Cleared your season predictions.');
   };
 
@@ -313,6 +378,9 @@ export default function SeasonPredictions() {
             </h1>
             <p className="mt-1 max-w-xl text-sm text-muted-foreground">
               Pick every regular-season game, then play out the playoffs through the Super Bowl.
+              {user
+                ? ' Signed in — your slate syncs across devices.'
+                : ' Sign in to sync this slate across devices.'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

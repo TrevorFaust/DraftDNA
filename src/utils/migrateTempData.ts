@@ -171,13 +171,17 @@ export const migrateAllTemporaryData = async (userId: string): Promise<{
   draftsMigrated: number;
   draftsErrors: number;
   rankingsMigrated: boolean;
+  seasonPredictionsMigrated: boolean;
 }> => {
   const { migrated, errors } = await migrateTemporaryDrafts(userId);
   const rankingsMigrated = await migrateTemporaryRankings(userId);
+  const { migrateLocalSeasonPredictions } = await import('@/utils/seasonPredictionsRemote');
+  const seasonPredictionsMigrated = await migrateLocalSeasonPredictions(userId);
 
   return {
     draftsMigrated: migrated,
     draftsErrors: errors,
     rankingsMigrated,
+    seasonPredictionsMigrated,
   };
 };

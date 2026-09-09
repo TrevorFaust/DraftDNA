@@ -19,6 +19,12 @@ const STORAGE_PREFIX = 'season-predictions:v2';
 
 export type SeasonPredictionPicks = Record<string, string>;
 
+export type SeasonPredictionBoardState = {
+  picks: SeasonPredictionPicks;
+  bracket: PlayoffBracketPicks;
+  awards: SeasonAwardsPicks;
+};
+
 type StoredPayload = {
   season: number;
   picks: SeasonPredictionPicks;
@@ -76,11 +82,52 @@ function normalizeAbbr(value: unknown): string | null {
   return canonScheduleAbbr(value) || null;
 }
 
-export function loadSeasonPredictionState(season: number = PICKEM_SEASON): {
-  picks: SeasonPredictionPicks;
-  bracket: PlayoffBracketPicks;
-  awards: SeasonAwardsPicks;
-} {
+function emptyBoard(): SeasonPredictionBoardState {
+  return {
+    picks: {},
+    bracket: emptyPlayoffBracketPicks(),
+    awards: emptySeasonAwardsPicks(),
+  };
+}
+
+/** Normalize local or cloud payload into a board for the given season. */
+export function normalizeSeasonPredictionBoard(
+  raw: unknown,
+  season: number = PICKEM_SEASON
+): SeasonPredictionBoardState {
+  if (!raw || typeof raw !== 'object') return emptyBoard();
+  const parsed = raw as Partial<StoredPayload> & { picks?: unknown };
+  if (parsed.season != null && parsed.season !== season) return emptyBoard();
+  if (!parsed.picks || typeof parsed.picks !== 'object') return emptyBoard();
+
+  const picks: SeasonPredictionPicks = {};
+  for (const [key, value] of Object.entries(parsed.picks as Record<string, unknown>)) {
+    if (typeof value !== 'string') continue;
+    const abbr = canonScheduleAbbr(value);
+    if (abbr) picks[key] = abbr;
+  }
+
+  return {
+    picks,
+    bracket: normalizeBracket(parsed.bracket),
+    awards: normalizeSeasonAwardsPicks(parsed.awards),
+  };
+}
+
+export function seasonBoardHasContent(board: SeasonPredictionBoardState): boolean {
+  if (Object.keys(board.picks).length > 0) return true;
+  if (board.bracket.superBowl) return true;
+  if (board.bracket.afc.conference || board.bracket.nfc.conference) return true;
+  if (board.bracket.afc.wildCard.some(Boolean) || board.bracket.nfc.wildCard.some(Boolean)) {
+    return true;
+  }
+  if (board.bracket.afc.divisional.some(Boolean) || board.bracket.nfc.divisional.some(Boolean)) {
+    return true;
+  }
+  return Object.values(board.awards).some((pick) => pick != null);
+}
+
+export function loadSeasonPredictionState(season: number = PICKEM_SEASON): SeasonPredictionBoardState {
   try {
     const raw = localStorage.getItem(storageKey(season));
     if (!raw) {
@@ -92,34 +139,21 @@ export function loadSeasonPredictionState(season: number = PICKEM_SEASON): {
       };
     }
 
-    const parsed = JSON.parse(raw) as StoredPayload;
-    if (parsed?.season !== season || !parsed.picks || typeof parsed.picks !== 'object') {
+    const parsed = JSON.parse(raw) as unknown;
+    const board = normalizeSeasonPredictionBoard(parsed, season);
+    if (Object.keys(board.picks).length === 0 && !seasonBoardHasContent(board)) {
       const legacyPicks = loadLegacyV1Picks(season);
-      return {
-        picks: legacyPicks,
-        bracket: emptyPlayoffBracketPicks(),
-        awards: emptySeasonAwardsPicks(),
-      };
+      if (Object.keys(legacyPicks).length > 0) {
+        return {
+          picks: legacyPicks,
+          bracket: emptyPlayoffBracketPicks(),
+          awards: emptySeasonAwardsPicks(),
+        };
+      }
     }
-
-    const picks: SeasonPredictionPicks = {};
-    for (const [key, value] of Object.entries(parsed.picks)) {
-      if (typeof value !== 'string') continue;
-      const abbr = canonScheduleAbbr(value);
-      if (abbr) picks[key] = abbr;
-    }
-
-    return {
-      picks,
-      bracket: normalizeBracket(parsed.bracket),
-      awards: normalizeSeasonAwardsPicks(parsed.awards),
-    };
+    return board;
   } catch {
-    return {
-      picks: {},
-      bracket: emptyPlayoffBracketPicks(),
-      awards: emptySeasonAwardsPicks(),
-    };
+    return emptyBoard();
   }
 }
 
