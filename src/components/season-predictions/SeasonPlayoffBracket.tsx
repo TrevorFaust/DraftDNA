@@ -19,6 +19,8 @@ import {
 } from '@/hooks/useNflTeamJerseyColors';
 import { cn } from '@/lib/utils';
 
+const SUPER_BOWL_LOGO_SRC = '/season-predictions/super-bowl-lix.png';
+
 function parseHexRgb(hex: string): [number, number, number] | null {
   const t = hex.trim();
   if (/^#[0-9A-Fa-f]{3}$/.test(t)) {
@@ -239,6 +241,7 @@ function ConferenceSide({
   picks,
   onPick,
   mirrored,
+  locked = false,
 }: {
   conference: 'AFC' | 'NFC';
   seeds: PlayoffSeed[];
@@ -249,6 +252,7 @@ function ConferenceSide({
     winnerAbbr: string
   ) => void;
   mirrored?: boolean;
+  locked?: boolean;
 }) {
   const isAfc = conference === 'AFC';
   const seed1 = seeds.find((s) => s.seed === 1) ?? null;
@@ -269,6 +273,7 @@ function ConferenceSide({
           key={matchup.id}
           matchup={matchup}
           winnerAbbr={picks.wildCard[index]}
+          disabled={locked}
           onPick={(abbr) => onPick('wildCard', index, abbr)}
         />
       ))}
@@ -297,6 +302,7 @@ function ConferenceSide({
             key={matchup.id}
             matchup={matchup}
             winnerAbbr={picks.divisional[index]}
+            disabled={locked}
             onPick={(abbr) => onPick('divisional', index, abbr)}
           />
         ))
@@ -324,6 +330,7 @@ function ConferenceSide({
         <MatchupCard
           matchup={conf}
           winnerAbbr={picks.conference}
+          disabled={locked}
           onPick={(abbr) => onPick('conference', null, abbr)}
         />
       )}
@@ -363,6 +370,7 @@ type BoardProps = {
   afcSeeds: PlayoffSeed[];
   nfcSeeds: PlayoffSeed[];
   bracket: PlayoffBracketPicks;
+  locked?: boolean;
   onConferencePick: (
     conference: 'AFC' | 'NFC',
     round: 'wildCard' | 'divisional' | 'conference',
@@ -376,6 +384,7 @@ export function SeasonPlayoffBracketBoard({
   afcSeeds,
   nfcSeeds,
   bracket,
+  locked = false,
   onConferencePick,
   onSuperBowlPick,
 }: BoardProps) {
@@ -391,44 +400,65 @@ export function SeasonPlayoffBracketBoard({
           conference="AFC"
           seeds={afcSeeds}
           picks={bracket.afc}
+          locked={locked}
           onPick={(round, index, abbr) => onConferencePick('AFC', round, index, abbr)}
         />
 
-        <section className="flex w-[7.5rem] shrink-0 flex-col sm:w-[9rem]">
-          <div className="mb-2 flex h-8 shrink-0 items-center justify-center gap-1.5">
-            <Trophy className="h-4 w-4 text-accent sm:h-5 sm:w-5" aria-hidden />
-            <h3 className="font-display text-sm tracking-wide sm:text-base">Super Bowl</h3>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col">
-            <p className="mb-2 shrink-0 text-center text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground sm:text-[0.65rem]">
-              Final
-            </p>
-            <div className="flex min-h-0 flex-1 flex-col justify-center gap-2">
-              {!sb ? (
-                <p className="text-center text-[11px] text-muted-foreground sm:text-sm">
-                  Pick both conference champions first.
-                </p>
-              ) : (
-                <div className="w-full space-y-2">
-                  <MatchupCard
-                    matchup={{
-                      id: 'sb',
-                      round: 'conference',
-                      home: sb.nfc,
-                      away: sb.afc,
-                    }}
-                    winnerAbbr={bracket.superBowl}
-                    onPick={onSuperBowlPick}
-                  />
-                  {champion && (
-                    <p className="text-center text-[11px] text-muted-foreground sm:text-sm">
-                      Champion:{' '}
-                      <span className="font-medium text-foreground">{champion.nick}</span>
-                    </p>
-                  )}
-                </div>
-              )}
+        <section className="flex w-[8.5rem] shrink-0 flex-col sm:w-[11rem]">
+          <div className="mb-1 flex shrink-0 flex-col items-center gap-1">
+            <div className="flex h-8 items-center justify-center gap-1.5">
+              <Trophy className="h-4 w-4 text-accent sm:h-5 sm:w-5" aria-hidden />
+              <h3 className="font-display text-sm tracking-wide sm:text-base">Super Bowl</h3>
             </div>
+            <img
+              src={SUPER_BOWL_LOGO_SRC}
+              alt="Super Bowl LIX"
+              className="h-14 w-auto object-contain sm:h-[4.5rem]"
+              loading="lazy"
+            />
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col justify-center gap-3">
+            {!sb ? (
+              <p className="text-center text-[11px] text-muted-foreground sm:text-sm">
+                Pick both conference champions first.
+              </p>
+            ) : (
+              <div className="w-full space-y-3">
+                <MatchupCard
+                  matchup={{
+                    id: 'sb',
+                    round: 'conference',
+                    home: sb.nfc,
+                    away: sb.afc,
+                  }}
+                  winnerAbbr={bracket.superBowl}
+                  disabled={locked}
+                  onPick={onSuperBowlPick}
+                />
+                {champion && (
+                  <div className="rounded-xl border border-accent/40 bg-accent/10 px-2 py-3 text-center">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">
+                      Champion
+                    </p>
+                    <div className="mt-1.5 flex flex-col items-center gap-1.5">
+                      <img
+                        src={espnTeamLogoUrl(champion.abbr)}
+                        alt=""
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 object-contain"
+                      />
+                      <p className="font-display text-lg leading-tight tracking-wide text-foreground sm:text-xl">
+                        {champion.name}
+                      </p>
+                      <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {formatSeasonRecord(champion.wins, champion.losses)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
@@ -437,6 +467,7 @@ export function SeasonPlayoffBracketBoard({
           seeds={nfcSeeds}
           picks={bracket.nfc}
           mirrored
+          locked={locked}
           onPick={(round, index, abbr) => onConferencePick('NFC', round, index, abbr)}
         />
       </div>

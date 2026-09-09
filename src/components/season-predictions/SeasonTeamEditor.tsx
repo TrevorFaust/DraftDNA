@@ -24,6 +24,7 @@ type Props = {
   selectedAbbr: string | null;
   onSelectTeam: (abbr: string) => void;
   onPick: (key: string, abbr: string) => void;
+  locked?: boolean;
 };
 
 function teamMatchups(teamAbbr: string): WeekMatchup[] {
@@ -37,7 +38,13 @@ function teamMatchups(teamAbbr: string): WeekMatchup[] {
   }));
 }
 
-export function SeasonTeamEditor({ picks, selectedAbbr, onSelectTeam, onPick }: Props) {
+export function SeasonTeamEditor({
+  picks,
+  selectedAbbr,
+  onSelectTeam,
+  onPick,
+  locked = false,
+}: Props) {
   const boards = buildSeasonStandings(picks);
   const selected = selectedAbbr
     ? boards.flatMap((b) => b.teams).find((t) => t.abbr === selectedAbbr) ?? null
@@ -122,7 +129,8 @@ export function SeasonTeamEditor({ picks, selectedAbbr, onSelectTeam, onPick }: 
                   matchup={matchup}
                   picked={picks[matchup.key] ?? null}
                   onPick={(abbr) => onPick(matchup.key, abbr)}
-                  alwaysUnlocked
+                  alwaysUnlocked={!locked}
+                  forceLocked={locked}
                 />
               </div>
             ))}

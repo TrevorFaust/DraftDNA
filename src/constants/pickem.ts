@@ -1,6 +1,16 @@
 export const PICKEM_SEASON = 2026;
 export const PICKEM_WEEKS = 18;
 
+/**
+ * Season Predictions lock: start of Sep 12, 2026 Eastern
+ * (end of the Sep 11 grace day after early-season games).
+ */
+export const SEASON_PREDICTIONS_LOCK_AT = new Date('2026-09-12T00:00:00-04:00');
+
+export function isSeasonPredictionsLocked(now: Date = new Date()): boolean {
+  return now.getTime() >= SEASON_PREDICTIONS_LOCK_AT.getTime();
+}
+
 /** Real team numbers when you have them. Missing teams use a stable 0–99 placeholder. */
 export const PICKEM_TEAM_JERSEY_NUMBERS: Partial<Record<string, number>> = {};
 

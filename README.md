@@ -14,7 +14,7 @@ Rank and mock without an account if you want to kick the tires. Make one when yo
 
 **News.** Monday week-in-reviews. Pick a franchise and read that team's issue.
 
-**Season Predictions.** Pre Season tool where you pick a winner for every 2026 regular-season game, week by week or by team. Finish the slate and you get projected division standings (W/L, division record, PCT) with NFL-style playoff seeding, then play out a full AFC/NFC bracket through the Super Bowl. Picks save in the browser. Random fill only covers games you have not picked yet.
+**Season Predictions.** Pre Season tool where you pick a winner for every 2026 regular-season game, week by week or by team. Finish the slate and you get projected division standings (W/L, division record, PCT) with NFL-style playoff seeding, then play out a full AFC/NFC bracket through the Super Bowl. Picks save in the browser and lock after September 11, 2026. Random fill only covers games you have not picked yet.
 
 **Pick Six Challenge.** Pick the top 6 fantasy scorers at each position (QB, RB, WR, TE, K, D/ST) in order. Nail a perfect board and you win $6,000 for that position. Six positions, up to $36,000. Partial-credit scoring and a leaderboard once the season starts. Free to enter. Official rules on the site. Deadline is NFL kickoff, Wednesday September 9, 2026.
 

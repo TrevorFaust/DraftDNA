@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Dices, RotateCcw } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { Dices, Lock, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Navbar } from '@/components/Navbar';
 import { PickemMatchupRow } from '@/components/pickem/PickemMatchupRow';
@@ -11,7 +12,11 @@ import {
 import { SeasonStandingsBoard } from '@/components/season-predictions/SeasonStandingsBoard';
 import { SeasonTeamEditor } from '@/components/season-predictions/SeasonTeamEditor';
 import { Button } from '@/components/ui/button';
-import { PICKEM_SEASON, PICKEM_WEEKS } from '@/constants/pickem';
+import {
+  isSeasonPredictionsLocked,
+  PICKEM_SEASON,
+  PICKEM_WEEKS,
+} from '@/constants/pickem';
 import { gamesForWeek, scheduleGameKey } from '@/constants/nfl2026ScheduleGrid';
 import { buildAllPlayoffSeeds } from '@/utils/seasonPredictionRecords';
 import { officialKickoff, type WeekMatchup } from '@/utils/nfl2026Schedule';
@@ -51,10 +56,48 @@ function predictionMatchupsForWeek(week: number): WeekMatchup[] {
     });
 }
 
+function fireChampionConfetti() {
+  const duration = 2200;
+  const animationEnd = Date.now() + duration;
+  const defaults = { startVelocity: 32, spread: 360, ticks: 70, zIndex: 80 };
+
+  function randomInRange(min: number, max: number) {
+    return Math.random() * (max - min) + min;
+  }
+
+  const interval = window.setInterval(() => {
+    const timeLeft = animationEnd - Date.now();
+    if (timeLeft <= 0) {
+      window.clearInterval(interval);
+      return;
+    }
+    const particleCount = 55 * (timeLeft / duration);
+    confetti({
+      ...defaults,
+      particleCount,
+      origin: { x: randomInRange(0.15, 0.35), y: Math.random() - 0.2 },
+    });
+    confetti({
+      ...defaults,
+      particleCount,
+      origin: { x: randomInRange(0.65, 0.85), y: Math.random() - 0.2 },
+    });
+  }, 220);
+}
+
+function lockedToast() {
+  toast.message('Season Predictions locked after September 11, 2026.');
+}
+
 export default function SeasonPredictions() {
   const initial = loadSeasonPredictionState();
+  const initialProgress = seasonPickProgress(initial.picks);
+  const seasonLocked = isSeasonPredictionsLocked();
+
   const [week, setWeek] = useState(1);
-  const [view, setView] = useState<SeasonPredictionView>('picks');
+  const [view, setView] = useState<SeasonPredictionView>(() =>
+    initialProgress.complete ? 'records' : 'picks'
+  );
   const [editTeamAbbr, setEditTeamAbbr] = useState<string | null>(null);
   const [picks, setPicks] = useState<SeasonPredictionPicks>(() => initial.picks);
   const [bracket, setBracket] = useState<PlayoffBracketPicks>(() => initial.bracket);
@@ -111,6 +154,10 @@ export default function SeasonPredictions() {
   };
 
   const handlePick = (key: string, abbr: string) => {
+    if (seasonLocked) {
+      lockedToast();
+      return;
+    }
     setPicks((prev) => {
       const next = { ...prev, [key]: abbr };
       if (seasonPickProgress(prev).complete) {
@@ -133,6 +180,10 @@ export default function SeasonPredictions() {
     index: number | null,
     winnerAbbr: string
   ) => {
+    if (seasonLocked) {
+      lockedToast();
+      return;
+    }
     setBracket((prev) => {
       const key = conference.toLowerCase() as 'afc' | 'nfc';
       const nextConf = applyConferencePick(prev[key], round, index, winnerAbbr);
@@ -141,10 +192,17 @@ export default function SeasonPredictions() {
   };
 
   const handleSuperBowlPick = (winnerAbbr: string) => {
+    if (seasonLocked) {
+      lockedToast();
+      return;
+    }
     setBracket((prev) => {
       const next = applySuperBowlPick(prev, winnerAbbr);
       if (playoffSeeds && bracketComplete(playoffSeeds.afc, playoffSeeds.nfc, next)) {
-        queueMicrotask(() => toast.success('Super Bowl champion locked in.'));
+        queueMicrotask(() => {
+          fireChampionConfetti();
+          toast.success('Super Bowl champion locked in.');
+        });
       }
       return next;
     });
@@ -165,6 +223,10 @@ export default function SeasonPredictions() {
   };
 
   const handleReset = () => {
+    if (seasonLocked) {
+      lockedToast();
+      return;
+    }
     clearSeasonPredictionPicks();
     setPicks({});
     setBracket(emptyPlayoffBracketPicks());
@@ -175,6 +237,10 @@ export default function SeasonPredictions() {
   };
 
   const handleRandomFill = () => {
+    if (seasonLocked) {
+      lockedToast();
+      return;
+    }
     const { picks: next, filled } = fillRemainingRandomPicks(picks);
     if (filled === 0) {
       toast.message('Every game already has a pick.');
@@ -202,10 +268,11 @@ export default function SeasonPredictions() {
         ? 'View projected records'
         : 'Finish earlier weeks first';
 
-  const footerEnabled = weekProgress.complete && (week < PICKEM_WEEKS || progress.complete);
+  const footerEnabled =
+    !seasonLocked && weekProgress.complete && (week < PICKEM_WEEKS || progress.complete);
 
   return (
-    <div className={cn('min-h-screen bg-background', view === 'picks' && 'pb-28')}>
+    <div className={cn('min-h-screen bg-background', view === 'picks' && !seasonLocked && 'pb-28')}>
       <Navbar />
       <main
         className={cn(
@@ -231,13 +298,13 @@ export default function SeasonPredictions() {
                 <span className="text-muted-foreground"> / {progress.total}</span>
               </p>
             </div>
-            {remainingSeason > 0 && (
+            {!seasonLocked && remainingSeason > 0 && (
               <Button type="button" variant="outline" className="gap-2" onClick={handleRandomFill}>
                 <Dices className="h-4 w-4" />
                 Random fill
               </Button>
             )}
-            {(progress.picked > 0 || playoffsComplete) && (
+            {!seasonLocked && (progress.picked > 0 || playoffsComplete) && (
               <Button type="button" variant="outline" className="gap-2" onClick={handleReset}>
                 <RotateCcw className="h-4 w-4" />
                 Reset
@@ -245,6 +312,16 @@ export default function SeasonPredictions() {
             )}
           </div>
         </div>
+
+        {seasonLocked && (
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-border/60 bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <p>
+              Predictions locked after September 11, 2026. You can still view your standings and
+              bracket, but picks can no longer change.
+            </p>
+          </div>
+        )}
 
         <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-secondary/60" aria-hidden>
           <div
@@ -277,22 +354,31 @@ export default function SeasonPredictions() {
               <div>
                 <h2 className="font-display text-xl tracking-wide">Projected records</h2>
                 <p className="text-sm text-muted-foreground">
-                  Tap a team to edit that club&apos;s games, or use week bubbles / By team.
+                  {seasonLocked
+                    ? 'Your locked standings and playoff seeds.'
+                    : "Tap a team to edit that club's games, or use week bubbles / By team."}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={() => selectWeek(1)}>
-                  Edit by week
-                </Button>
-                <Button type="button" variant="outline" onClick={selectByTeam}>
-                  Edit by team
-                </Button>
+                {!seasonLocked && (
+                  <>
+                    <Button type="button" variant="outline" onClick={() => selectWeek(1)}>
+                      Edit by week
+                    </Button>
+                    <Button type="button" variant="outline" onClick={selectByTeam}>
+                      Edit by team
+                    </Button>
+                  </>
+                )}
                 <Button type="button" onClick={selectPlayoffs}>
                   Playoff bracket
                 </Button>
               </div>
             </div>
-            <SeasonStandingsBoard picks={picks} onSelectTeam={selectTeamEditor} />
+            <SeasonStandingsBoard
+              picks={picks}
+              onSelectTeam={seasonLocked ? undefined : selectTeamEditor}
+            />
           </section>
         ) : view === 'playoffs' && playoffSeeds ? (
           <section>
@@ -311,6 +397,7 @@ export default function SeasonPredictions() {
               afcSeeds={playoffSeeds.afc}
               nfcSeeds={playoffSeeds.nfc}
               bracket={bracket}
+              locked={seasonLocked}
               onConferencePick={handleConferenceBracketPick}
               onSuperBowlPick={handleSuperBowlPick}
             />
@@ -318,9 +405,13 @@ export default function SeasonPredictions() {
         ) : view === 'byTeam' ? (
           <section className="mb-6">
             <div className="mb-3">
-              <h2 className="font-display text-xl tracking-wide">Edit by team</h2>
+              <h2 className="font-display text-xl tracking-wide">
+                {seasonLocked ? 'View by team' : 'Edit by team'}
+              </h2>
               <p className="text-sm text-muted-foreground">
-                Changing a game updates both teams&apos; records immediately.
+                {seasonLocked
+                  ? 'Browse each team’s predicted games.'
+                  : "Changing a game updates both teams' records immediately."}
               </p>
             </div>
             <SeasonTeamEditor
@@ -328,6 +419,7 @@ export default function SeasonPredictions() {
               selectedAbbr={editTeamAbbr}
               onSelectTeam={setEditTeamAbbr}
               onPick={handlePick}
+              locked={seasonLocked}
             />
           </section>
         ) : (
@@ -346,7 +438,8 @@ export default function SeasonPredictions() {
                   matchup={matchup}
                   picked={picks[matchup.key] ?? null}
                   onPick={(abbr) => handlePick(matchup.key, abbr)}
-                  alwaysUnlocked
+                  alwaysUnlocked={!seasonLocked}
+                  forceLocked={seasonLocked}
                 />
               ))}
             </div>
@@ -354,7 +447,7 @@ export default function SeasonPredictions() {
         )}
       </main>
 
-      {view === 'picks' && (
+      {view === 'picks' && !seasonLocked && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur-md">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
