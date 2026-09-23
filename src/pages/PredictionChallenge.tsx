@@ -34,7 +34,6 @@ import {
   ChevronUp,
   ChevronDown,
   Instagram,
-  Medal,
   Pencil,
   Lock,
   Info,
@@ -49,6 +48,7 @@ import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { OfficialRulesContent } from '@/components/OfficialRulesContent';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickSixMark } from '@/components/PickSixIcon';
+import { PickSixDashboardLeaderboard } from '@/components/PickSixDashboardLeaderboard';
 import {
   SITE_NAME,
   SEASON,
@@ -772,34 +772,8 @@ ${shareUrl}`;
                       ))}
                     </div>
                   </div>
-                  <div className="flex-1 md:max-w-[50%] glass-card p-6 flex flex-col justify-center">
-                    {SUBMISSIONS_LOCKED && (
-                      <p className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
-                        <Lock className="w-4 h-4 shrink-0" />
-                        Predictions are locked. The NFL season has started.
-                      </p>
-                    )}
-                    {SUBMISSIONS_LOCKED ? (
-                      <div>
-                        <h3 className="font-display text-lg mb-2 flex items-center gap-2">
-                          <Medal className="w-5 h-5 text-amber-500" />
-                          Leaderboard
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Position leaderboard will be available once the {SEASON} season is complete.
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <h3 className="font-display text-lg mb-2 flex items-center gap-2">
-                          <Medal className="w-5 h-5 text-amber-500" />
-                          Leaderboard
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          The leaderboard will be available when the {SEASON} season starts.
-                        </p>
-                      </div>
-                    )}
+                  <div className="flex-1 md:max-w-[50%] glass-card p-4 sm:p-6 flex flex-col min-h-[280px]">
+                    <PickSixDashboardLeaderboard position={position} />
                   </div>
                 </div>
               ) : (

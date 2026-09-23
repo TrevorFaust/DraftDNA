@@ -58,8 +58,11 @@ type PoolPlayer = {
   season: number | null;
 };
 
-export function usePickSixPositionLeaderboard(currentUserId: string | undefined) {
-  const [position, setPosition] = useState<PickSixPosition>('QB');
+export function usePickSixPositionLeaderboard(
+  currentUserId: string | undefined,
+  initialPosition: PickSixPosition = 'QB'
+) {
+  const [position, setPosition] = useState<PickSixPosition>(initialPosition);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [entriesError, setEntriesError] = useState<string | null>(null);
   const [rawEntries, setRawEntries] = useState<PositionEntryRow[]>([]);

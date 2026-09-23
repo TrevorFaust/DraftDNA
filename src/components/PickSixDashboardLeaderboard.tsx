@@ -300,7 +300,12 @@ function LeaderboardListRow({
   );
 }
 
-export function PickSixDashboardLeaderboard() {
+export function PickSixDashboardLeaderboard({
+  position: lockedPosition,
+}: {
+  /** Follow one position and hide this board's own position tabs. */
+  position?: PickSixPosition;
+} = {}) {
   const { user } = useAuth();
   const {
     position,
@@ -317,13 +322,17 @@ export function PickSixDashboardLeaderboard() {
     loading,
     entriesError,
     statsReady,
-  } = usePickSixPositionLeaderboard(user?.id);
+  } = usePickSixPositionLeaderboard(user?.id, lockedPosition ?? 'QB');
 
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   const toggleExpand = useCallback((userId: string) => {
     setExpandedUserId((prev) => (prev === userId ? null : userId));
   }, []);
+
+  useEffect(() => {
+    if (lockedPosition && lockedPosition !== position) setPosition(lockedPosition);
+  }, [lockedPosition, position, setPosition]);
 
   useEffect(() => {
     setExpandedUserId(null);
@@ -338,6 +347,7 @@ export function PickSixDashboardLeaderboard() {
           <Medal className="w-4 h-4 text-amber-500" />
           Leaderboard
         </h3>
+        {!lockedPosition && (
         <Tabs
           value={position}
           onValueChange={(v) => setPosition(v as PickSixPosition)}
@@ -356,6 +366,7 @@ export function PickSixDashboardLeaderboard() {
             ))}
           </TabsList>
         </Tabs>
+        )}
       </div>
 
       {loading ? (
