@@ -522,7 +522,7 @@ function SelectedLeaderPicks({
   return (
     <>
       <h3 className="mb-3 shrink-0 break-words font-display text-lg leading-snug">{heading}</h3>
-      <ol className="space-y-1.5">
+      <ol className="inline-grid max-w-full grid-cols-[1.25rem_minmax(0,max-content)_auto] items-start gap-x-3 gap-y-1.5">
         {RANKS.map((rank) => {
           const pick = pickByRank.get(rank);
           const status = pick
@@ -533,11 +533,11 @@ function SelectedLeaderPicks({
               ? positionRankLookup.getOverallRank(pick.playerId, pick.playerName)
               : null;
           return (
-            <li key={rank} className="flex min-h-11 items-start gap-2 py-1 text-sm">
-              <span className="w-5 shrink-0 pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+            <li key={rank} className="col-span-3 grid grid-cols-subgrid items-start gap-x-3 py-1 text-sm">
+              <span className="pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
                 {rank}.
               </span>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0">
                 <p
                   className={cn(
                     'break-words leading-snug',
@@ -552,7 +552,7 @@ function SelectedLeaderPicks({
                   </p>
                 )}
               </div>
-              <span className="shrink-0 pt-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
+              <span className="pt-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                 {status ? formatPickSixSlotPoints(status.points) : '—'}
               </span>
             </li>
@@ -563,9 +563,9 @@ function SelectedLeaderPicks({
   );
 }
 
-/** Shared height so the four challenge cards line up on tablet and desktop. */
+/** Challenge cards size to their own lists so a taller leaderboard does not stretch the others. */
 export const pickSixChallengeCardClass =
-  'glass-card flex h-full min-h-0 flex-col p-4 sm:p-5';
+  'glass-card flex w-full flex-col p-4 sm:p-5';
 
 /** Challenge page: actual top 6, a scrollable leader list, and the selected entry's picks. */
 export function PickSixChallengeColumns({ position: lockedPosition }: { position: PickSixPosition }) {
@@ -629,14 +629,14 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
               {statsReady ? 'No stats for this position yet.' : 'Loading stats…'}
             </p>
           ) : (
-            <ol className="space-y-2">
+            <ol className="inline-grid max-w-full grid-cols-[1.25rem_minmax(0,max-content)_auto] items-baseline gap-x-3 gap-y-2">
               {actualTop6.map((player) => (
-                <li key={player.identityKey} className="flex min-h-11 items-start gap-2 py-1 text-sm">
-                  <span className="w-5 shrink-0 pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+                <li key={player.identityKey} className="col-span-3 grid grid-cols-subgrid items-baseline gap-x-3 py-1 text-sm">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {player.positionRank}.
                   </span>
-                  <span className="min-w-0 flex-1 break-words font-medium leading-snug">{player.name}</span>
-                  <span className="shrink-0 pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+                  <span className="min-w-0 break-words font-medium leading-snug">{player.name}</span>
+                  <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
                     {formatPickSixFantasyPoints(player.fantasyPoints)}
                   </span>
                 </li>
@@ -661,7 +661,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
             No {position} entries yet.
           </p>
         ) : (
-          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
+          <div className="max-h-[32rem] space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
             {leaderboard.map((entry) => {
               const isCurrentUser = !!user && entry.userId === user.id;
               const canSelect = (PICK_SIX_VIEW_OTHERS_PICKS || isCurrentUser) && entry.picks.length > 0;

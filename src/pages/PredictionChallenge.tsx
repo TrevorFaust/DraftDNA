@@ -726,7 +726,7 @@ ${shareUrl}`;
               </p>
 
               {savedPositions.has(position) && editingPosition !== position ? (
-                <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <div className={pickSixChallengeCardClass}>
                     <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
                       <h3 className="font-display text-lg flex items-center gap-2">
