@@ -65,7 +65,7 @@ export function formatPickSixKickoffDisplay(): string {
 export const PICK_SIX_SCORING_STATS_SEASON = SEASON;
 
 /**
- * Local preview of live scoring UI (2025 stats via `usePickSixLiveStats` until 2026 RPC exists).
+ * Local preview of live scoring UI (`usePickSixLiveStats`, contest-season games so far).
  * Set `VITE_PICK_SIX_PREVIEW_LIVE_SCORING=true` in `.env`.
  */
 export const PICK_SIX_PREVIEW_LIVE_SCORING =

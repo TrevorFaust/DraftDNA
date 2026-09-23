@@ -25,6 +25,10 @@ import {
   PLAYER_POOL_PRIOR_SEASON,
   PLAYER_POOL_CURRENT_SEASON,
 } from "@/constants/playerPoolSeason";
+import {
+  DEFAULT_PLAYER_STATS_SEASON,
+  type PlayerStatsSeason,
+} from "@/constants/playerStatsSeason";
 import { fetchMergedPlayerPool } from "@/utils/playerPoolFetch";
 import { useNflTeams } from "@/hooks/useNflTeams";
 import { useAuth } from "@/hooks/useAuth";
@@ -401,6 +405,7 @@ export default function PlayersSpreadsheet() {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [ageByEspnId, setAgeByEspnId] = useState<Map<string, number>>(new Map());
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "adp", direction: "asc" });
+  const [statsSeason, setStatsSeason] = useState<PlayerStatsSeason>(DEFAULT_PLAYER_STATS_SEASON);
   const { teams: nflTeams } = useNflTeams();
 
   const displayBucket = useMemo((): StatsBucket => {
@@ -444,7 +449,7 @@ export default function PlayersSpreadsheet() {
     location.key,
   ]);
 
-  const statsMap = usePlayer2025Stats(displayBucket.scoringFormat);
+  const statsMap = usePlayer2025Stats(displayBucket.scoringFormat, { season: statsSeason });
   const positionAdpRankMap = useMemo(() => buildPositionAdpRankMap(players), [players]);
   const teamContext = useNflTeamContext();
 
@@ -462,11 +467,11 @@ export default function PlayersSpreadsheet() {
   const headerTooltips = useMemo(
     () => ({
       adp: `Average draft position from community consensus for ${bucketBadgeLine.toLowerCase()}. Lower is drafted earlier.`,
-      posRank: `Fantasy rank within this position for the 2025 season, ordered by total fantasy points using ${scoringPhrase} scoring.`,
-      totalPts: `Total fantasy points for the 2025 season using ${scoringPhrase} scoring.`,
-      ppg: `Average fantasy points per game played in 2025 using ${scoringPhrase} scoring.`,
+      posRank: `Fantasy rank within this position for the ${statsSeason} season, ordered by total fantasy points using ${scoringPhrase} scoring.`,
+      totalPts: `Total fantasy points for the ${statsSeason} season using ${scoringPhrase} scoring.`,
+      ppg: `Average fantasy points per game played in ${statsSeason} using ${scoringPhrase} scoring.`,
     }),
-    [bucketBadgeLine, scoringPhrase]
+    [bucketBadgeLine, scoringPhrase, statsSeason]
   );
 
   useEffect(() => {
@@ -833,6 +838,27 @@ export default function PlayersSpreadsheet() {
               ))}
             </SelectContent>
           </Select>
+          <div className="flex items-center gap-2">
+            <label htmlFor="player-stats-season" className="text-sm font-medium text-foreground">
+              Season
+            </label>
+            <Select
+              value={String(statsSeason)}
+              onValueChange={(value) => setStatsSeason(Number(value) as PlayerStatsSeason)}
+            >
+              <SelectTrigger
+                id="player-stats-season"
+                className="w-[6.5rem] h-9 bg-secondary/50 border-border/50"
+                aria-label="Stats season"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2026">2026</SelectItem>
+                <SelectItem value="2025">2025</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="rounded-lg border border-border/50 bg-secondary/20 min-w-0 max-w-full overflow-x-auto overflow-y-visible scrollbar-thin -mx-0.5">
@@ -1045,6 +1071,8 @@ export default function PlayersSpreadsheet() {
           onOpenChange={setDetailDialogOpen}
           stats2025={selectedPlayer ? statsMap.get(selectedPlayer.id) : undefined}
           allStats2025={statsMap}
+          statsSeason={statsSeason}
+          onStatsSeasonChange={setStatsSeason}
           positionAdpRank={
             selectedPlayer ? positionAdpRankMap.get(selectedPlayer.id) ?? null : null
           }

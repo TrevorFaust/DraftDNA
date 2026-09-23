@@ -10,6 +10,11 @@ import {
 } from '@/utils/defenseFantasy2025';
 import { canonicalTeamAbbr, resolveTeamAbbrForDisplay, teamFieldToAbbr } from '@/utils/teamMapping';
 import { PLAYER_POOL_PRIOR_SEASON } from '@/constants/playerPoolSeason';
+import {
+  gamesTableForSeason,
+  teamStatsTableForSeason,
+  type PlayerStatsSeason,
+} from '@/constants/playerStatsSeason';
 
 /** Season kicking totals (Player Stats page when filtering to K). From `get_player_2025_season_stats` k_* columns. */
 export interface KickerSeasonTotals2025 {
@@ -101,7 +106,12 @@ export type Player2025SeasonRawBundle = {
   } | null;
 };
 
-export const PLAYER_2025_STATS_QUERY_KEY = ['player-2025-season-stats'] as const;
+export function playerSeasonStatsQueryKey(season: PlayerStatsSeason) {
+  return ['player-season-stats', season] as const;
+}
+
+/** @deprecated Use {@link playerSeasonStatsQueryKey} */
+export const PLAYER_2025_STATS_QUERY_KEY = playerSeasonStatsQueryKey(2025);
 
 /** Season totals barely change day to day — share one fetch across Rankings, Stats, History, Pick Six, etc. */
 const PLAYER_2025_STATS_STALE_MS = 60 * 60 * 1000;
@@ -152,14 +162,21 @@ function statsTeamAbbrKey(rawTeam: string): string {
   return canonicalTeamAbbr(abbr) ?? abbr;
 }
 
-async function fetchPlayer2025SeasonRaw(): Promise<Player2025SeasonRawBundle> {
-  const [rpcRes, tsRes, gamesRes, plRes] = await Promise.all([
-    (supabase.rpc as any)('get_player_2025_season_stats'),
-    (supabase as any).from('team_stats_2025').select(TEAM_STATS_2025_COLUMNS).lte('week', 18),
-    supabase
-      .from('games_2025')
+async function fetchPlayer2025SeasonRaw(
+  season: PlayerStatsSeason = 2025
+): Promise<Player2025SeasonRawBundle> {
+  const teamTable = teamStatsTableForSeason(season);
+  const gamesTable = gamesTableForSeason(season);
+  let rpcRes = await (supabase.rpc as any)('get_player_season_stats', { p_season: season });
+  if (rpcRes.error && season === 2025) {
+    rpcRes = await (supabase.rpc as any)('get_player_2025_season_stats');
+  }
+  const [tsRes, gamesRes, plRes] = await Promise.all([
+    (supabase as any).from(teamTable).select(TEAM_STATS_2025_COLUMNS).lte('week', 18),
+    (supabase as any)
+      .from(gamesTable)
       .select('week, home_team, away_team, home_score, away_score')
-      .eq('season', 2025)
+      .eq('season', season)
       .eq('game_type', 'REG')
       .lte('week', 18),
     supabase
@@ -171,7 +188,7 @@ async function fetchPlayer2025SeasonRaw(): Promise<Player2025SeasonRawBundle> {
 
   let rawRows: RawRow[] = [];
   if (rpcRes.error) {
-    console.warn('Failed to fetch player 2025 season stats:', rpcRes.error);
+    console.warn(`Failed to fetch player ${season} season stats:`, rpcRes.error);
   } else {
     rawRows = Array.isArray(rpcRes.data) ? rpcRes.data : [];
   }
@@ -192,15 +209,15 @@ async function fetchPlayer2025SeasonRaw(): Promise<Player2025SeasonRawBundle> {
   let teamStatsRows = (tsRes.data ?? []) as Record<string, unknown>[];
   let tsError = tsRes.error;
   if (tsError) {
-    console.warn('Narrow team_stats_2025 select failed; retrying with *:', tsError);
-    const retry = await (supabase as any).from('team_stats_2025').select('*').lte('week', 18);
+    console.warn(`Narrow ${teamTable} select failed; retrying with *:`, tsError);
+    const retry = await (supabase as any).from(teamTable).select('*').lte('week', 18);
     tsError = retry.error;
     teamStatsRows = (retry.data ?? []) as Record<string, unknown>[];
   }
 
   if (tsError || gamesRes.error || playersRes.error) {
-    if (tsError) console.warn('Failed to fetch team_stats_2025 for defense PPG:', tsError);
-    if (gamesRes.error) console.warn('Failed to fetch games_2025 for defense PPG:', gamesRes.error);
+    if (tsError) console.warn(`Failed to fetch ${teamTable} for defense PPG:`, tsError);
+    if (gamesRes.error) console.warn(`Failed to fetch ${gamesTable} for defense PPG:`, gamesRes.error);
     if (playersRes.error) console.warn('Failed to fetch D/ST players for PPG:', playersRes.error);
     return { rawRows, defenseBundle: null };
   }
@@ -379,6 +396,8 @@ function buildPlayer2025StatsMap(
               opponentStatsByTeamWeek.get(`${game.opponent}__${week}`)
             : undefined;
 
+        // Future weeks are on the 2026 schedule before stats or a score exist.
+        if (s == null && game?.pointsAllowed == null) continue;
         const input = buildDefenseFantasyGameInput(week, teamKey, game, s, opponentStats);
         if (input == null) continue;
         const wkFp = calculateDefenseFantasyPoints(input);
@@ -456,22 +475,20 @@ function buildPlayer2025StatsMap(
 }
 
 /**
- * Fetch 2025 season fantasy totals and position rank for all players. Returns a map of playerId -> stats.
- * @param scoringFormatOverride - When provided (e.g. from Rankings bucket), use this instead of the selected league's format.
- *  Ensures PPG/total points reflect the current bucket (standard, half_ppr, ppr) when switching leagues.
- * @param options.enabled - When false, skips network fetch and returns an empty map.
+ * Fetch season fantasy totals and position rank. Returns the map plus whether the request has settled.
  */
-export function usePlayer2025Stats(
+export function usePlayerSeasonStatsBundle(
   scoringFormatOverride?: ScoringFormat | null,
-  options?: { enabled?: boolean }
-): Map<string, Player2025Stats> {
+  options?: { enabled?: boolean; season?: PlayerStatsSeason }
+): { map: Map<string, Player2025Stats>; isFetched: boolean } {
   const enabled = options?.enabled !== false;
+  const season: PlayerStatsSeason = options?.season ?? 2025;
   const leagueFormat = useScoringFormat();
   const scoringFormat = (scoringFormatOverride ?? leagueFormat) as ScoringFormat;
 
-  const { data } = useQuery({
-    queryKey: PLAYER_2025_STATS_QUERY_KEY,
-    queryFn: fetchPlayer2025SeasonRaw,
+  const { data, isFetched } = useQuery({
+    queryKey: playerSeasonStatsQueryKey(season),
+    queryFn: () => fetchPlayer2025SeasonRaw(season),
     enabled,
     staleTime: PLAYER_2025_STATS_STALE_MS,
     gcTime: PLAYER_2025_STATS_GC_MS,
@@ -480,8 +497,24 @@ export function usePlayer2025Stats(
     retry: 1,
   });
 
-  return useMemo(() => {
+  const map = useMemo(() => {
     if (!enabled) return new Map<string, Player2025Stats>();
     return buildPlayer2025StatsMap(data, scoringFormat);
   }, [data, scoringFormat, enabled]);
+
+  return { map, isFetched: enabled ? isFetched : true };
+}
+
+/**
+ * Fetch season fantasy totals and position rank for all players. Returns a map of playerId -> stats.
+ * @param scoringFormatOverride - When provided (e.g. from Rankings bucket), use this instead of the selected league's format.
+ *  Ensures PPG/total points reflect the current bucket (standard, half_ppr, ppr) when switching leagues.
+ * @param options.enabled - When false, skips network fetch and returns an empty map.
+ * @param options.season - 2026 (in progress) or 2025. Defaults to 2025 so rankings PPG stays on last year.
+ */
+export function usePlayer2025Stats(
+  scoringFormatOverride?: ScoringFormat | null,
+  options?: { enabled?: boolean; season?: PlayerStatsSeason }
+): Map<string, Player2025Stats> {
+  return usePlayerSeasonStatsBundle(scoringFormatOverride, options).map;
 }

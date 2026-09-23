@@ -8,6 +8,7 @@
     "sync:rookies-2026": "npx tsx scripts/sync-drafted-rookies-2026.ts",
     "sync:rosters-2026": "npx tsx scripts/sync-rosters-2026-from-nflverse.ts",
     "sync:weekly-stats-2026": "npx tsx scripts/sync-weekly-stats-2026-from-nflverse.ts",
+    "sync:team-games-2026": "npx tsx scripts/sync-team-stats-and-games-2026.ts",
     "import:rookies-2026-board": "npx tsx scripts/import-rookies-2026-board.ts",
     "sync:players-info": "npx tsx scripts/sync-players-info-from-nflverse.ts",
     "cleanup:stale-rookies": "npx tsx scripts/cleanup-stale-expected-rookies.ts",

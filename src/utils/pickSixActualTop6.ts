@@ -155,9 +155,8 @@ function dedupeKeyForEntry(
 }
 
 /**
- * Rank everyone with 2025 half-PPR stats at this position. Source of truth is `statsMap`
- * (not the merged pick pool), so vets like McCaffrey are not dropped when only their
- * 2025 row has stats.
+ * Rank everyone with half-PPR stats at this position. Source of truth is `statsMap`
+ * (not the merged pick pool), so a player is kept when only one season row has stats.
  */
 function collectPlayersByFantasyPoints(
   position: PickSixPosition,
@@ -209,7 +208,7 @@ function collectPlayersByFantasyPoints(
   return sorted.map((p, i) => ({ ...p, positionRank: i + 1 }));
 }
 
-/** Live top 6 = highest 2025 half-PPR fantasy point totals at the position. */
+/** Live top 6 = highest half-PPR fantasy point totals at the position for the loaded season. */
 export function buildPickSixActualTop6(
   position: PickSixPosition,
   allPlayers: PoolPlayer[],

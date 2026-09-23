@@ -26,7 +26,14 @@ import { lookupJerseyNumberFill, useNflTeamJerseyColors } from '@/hooks/useNflTe
 import { GitCompareArrows, BarChart3 } from 'lucide-react';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import type { Player } from '@/types/database';
-import type { Player2025Stats } from '@/hooks/usePlayer2025Stats';
+import { usePlayerSeasonStatsBundle, type Player2025Stats } from '@/hooks/usePlayer2025Stats';
+import {
+  DEFAULT_PLAYER_STATS_SEASON,
+  gamesTableForSeason,
+  teamStatsTableForSeason,
+  weeklyStatsTableForSeason,
+  type PlayerStatsSeason,
+} from '@/constants/playerStatsSeason';
 import type { ScoringFormat } from '@/utils/fantasyPoints';
 import { getAgeFromBirthDate } from '@/utils/playerAge';
 import {
@@ -139,9 +146,12 @@ interface PlayerDetailDialogProps {
   player: Player | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** 2025 season fantasy points and position rank (e.g. QB1, RB9) - shown next to name in header */
+  /** Season totals passed by the parent. The dialog loads the selected year itself when this is stale. */
   stats2025?: Player2025Stats | null;
   allStats2025?: Map<string, Player2025Stats>;
+  /** Controlled season for the Player Stats page. Popup defaults to 2026. */
+  statsSeason?: PlayerStatsSeason;
+  onStatsSeasonChange?: (season: PlayerStatsSeason) => void;
   /** Overall ADP rank at position (e.g. 8 = WR8) */
   positionAdpRank?: number | null;
 }
@@ -253,7 +263,36 @@ type ComparisonWeeklyExtras = {
   longestFgYards: number | null;
 };
 
-async function fetchWeeklyComparisonExtras(player: Player): Promise<ComparisonWeeklyExtras> {
+async function resolveGsisId(espnId: string): Promise<string | null> {
+  const { data: dc } = await supabase
+    .from('depth_charts_2025')
+    .select('gsis_id')
+    .eq('espn_id', espnId)
+    .limit(1)
+    .maybeSingle();
+  if (dc?.gsis_id) return dc.gsis_id;
+
+  const { data: roster } = await supabase
+    .from('rosters_2025')
+    .select('gsis_id')
+    .eq('espn_id', espnId)
+    .limit(1)
+    .maybeSingle();
+  if (roster?.gsis_id) return roster.gsis_id;
+
+  const { data: info } = await (supabase as any)
+    .from('players_info')
+    .select('gsis_id')
+    .eq('espn_id', espnId)
+    .limit(1)
+    .maybeSingle();
+  return info?.gsis_id ?? null;
+}
+
+async function fetchWeeklyComparisonExtras(
+  player: Player,
+  season: PlayerStatsSeason
+): Promise<ComparisonWeeklyExtras> {
   const empty: ComparisonWeeklyExtras = {
     rushAttempts: null,
     passAttempts: null,
@@ -262,29 +301,14 @@ async function fetchWeeklyComparisonExtras(player: Player): Promise<ComparisonWe
   };
   if (!player.espn_id) return empty;
 
-  let gsisId: string | null = null;
-  const { data: dc } = await supabase
-    .from('depth_charts_2025')
-    .select('gsis_id')
-    .eq('espn_id', player.espn_id)
-    .limit(1)
-    .maybeSingle();
-  if (dc?.gsis_id) gsisId = dc.gsis_id;
-  else {
-    const { data: r } = await supabase
-      .from('rosters_2025')
-      .select('gsis_id')
-      .eq('espn_id', player.espn_id)
-      .limit(1)
-      .maybeSingle();
-    if (r?.gsis_id) gsisId = r.gsis_id;
-  }
-
+  const gsisId = await resolveGsisId(String(player.espn_id));
   const statsId = gsisId || String(player.espn_id);
-  const { data: rows, error } = await supabase
-    .from('weekly_stats_2025')
+  const { data: rows, error } = await (supabase as any)
+    .from(weeklyStatsTableForSeason(season))
     .select('*')
     .eq('player_id', statsId)
+    .eq('season', season)
+    .eq('season_type', 'REG')
     .lte('week', 18);
 
   if (error || !rows?.length) return empty;
@@ -578,8 +602,10 @@ export const PlayerDetailDialog = ({
   player,
   open,
   onOpenChange,
-  stats2025,
-  allStats2025,
+  stats2025: statsFromParent,
+  allStats2025: allStatsFromParent,
+  statsSeason,
+  onStatsSeasonChange,
   positionAdpRank,
 }: PlayerDetailDialogProps) => {
   const scoringFormat = useScoringFormat();
@@ -596,7 +622,25 @@ export const PlayerDetailDialog = ({
   const [comparisonPlayerAge, setComparisonPlayerAge] = useState<number | null>(null);
   const [comparisonStatSource, setComparisonStatSource] = useState<'player' | 'team'>('player');
   const [loading, setLoading] = useState(false);
-  const selectedSeason: 2025 = 2025;
+  const [localSeason, setLocalSeason] = useState<PlayerStatsSeason>(DEFAULT_PLAYER_STATS_SEASON);
+  const selectedSeason = statsSeason ?? localSeason;
+  const setSelectedSeason = (year: PlayerStatsSeason) => {
+    onStatsSeasonChange?.(year);
+    if (statsSeason == null) setLocalSeason(year);
+  };
+  const { map: seasonStatsMap, isFetched: seasonStatsFetched } = usePlayerSeasonStatsBundle(undefined, {
+    season: selectedSeason,
+    enabled: open && !!player,
+  });
+  const stats2025 =
+    (player ? seasonStatsMap.get(player.id) : undefined) ??
+    (selectedSeason === 2025 ? statsFromParent : undefined);
+  const allStats2025 =
+    seasonStatsMap.size > 0
+      ? seasonStatsMap
+      : selectedSeason === 2025
+        ? allStatsFromParent
+        : seasonStatsMap;
   // For RBs/WRs: 'rushing' or 'receiving', for QBs: 'passing' or 'rushing'
   const [statView, setStatView] = useState<'rushing' | 'receiving' | 'passing'>('rushing');
   const { data: jerseyColorsByAbbr } = useNflTeamJerseyColors();
@@ -666,7 +710,10 @@ export const PlayerDetailDialog = ({
         const age = await fetchPlayerAgeFromEspn(espnId);
         if (age != null) setPlayerAge(age);
       }
-      if (selectedSeason === 2025) {
+      if (selectedSeason === 2025 || selectedSeason === 2026) {
+        const teamTable = teamStatsTableForSeason(selectedSeason);
+        const gamesTable = gamesTableForSeason(selectedSeason);
+        const weeklyTable = weeklyStatsTableForSeason(selectedSeason);
         if (isDefense) {
           const scheduleTeam = resolvedTeamAbbr;
           const scheduleTeamAliases = defenseScheduleAliases(scheduleTeam);
@@ -675,13 +722,13 @@ export const PlayerDetailDialog = ({
 
           if (scheduleTeamAliases.length > 0) {
             const { data, error } = await (supabase as any)
-              .from('team_stats_2025')
+              .from(teamTable)
               .select('*')
               .in('team', scheduleTeamAliases)
               .lte('week', 18)
               .order('week', { ascending: true });
             if (error) {
-              console.error('Failed to fetch team_stats_2025 for defense:', error);
+              console.error(`Failed to fetch ${teamTable} for defense:`, error);
             } else {
               statsData = data ?? [];
             }
@@ -693,10 +740,10 @@ export const PlayerDetailDialog = ({
             const gamesOr = scheduleTeamAliases
               .flatMap((t) => [`home_team.eq.${t}`, `away_team.eq.${t}`])
               .join(',');
-            const { data: games } = await supabase
-              .from('games_2025')
+            const { data: games } = await (supabase as any)
+              .from(gamesTable)
               .select('week, home_team, away_team, home_score, away_score, gameday')
-              .eq('season', 2025)
+              .eq('season', selectedSeason)
               .eq('game_type', 'REG')
               .lte('week', 18)
               .or(gamesOr);
@@ -723,12 +770,12 @@ export const PlayerDetailDialog = ({
           const opponentStatsByTeamWeek = new Map<string, any>();
           if (opponentTeams.length > 0) {
             const { data: opponentStats, error: opponentStatsError } = await (supabase as any)
-              .from('team_stats_2025')
+              .from(teamTable)
               .select('*')
               .in('team', opponentTeams)
               .lte('week', 18);
             if (opponentStatsError) {
-              console.error('Failed to fetch opponent team_stats_2025 for defense:', opponentStatsError);
+              console.error(`Failed to fetch opponent ${teamTable} for defense:`, opponentStatsError);
             } else {
               for (const row of opponentStats ?? []) {
                 if (!row?.team || typeof row?.week !== 'number') continue;
@@ -906,25 +953,7 @@ export const PlayerDetailDialog = ({
         }
 
         // 1. Resolve gsis_id (weekly_stats uses GSIS format, not espn_id)
-        let gsisId: string | null = null;
-        if (player.espn_id) {
-          const { data: dc } = await supabase
-            .from('depth_charts_2025')
-            .select('gsis_id')
-            .eq('espn_id', player.espn_id)
-            .limit(1)
-            .maybeSingle();
-          if (dc?.gsis_id) gsisId = dc.gsis_id;
-          else {
-            const { data: r } = await supabase
-              .from('rosters_2025')
-              .select('gsis_id')
-              .eq('espn_id', player.espn_id)
-              .limit(1)
-              .maybeSingle();
-            if (r?.gsis_id) gsisId = r.gsis_id;
-          }
-        }
+        const gsisId = player.espn_id ? await resolveGsisId(String(player.espn_id)) : null;
 
         // 2. Get team for schedule: rosters_2025 (current team) or player.team
         let scheduleTeam: string | null = player.team ?? null;
@@ -943,29 +972,35 @@ export const PlayerDetailDialog = ({
         const statsId = gsisId || player.espn_id;
         let statsData: any[] = [];
         if (statsId) {
-          const { data } = await supabase
-            .from('weekly_stats_2025')
+          const { data } = await (supabase as any)
+            .from(weeklyTable)
             .select('*')
             .eq('player_id', statsId)
+            .eq('season', selectedSeason)
+            .eq('season_type', 'REG')
             .lte('week', 18)
             .order('week', { ascending: true });
           statsData = data ?? [];
         }
         if (statsData.length === 0 && player.espn_id) {
-          const { data } = await supabase
-            .from('weekly_stats_2025')
+          const { data } = await (supabase as any)
+            .from(weeklyTable)
             .select('*')
             .eq('player_id', player.espn_id)
+            .eq('season', selectedSeason)
+            .eq('season_type', 'REG')
             .lte('week', 18)
             .order('week', { ascending: true });
           statsData = data ?? [];
         }
         if (statsData.length === 0) {
           const lastName = player.name.split(' ').pop() || '';
-          let query = supabase
-            .from('weekly_stats_2025')
+          let query = (supabase as any)
+            .from(weeklyTable)
             .select('*')
             .ilike('player_name', `%${lastName}%`)
+            .eq('season', selectedSeason)
+            .eq('season_type', 'REG')
             .lte('week', 18);
           if (player.team) query = query.eq('team', player.team);
           const { data } = await query.order('week', { ascending: true });
@@ -990,13 +1025,13 @@ export const PlayerDetailDialog = ({
         const teams = [...new Set(teamByWeek.values())].filter(Boolean);
         const teamsToFetch = teams.length > 0 ? teams : (scheduleTeam ? [scheduleTeam] : []);
 
-        // 5. Fetch games from games_2025 for the player's team(s)
+        // 5. Fetch games for the player's team(s)
         const teamGames = new Map<number, { opponent: string; gameday: string | null }>();
         if (teamsToFetch.length > 0) {
-          const { data: games } = await supabase
-            .from('games_2025')
+          const { data: games } = await (supabase as any)
+            .from(gamesTable)
             .select('week, home_team, away_team, gameday')
-            .eq('season', 2025)
+            .eq('season', selectedSeason)
             .eq('game_type', 'REG')
             .lte('week', 18)
             .or(teamsToFetch.map(t => `home_team.eq.${t},away_team.eq.${t}`).join(','));
@@ -1342,15 +1377,15 @@ export const PlayerDetailDialog = ({
     let cancelled = false;
     void (async () => {
       const [left, right] = await Promise.all([
-        fetchWeeklyComparisonExtras(player),
-        fetchWeeklyComparisonExtras(comparisonPlayer),
+        fetchWeeklyComparisonExtras(player, selectedSeason),
+        fetchWeeklyComparisonExtras(comparisonPlayer, selectedSeason),
       ]);
       if (!cancelled) setComparisonWeeklyExtras({ left, right });
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, player, comparisonPlayer]);
+  }, [open, player, comparisonPlayer, selectedSeason]);
 
   useEffect(() => {
     if (!comparisonPlayer) {
@@ -2054,10 +2089,24 @@ export const PlayerDetailDialog = ({
                 className="mt-0 mb-0 text-xs sm:text-sm"
               />
             </div>
-            {stats2025 && (
-              <div className="shrink-0 rounded-lg border border-primary/30 sm:border-2 bg-primary/5 px-3 py-2 sm:px-5 sm:py-4 w-full sm:w-auto sm:min-w-[200px]">
+            <div className="shrink-0 rounded-lg border border-primary/30 sm:border-2 bg-primary/5 px-3 py-2 sm:px-5 sm:py-4 w-full sm:w-auto sm:min-w-[200px]">
                 <div className="flex items-center justify-between gap-3 mb-1.5 sm:mb-3">
-                  <p className="text-xs sm:text-sm font-semibold text-foreground">2025 Stats</p>
+                  <Select
+                    value={String(selectedSeason)}
+                    onValueChange={(value) => setSelectedSeason(Number(value) as PlayerStatsSeason)}
+                  >
+                    <SelectTrigger
+                      className="h-9 w-[5.75rem] bg-background"
+                      aria-label="Stats season"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2026">2026</SelectItem>
+                      <SelectItem value="2025">2025</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {stats2025 ? (
                   <div className="flex items-center gap-3 sm:gap-6 text-sm sm:text-base">
                     <span>
                       <span className="text-muted-foreground">Pos Rk:</span>{' '}
@@ -2079,7 +2128,13 @@ export const PlayerDetailDialog = ({
                       )}
                     </span>
                   </div>
+                  ) : !seasonStatsFetched ? (
+                    <p className="text-xs sm:text-sm text-muted-foreground">Loading stats</p>
+                  ) : (
+                    <p className="text-xs sm:text-sm text-muted-foreground">No stats yet</p>
+                  )}
                 </div>
+                {stats2025 && (
                 <div className="pt-1.5 sm:pt-2 border-t border-border/50 grid grid-cols-2 sm:grid-cols-1 gap-x-3 gap-y-1 sm:gap-y-1.5 text-xs sm:text-sm">
                   {isDefensePosition(player.position) && (
                     <>
@@ -2154,8 +2209,8 @@ export const PlayerDetailDialog = ({
                     </div>
                   )}
                 </div>
+                )}
               </div>
-            )}
           </div>
         </DialogHeader>
 
@@ -2177,16 +2232,8 @@ export const PlayerDetailDialog = ({
             </TabsList>
 
             <TabsContent value="stats" className="flex-1 min-h-0 overflow-auto mt-2 sm:mt-4 scrollbar-thin">
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <h3 className="font-semibold text-sm sm:text-base">Season Stats</h3>
-                <Button
-                  variant="default"
-                  size="sm"
-                  aria-pressed="true"
-                  className="mr-2 cursor-default pointer-events-none bg-primary text-primary-foreground opacity-100"
-                >
-                  2025
-                </Button>
+              <div className="mb-2 sm:mb-4">
+                <h3 className="font-semibold text-sm sm:text-base">{selectedSeason} game log</h3>
               </div>
               
               {showStatTabs && (
@@ -2339,7 +2386,7 @@ export const PlayerDetailDialog = ({
             <TabsContent value="comparison" className="flex-1 min-h-0 overflow-auto mt-4 scrollbar-thin">
               <div className="space-y-4">
                 <div className="grid gap-2">
-                  <p className="text-sm text-muted-foreground">Select another player to compare 2025 season stats side-by-side.</p>
+                  <p className="text-sm text-muted-foreground">Select another player to compare {selectedSeason} season stats side-by-side.</p>
                   <Input
                     value={comparisonQuery}
                     onChange={(e) => setComparisonQuery(e.target.value)}
@@ -2400,7 +2447,7 @@ export const PlayerDetailDialog = ({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="player">Player stats (2025)</SelectItem>
+                          <SelectItem value="player">Player stats ({selectedSeason})</SelectItem>
                           <SelectItem value="team">Team ranks</SelectItem>
                         </SelectContent>
                       </Select>
