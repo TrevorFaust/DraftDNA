@@ -522,7 +522,7 @@ function SelectedLeaderPicks({
   return (
     <>
       <h3 className="mb-3 shrink-0 break-words font-display text-lg leading-snug">{heading}</h3>
-      <ol className="inline-grid max-w-full grid-cols-[1.25rem_minmax(0,max-content)_auto] items-start gap-x-3 gap-y-1.5">
+      <ol className="grid w-max max-w-full grow grid-cols-[1.25rem_minmax(0,max-content)_auto] content-between gap-x-3 gap-y-2 self-start">
         {RANKS.map((rank) => {
           const pick = pickByRank.get(rank);
           const status = pick
@@ -563,7 +563,7 @@ function SelectedLeaderPicks({
   );
 }
 
-/** Challenge cards size to their own lists so a taller leaderboard does not stretch the others. */
+/** Equal-height challenge cards. Lists grow and spread so the last row sits on the bottom edge. */
 export const pickSixChallengeCardClass =
   'glass-card flex w-full flex-col p-4 sm:p-5';
 
@@ -621,7 +621,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
     <>
       <section className={pickSixChallengeCardClass} aria-label={pickSixCurrentTop6Heading(position)}>
         <h3 className="mb-3 shrink-0 break-words font-display text-lg leading-snug">{pickSixCurrentTop6Heading(position)}</h3>
-        <div>
+        <div className="flex grow flex-col">
           {!liveScoringActive ? (
             <p className="text-sm leading-relaxed text-muted-foreground">{pickSixPreSeasonNotice()}</p>
           ) : actualTop6.length === 0 ? (
@@ -629,7 +629,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
               {statsReady ? 'No stats for this position yet.' : 'Loading stats…'}
             </p>
           ) : (
-            <ol className="inline-grid max-w-full grid-cols-[1.25rem_minmax(0,max-content)_auto] items-baseline gap-x-3 gap-y-2">
+            <ol className="grid w-max max-w-full grow grid-cols-[1.25rem_minmax(0,max-content)_auto] content-between gap-x-3 gap-y-2 self-start">
               {actualTop6.map((player) => (
                 <li key={player.identityKey} className="col-span-3 grid grid-cols-subgrid items-baseline gap-x-3 py-1 text-sm">
                   <span className="font-mono text-xs tabular-nums text-muted-foreground">
@@ -661,7 +661,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
             No {position} entries yet.
           </p>
         ) : (
-          <div className="max-h-[32rem] space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
+          <div className="flex max-h-[40rem] grow flex-col justify-between gap-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
             {leaderboard.map((entry) => {
               const isCurrentUser = !!user && entry.userId === user.id;
               const canSelect = (PICK_SIX_VIEW_OTHERS_PICKS || isCurrentUser) && entry.picks.length > 0;
@@ -678,7 +678,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
                   disabled={!canSelect}
                   onClick={() => setSelectedUserId(entry.userId)}
                   className={cn(
-                    'flex min-h-11 w-full items-start justify-between gap-2 rounded-lg border px-3 py-2 text-left',
+                    'flex min-h-11 w-full shrink-0 items-start justify-between gap-2 rounded-lg border px-3 py-2 text-left',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     isSelected
                       ? 'border-primary bg-primary/10'

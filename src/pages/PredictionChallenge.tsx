@@ -726,7 +726,7 @@ ${shareUrl}`;
               </p>
 
               {savedPositions.has(position) && editingPosition !== position ? (
-                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <div className={pickSixChallengeCardClass}>
                     <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
                       <h3 className="font-display text-lg flex items-center gap-2">
@@ -750,11 +750,11 @@ ${shareUrl}`;
                         </span>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="flex grow flex-col justify-between gap-2">
                       {predictions[position].filter(Boolean).map((player, i) => (
                         <div
                           key={player!.id}
-                          className="flex items-start gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-2.5 sm:gap-3 sm:px-2.5"
+                          className="flex shrink-0 items-start gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-2.5 sm:gap-3 sm:px-2.5"
                         >
                           <span className="w-6 shrink-0 pt-0.5 text-sm font-mono tabular-nums text-muted-foreground">
                             #{i + 1}
