@@ -543,7 +543,7 @@ ${shareUrl}`;
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="mx-auto w-full max-w-[96rem] px-4 py-8">
         <div className={cn('relative', !user && 'min-h-[60vh]')}>
           {!user && (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/85 backdrop-blur-[2px]">
@@ -750,24 +750,24 @@ ${shareUrl}`;
                         </span>
                       )}
                     </div>
-                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
+                    <div className="space-y-2">
                       {predictions[position].filter(Boolean).map((player, i) => (
                         <div
                           key={player!.id}
-                          className="flex items-center gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-2.5 sm:gap-3 sm:px-2.5"
+                          className="flex items-start gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-2.5 sm:gap-3 sm:px-2.5"
                         >
-                          <span className="w-6 shrink-0 text-sm font-mono tabular-nums text-muted-foreground">
+                          <span className="w-6 shrink-0 pt-0.5 text-sm font-mono tabular-nums text-muted-foreground">
                             #{i + 1}
                           </span>
-                          <PositionBadge position={player!.position} className="shrink-0" />
-                          <span className="min-w-0 flex-1 truncate text-base font-semibold leading-snug">
+                          <PositionBadge position={player!.position} className="mt-0.5 shrink-0" />
+                          <p className="min-w-0 flex-1 break-words text-base font-semibold leading-snug">
                             {player!.name}
-                          </span>
-                          {player!.team && (
-                            <span className="shrink-0 text-sm text-muted-foreground">
-                              {player!.team}
-                            </span>
-                          )}
+                            {player!.team ? (
+                              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                {player!.team}
+                              </span>
+                            ) : null}
+                          </p>
                         </div>
                       ))}
                     </div>

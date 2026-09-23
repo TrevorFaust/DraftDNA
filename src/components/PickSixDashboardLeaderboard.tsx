@@ -521,8 +521,8 @@ function SelectedLeaderPicks({
 
   return (
     <>
-      <h3 className="mb-3 shrink-0 truncate font-display text-lg">{heading}</h3>
-      <ol className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
+      <h3 className="mb-3 shrink-0 break-words font-display text-lg leading-snug">{heading}</h3>
+      <ol className="space-y-1.5">
         {RANKS.map((rank) => {
           const pick = pickByRank.get(rank);
           const status = pick
@@ -533,25 +533,26 @@ function SelectedLeaderPicks({
               ? positionRankLookup.getOverallRank(pick.playerId, pick.playerName)
               : null;
           return (
-            <li key={rank} className="flex min-h-11 min-w-0 items-center gap-2 text-sm">
-              <span className="w-5 shrink-0 text-muted-foreground font-mono tabular-nums text-xs">
+            <li key={rank} className="flex min-h-11 items-start gap-2 py-1 text-sm">
+              <span className="w-5 shrink-0 pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
                 {rank}.
               </span>
-              <span
-                className={cn(
-                  'min-w-0 flex-1 truncate',
-                  status?.kind === 'exact' && 'text-green-600 dark:text-green-400 font-medium'
-                )}
-              >
-                {pick?.playerName ?? '—'}
+              <div className="min-w-0 flex-1">
+                <p
+                  className={cn(
+                    'break-words leading-snug',
+                    status?.kind === 'exact' && 'font-medium text-green-600 dark:text-green-400'
+                  )}
+                >
+                  {pick?.playerName ?? '—'}
+                </p>
                 {overall != null && overall > 6 && (
-                  <span className="text-xs text-muted-foreground font-normal">
-                    {' '}
+                  <p className="break-words text-xs leading-snug text-muted-foreground">
                     ({formatPickSixOverallRank(overall)})
-                  </span>
+                  </p>
                 )}
-              </span>
-              <span className="w-9 shrink-0 text-right font-mono tabular-nums text-xs text-muted-foreground">
+              </div>
+              <span className="shrink-0 pt-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                 {status ? formatPickSixSlotPoints(status.points) : '—'}
               </span>
             </li>
@@ -564,7 +565,7 @@ function SelectedLeaderPicks({
 
 /** Shared height so the four challenge cards line up on tablet and desktop. */
 export const pickSixChallengeCardClass =
-  'glass-card flex h-full min-h-0 flex-col p-4 sm:p-5 md:h-[28rem]';
+  'glass-card flex h-full min-h-0 flex-col p-4 sm:p-5';
 
 /** Challenge page: actual top 6, a scrollable leader list, and the selected entry's picks. */
 export function PickSixChallengeColumns({ position: lockedPosition }: { position: PickSixPosition }) {
@@ -619,8 +620,8 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
   return (
     <>
       <section className={pickSixChallengeCardClass} aria-label={pickSixCurrentTop6Heading(position)}>
-        <h3 className="mb-3 shrink-0 font-display text-lg">{pickSixCurrentTop6Heading(position)}</h3>
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1 scrollbar-thin">
+        <h3 className="mb-3 shrink-0 break-words font-display text-lg leading-snug">{pickSixCurrentTop6Heading(position)}</h3>
+        <div>
           {!liveScoringActive ? (
             <p className="text-sm leading-relaxed text-muted-foreground">{pickSixPreSeasonNotice()}</p>
           ) : actualTop6.length === 0 ? (
@@ -630,12 +631,12 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
           ) : (
             <ol className="space-y-2">
               {actualTop6.map((player) => (
-                <li key={player.identityKey} className="flex min-h-11 items-center gap-2 text-sm">
-                  <span className="w-5 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                <li key={player.identityKey} className="flex min-h-11 items-start gap-2 py-1 text-sm">
+                  <span className="w-5 shrink-0 pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
                     {player.positionRank}.
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{player.name}</span>
-                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                  <span className="min-w-0 flex-1 break-words font-medium leading-snug">{player.name}</span>
+                  <span className="shrink-0 pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
                     {formatPickSixFantasyPoints(player.fantasyPoints)}
                   </span>
                 </li>
@@ -647,7 +648,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
 
       <section className={pickSixChallengeCardClass} aria-label={pickSixLeaderboardHeading(position)}>
         <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 font-display text-lg">
+          <h3 className="flex min-w-0 items-center gap-2 break-words font-display text-lg leading-snug">
             <Medal className="h-5 w-5 text-amber-500" aria-hidden />
             Leaderboard
           </h3>
@@ -677,7 +678,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
                   disabled={!canSelect}
                   onClick={() => setSelectedUserId(entry.userId)}
                   className={cn(
-                    'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left',
+                    'flex min-h-11 w-full items-start justify-between gap-2 rounded-lg border px-3 py-2 text-left',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     isSelected
                       ? 'border-primary bg-primary/10'
@@ -686,20 +687,20 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
                     !canSelect && 'cursor-default opacity-80'
                   )}
                 >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="w-6 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                  <span className="flex min-w-0 flex-1 items-start gap-2">
+                    <span className="w-6 shrink-0 pt-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                       #{entry.rank}
                     </span>
                     <span
                       className={cn(
-                        'truncate text-sm font-medium',
+                        'min-w-0 break-words text-sm font-medium leading-snug',
                         isCurrentUser && 'text-amber-600 dark:text-amber-400'
                       )}
                     >
                       {displayName}
                     </span>
                   </span>
-                  <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
+                  <span className="flex shrink-0 items-center gap-2 pt-0.5 text-xs tabular-nums">
                     <span className="rounded bg-secondary px-1.5 py-0.5 font-medium">
                       {entry.exactMatches}/6
                     </span>
