@@ -48,7 +48,7 @@ import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { OfficialRulesContent } from '@/components/OfficialRulesContent';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickSixMark } from '@/components/PickSixIcon';
-import { PickSixChallengeColumns } from '@/components/PickSixDashboardLeaderboard';
+import { PickSixChallengeColumns, pickSixChallengeCardClass } from '@/components/PickSixDashboardLeaderboard';
 import {
   SITE_NAME,
   SEASON,
@@ -543,7 +543,7 @@ ${shareUrl}`;
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="max-w-5xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         <div className={cn('relative', !user && 'min-h-[60vh]')}>
           {!user && (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/85 backdrop-blur-[2px]">
@@ -726,9 +726,9 @@ ${shareUrl}`;
               </p>
 
               {savedPositions.has(position) && editingPosition !== position ? (
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
-                  <div className="glass-card p-6">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <div className={pickSixChallengeCardClass}>
+                    <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
                       <h3 className="font-display text-lg flex items-center gap-2">
                         <CheckCircle2 className="w-5 h-5 text-green-500" />
                         Your Top {TOP_N}
@@ -750,7 +750,7 @@ ${shareUrl}`;
                         </span>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
                       {predictions[position].filter(Boolean).map((player, i) => (
                         <div
                           key={player!.id}

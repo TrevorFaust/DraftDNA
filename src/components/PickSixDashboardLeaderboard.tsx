@@ -520,9 +520,9 @@ function SelectedLeaderPicks({
       : pickSixTheirTop6Heading(position);
 
   return (
-    <div className="mt-3 pt-3 border-t border-border/50">
-      <p className="text-xs font-medium text-muted-foreground mb-2">{heading}</p>
-      <ol className="space-y-1.5">
+    <>
+      <h3 className="mb-3 shrink-0 truncate font-display text-lg">{heading}</h3>
+      <ol className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
         {RANKS.map((rank) => {
           const pick = pickByRank.get(rank);
           const status = pick
@@ -533,7 +533,7 @@ function SelectedLeaderPicks({
               ? positionRankLookup.getOverallRank(pick.playerId, pick.playerName)
               : null;
           return (
-            <li key={rank} className="flex items-center gap-2 min-w-0 text-sm">
+            <li key={rank} className="flex min-h-11 min-w-0 items-center gap-2 text-sm">
               <span className="w-5 shrink-0 text-muted-foreground font-mono tabular-nums text-xs">
                 {rank}.
               </span>
@@ -558,11 +558,15 @@ function SelectedLeaderPicks({
           );
         })}
       </ol>
-    </div>
+    </>
   );
 }
 
-/** Challenge page: actual top 6 beside a scrollable leader list. Selecting a row shows that entry's picks. */
+/** Shared height so the four challenge cards line up on tablet and desktop. */
+export const pickSixChallengeCardClass =
+  'glass-card flex h-full min-h-0 flex-col p-4 sm:p-5 md:h-[28rem]';
+
+/** Challenge page: actual top 6, a scrollable leader list, and the selected entry's picks. */
 export function PickSixChallengeColumns({ position: lockedPosition }: { position: PickSixPosition }) {
   const { user } = useAuth();
   const {
@@ -580,21 +584,25 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
   } = usePickSixPositionLeaderboard(user?.id, lockedPosition);
 
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const leaderIds = leaderboard.map((entry) => entry.userId).join('\0');
 
   useEffect(() => {
     if (lockedPosition !== position) setPosition(lockedPosition);
   }, [lockedPosition, position, setPosition]);
 
   useEffect(() => {
-    setSelectedUserId(null);
-  }, [position]);
+    setSelectedUserId((prev) => {
+      if (prev && leaderboard.some((entry) => entry.userId === prev)) return prev;
+      return leaderboard[0]?.userId ?? null;
+    });
+  }, [leaderIds, leaderboard]);
 
   const selected = leaderboard.find((entry) => entry.userId === selectedUserId) ?? null;
   const selectedIsYou = !!user && selected?.userId === user.id;
 
   if (loading) {
     return (
-      <div className="lg:col-span-2 glass-card p-6 flex items-center justify-center min-h-[12rem]">
+      <div className={`${pickSixChallengeCardClass} items-center justify-center lg:col-span-3`}>
         <BrandedLoader size={32} />
       </div>
     );
@@ -602,7 +610,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
 
   if (entriesError) {
     return (
-      <div className="lg:col-span-2 glass-card p-6">
+      <div className={`${pickSixChallengeCardClass} lg:col-span-3`}>
         <p className="text-sm text-destructive">{entriesError}</p>
       </div>
     );
@@ -610,38 +618,40 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
 
   return (
     <>
-      <section className="glass-card p-4 sm:p-6" aria-label={pickSixCurrentTop6Heading(position)}>
-        <h3 className="font-display text-lg mb-3">{pickSixCurrentTop6Heading(position)}</h3>
-        {!liveScoringActive ? (
-          <p className="text-sm text-muted-foreground leading-relaxed">{pickSixPreSeasonNotice()}</p>
-        ) : actualTop6.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {statsReady ? 'No stats for this position yet.' : 'Loading stats…'}
-          </p>
-        ) : (
-          <ol className="space-y-2">
-            {actualTop6.map((player) => (
-              <li key={player.identityKey} className="flex items-center gap-2 min-w-0 text-sm">
-                <span className="w-5 shrink-0 text-muted-foreground font-mono tabular-nums text-xs">
-                  {player.positionRank}.
-                </span>
-                <span className="min-w-0 flex-1 truncate font-medium">{player.name}</span>
-                <span className="shrink-0 font-mono tabular-nums text-xs text-muted-foreground">
-                  {formatPickSixFantasyPoints(player.fantasyPoints)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
+      <section className={pickSixChallengeCardClass} aria-label={pickSixCurrentTop6Heading(position)}>
+        <h3 className="mb-3 shrink-0 font-display text-lg">{pickSixCurrentTop6Heading(position)}</h3>
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1 scrollbar-thin">
+          {!liveScoringActive ? (
+            <p className="text-sm leading-relaxed text-muted-foreground">{pickSixPreSeasonNotice()}</p>
+          ) : actualTop6.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {statsReady ? 'No stats for this position yet.' : 'Loading stats…'}
+            </p>
+          ) : (
+            <ol className="space-y-2">
+              {actualTop6.map((player) => (
+                <li key={player.identityKey} className="flex min-h-11 items-center gap-2 text-sm">
+                  <span className="w-5 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                    {player.positionRank}.
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{player.name}</span>
+                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                    {formatPickSixFantasyPoints(player.fantasyPoints)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </section>
 
-      <section className="glass-card p-4 sm:p-6" aria-label={pickSixLeaderboardHeading(position)}>
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h3 className="font-display text-lg flex items-center gap-2">
-            <Medal className="w-5 h-5 text-amber-500" aria-hidden />
+      <section className={pickSixChallengeCardClass} aria-label={pickSixLeaderboardHeading(position)}>
+        <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
+          <h3 className="flex items-center gap-2 font-display text-lg">
+            <Medal className="h-5 w-5 text-amber-500" aria-hidden />
             Leaderboard
           </h3>
-          <p className="text-xs text-muted-foreground tabular-nums">
+          <p className="text-xs tabular-nums text-muted-foreground">
             {leaderboard.length} {leaderboard.length === 1 ? 'player' : 'players'}
           </p>
         </div>
@@ -650,70 +660,81 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
             No {position} entries yet.
           </p>
         ) : (
+          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
+            {leaderboard.map((entry) => {
+              const isCurrentUser = !!user && entry.userId === user.id;
+              const canSelect = (PICK_SIX_VIEW_OTHERS_PICKS || isCurrentUser) && entry.picks.length > 0;
+              const isSelected = selectedUserId === entry.userId;
+              const displayName = isCurrentUser
+                ? 'You'
+                : entry.username?.trim() || `Player #${entry.rank}`;
+              return (
+                <button
+                  key={entry.userId}
+                  type="button"
+                  aria-pressed={isSelected}
+                  aria-controls="pick-six-selected-picks"
+                  disabled={!canSelect}
+                  onClick={() => setSelectedUserId(entry.userId)}
+                  className={cn(
+                    'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    isSelected
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border/50 hover:bg-muted/40',
+                    isCurrentUser && !isSelected && 'border-amber-500/40 bg-amber-500/5',
+                    !canSelect && 'cursor-default opacity-80'
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="w-6 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                      #{entry.rank}
+                    </span>
+                    <span
+                      className={cn(
+                        'truncate text-sm font-medium',
+                        isCurrentUser && 'text-amber-600 dark:text-amber-400'
+                      )}
+                    >
+                      {displayName}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
+                    <span className="rounded bg-secondary px-1.5 py-0.5 font-medium">
+                      {entry.exactMatches}/6
+                    </span>
+                    <span className="text-muted-foreground">{entry.scoreLabel} pts</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section
+        id="pick-six-selected-picks"
+        className={pickSixChallengeCardClass}
+        aria-live="polite"
+        aria-label={selected ? undefined : 'Selected picks'}
+      >
+        {selected && (selectedIsYou || PICK_SIX_VIEW_OTHERS_PICKS) ? (
+          <SelectedLeaderPicks
+            position={position}
+            entry={selected}
+            isCurrentUser={selectedIsYou}
+            actualTop6Keys={actualTop6Keys}
+            playersById={playersById}
+            positionRankLookup={positionRankLookup}
+          />
+        ) : (
           <>
-            <div
-              className="space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin"
-              style={{ maxHeight: 'min(18rem, 42vh)' }}
-            >
-              {leaderboard.map((entry) => {
-                const isCurrentUser = !!user && entry.userId === user.id;
-                const canSelect = (PICK_SIX_VIEW_OTHERS_PICKS || isCurrentUser) && entry.picks.length > 0;
-                const isSelected = selectedUserId === entry.userId;
-                const displayName = isCurrentUser
-                  ? 'You'
-                  : entry.username?.trim() || `Player #${entry.rank}`;
-                return (
-                  <button
-                    key={entry.userId}
-                    type="button"
-                    aria-pressed={isSelected}
-                    disabled={!canSelect}
-                    onClick={() =>
-                      setSelectedUserId((prev) => (prev === entry.userId ? null : entry.userId))
-                    }
-                    className={cn(
-                      'w-full min-h-11 flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      isSelected
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border/50 hover:bg-muted/40',
-                      isCurrentUser && !isSelected && 'border-amber-500/40 bg-amber-500/5',
-                      !canSelect && 'cursor-default opacity-80'
-                    )}
-                  >
-                    <span className="flex items-center gap-2 min-w-0">
-                      <span className="w-6 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
-                        #{entry.rank}
-                      </span>
-                      <span
-                        className={cn(
-                          'truncate text-sm font-medium',
-                          isCurrentUser && 'text-amber-600 dark:text-amber-400'
-                        )}
-                      >
-                        {displayName}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-2 shrink-0 text-xs tabular-nums">
-                      <span className="rounded bg-secondary px-1.5 py-0.5 font-medium">
-                        {entry.exactMatches}/6
-                      </span>
-                      <span className="text-muted-foreground">{entry.scoreLabel} pts</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {selected && (selectedIsYou || PICK_SIX_VIEW_OTHERS_PICKS) && (
-              <SelectedLeaderPicks
-                position={position}
-                entry={selected}
-                isCurrentUser={selectedIsYou}
-                actualTop6Keys={actualTop6Keys}
-                playersById={playersById}
-                positionRankLookup={positionRankLookup}
-              />
-            )}
+            <h3 className="mb-3 shrink-0 font-display text-lg">Picks</h3>
+            <p className="text-sm text-muted-foreground">
+              {leaderboard.length === 0
+                ? `No ${position} entries yet.`
+                : 'Select a name on the leaderboard to see their top 6.'}
+            </p>
           </>
         )}
       </section>
