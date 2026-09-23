@@ -522,7 +522,7 @@ function SelectedLeaderPicks({
   return (
     <>
       <h3 className="mb-3 shrink-0 break-words font-display text-lg leading-snug">{heading}</h3>
-      <ol className="grid w-max max-w-full grow grid-cols-[1.25rem_minmax(0,max-content)_auto] content-between gap-x-3 gap-y-2 self-start">
+      <ol className="grid w-max max-w-full grid-cols-[1.25rem_minmax(0,max-content)_auto] gap-x-3 gap-y-1.5">
         {RANKS.map((rank) => {
           const pick = pickByRank.get(rank);
           const status = pick
@@ -533,7 +533,7 @@ function SelectedLeaderPicks({
               ? positionRankLookup.getOverallRank(pick.playerId, pick.playerName)
               : null;
           return (
-            <li key={rank} className="col-span-3 grid grid-cols-subgrid items-start gap-x-3 py-1 text-sm">
+            <li key={rank} className="col-span-3 grid grid-cols-subgrid items-start gap-x-3 text-sm">
               <span className="pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
                 {rank}.
               </span>
@@ -563,9 +563,9 @@ function SelectedLeaderPicks({
   );
 }
 
-/** Equal-height challenge cards. Lists grow and spread so the last row sits on the bottom edge. */
+/** Equal-height challenge cards. The leaderboard scrolls instead of stretching the row. */
 export const pickSixChallengeCardClass =
-  'glass-card flex w-full flex-col p-4 sm:p-5';
+  'glass-card flex w-full flex-col p-4';
 
 /** Challenge page: actual top 6, a scrollable leader list, and the selected entry's picks. */
 export function PickSixChallengeColumns({ position: lockedPosition }: { position: PickSixPosition }) {
@@ -621,7 +621,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
     <>
       <section className={pickSixChallengeCardClass} aria-label={pickSixCurrentTop6Heading(position)}>
         <h3 className="mb-3 shrink-0 break-words font-display text-lg leading-snug">{pickSixCurrentTop6Heading(position)}</h3>
-        <div className="flex grow flex-col">
+        <div>
           {!liveScoringActive ? (
             <p className="text-sm leading-relaxed text-muted-foreground">{pickSixPreSeasonNotice()}</p>
           ) : actualTop6.length === 0 ? (
@@ -629,9 +629,9 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
               {statsReady ? 'No stats for this position yet.' : 'Loading stats…'}
             </p>
           ) : (
-            <ol className="grid w-max max-w-full grow grid-cols-[1.25rem_minmax(0,max-content)_auto] content-between gap-x-3 gap-y-2 self-start">
+            <ol className="grid w-max max-w-full grid-cols-[1.25rem_minmax(0,max-content)_auto] gap-x-3 gap-y-1.5">
               {actualTop6.map((player) => (
-                <li key={player.identityKey} className="col-span-3 grid grid-cols-subgrid items-baseline gap-x-3 py-1 text-sm">
+                <li key={player.identityKey} className="col-span-3 grid grid-cols-subgrid items-baseline gap-x-3 text-sm">
                   <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {player.positionRank}.
                   </span>
@@ -646,7 +646,7 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
         </div>
       </section>
 
-      <section className={pickSixChallengeCardClass} aria-label={pickSixLeaderboardHeading(position)}>
+      <section className={`${pickSixChallengeCardClass} h-full min-h-0 overflow-hidden`} aria-label={pickSixLeaderboardHeading(position)}>
         <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
           <h3 className="flex min-w-0 items-center gap-2 break-words font-display text-lg leading-snug">
             <Medal className="h-5 w-5 text-amber-500" aria-hidden />
@@ -661,7 +661,11 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
             No {position} entries yet.
           </p>
         ) : (
-          <div className="flex max-h-[40rem] grow flex-col justify-between gap-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
+          <div
+            className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin"
+            tabIndex={leaderboard.length > 6 ? 0 : undefined}
+            aria-label={leaderboard.length > 6 ? 'Leaderboard, scroll for more players' : undefined}
+          >
             {leaderboard.map((entry) => {
               const isCurrentUser = !!user && entry.userId === user.id;
               const canSelect = (PICK_SIX_VIEW_OTHERS_PICKS || isCurrentUser) && entry.picks.length > 0;

@@ -750,16 +750,16 @@ ${shareUrl}`;
                         </span>
                       )}
                     </div>
-                    <div className="flex grow flex-col justify-between gap-2">
+                    <div className="flex flex-col gap-1.5">
                       {predictions[position].filter(Boolean).map((player, i) => (
                         <div
                           key={player!.id}
-                          className="flex shrink-0 items-start gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-2.5 sm:gap-3 sm:px-2.5"
+                          className="flex shrink-0 items-center gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-2 sm:gap-2.5 sm:px-2.5"
                         >
-                          <span className="w-6 shrink-0 pt-0.5 text-sm font-mono tabular-nums text-muted-foreground">
+                          <span className="w-6 shrink-0 text-sm font-mono tabular-nums text-muted-foreground">
                             #{i + 1}
                           </span>
-                          <PositionBadge position={player!.position} className="mt-0.5 shrink-0" />
+                          <PositionBadge position={player!.position} className="shrink-0" />
                           <p className="min-w-0 flex-1 break-words text-base font-semibold leading-snug">
                             {player!.name}
                             {player!.team ? (
