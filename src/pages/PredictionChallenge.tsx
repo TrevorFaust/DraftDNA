@@ -48,7 +48,7 @@ import { usePlayer2025Stats } from '@/hooks/usePlayer2025Stats';
 import { OfficialRulesContent } from '@/components/OfficialRulesContent';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickSixMark } from '@/components/PickSixIcon';
-import { PickSixDashboardLeaderboard } from '@/components/PickSixDashboardLeaderboard';
+import { PickSixChallengeColumns } from '@/components/PickSixDashboardLeaderboard';
 import {
   SITE_NAME,
   SEASON,
@@ -726,8 +726,8 @@ ${shareUrl}`;
               </p>
 
               {savedPositions.has(position) && editingPosition !== position ? (
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-1 md:max-w-[50%] glass-card p-6">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
+                  <div className="glass-card p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-display text-lg flex items-center gap-2">
                         <CheckCircle2 className="w-5 h-5 text-green-500" />
@@ -772,9 +772,7 @@ ${shareUrl}`;
                       ))}
                     </div>
                   </div>
-                  <div className="flex-1 md:max-w-[50%] glass-card p-4 sm:p-6 flex flex-col min-h-[280px]">
-                    <PickSixDashboardLeaderboard position={position} />
-                  </div>
+                  <PickSixChallengeColumns position={position} />
                 </div>
               ) : (
                 <>

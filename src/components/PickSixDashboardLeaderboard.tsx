@@ -495,3 +495,228 @@ export function PickSixDashboardLeaderboard({
     </div>
   );
 }
+
+function SelectedLeaderPicks({
+  position,
+  entry,
+  isCurrentUser,
+  actualTop6Keys,
+  playersById,
+  positionRankLookup,
+}: {
+  position: PickSixPosition;
+  entry: PickSixLeaderboardEntry;
+  isCurrentUser: boolean;
+  actualTop6Keys: string[];
+  playersById: Map<string, { espn_id?: string | null }>;
+  positionRankLookup: PickSixPositionRankLookup;
+}) {
+  const pickByRank = new Map(entry.picks.map((p) => [p.rank, p]));
+  const name = entry.username?.trim();
+  const heading = isCurrentUser
+    ? pickSixYourTop6Heading(position)
+    : name
+      ? `${name}'s top 6`
+      : pickSixTheirTop6Heading(position);
+
+  return (
+    <div className="mt-3 pt-3 border-t border-border/50">
+      <p className="text-xs font-medium text-muted-foreground mb-2">{heading}</p>
+      <ol className="space-y-1.5">
+        {RANKS.map((rank) => {
+          const pick = pickByRank.get(rank);
+          const status = pick
+            ? evaluatePickSixSlot(actualTop6Keys, pick.playerId, pick.rank, playersById)
+            : null;
+          const overall =
+            pick && status?.kind === 'miss'
+              ? positionRankLookup.getOverallRank(pick.playerId, pick.playerName)
+              : null;
+          return (
+            <li key={rank} className="flex items-center gap-2 min-w-0 text-sm">
+              <span className="w-5 shrink-0 text-muted-foreground font-mono tabular-nums text-xs">
+                {rank}.
+              </span>
+              <span
+                className={cn(
+                  'min-w-0 flex-1 truncate',
+                  status?.kind === 'exact' && 'text-green-600 dark:text-green-400 font-medium'
+                )}
+              >
+                {pick?.playerName ?? '—'}
+                {overall != null && overall > 6 && (
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {' '}
+                    ({formatPickSixOverallRank(overall)})
+                  </span>
+                )}
+              </span>
+              <span className="w-9 shrink-0 text-right font-mono tabular-nums text-xs text-muted-foreground">
+                {status ? formatPickSixSlotPoints(status.points) : '—'}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+/** Challenge page: actual top 6 beside a scrollable leader list. Selecting a row shows that entry's picks. */
+export function PickSixChallengeColumns({ position: lockedPosition }: { position: PickSixPosition }) {
+  const { user } = useAuth();
+  const {
+    position,
+    setPosition,
+    liveScoringActive,
+    actualTop6,
+    actualTop6Keys,
+    positionRankLookup,
+    playersById,
+    leaderboard,
+    loading,
+    entriesError,
+    statsReady,
+  } = usePickSixPositionLeaderboard(user?.id, lockedPosition);
+
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (lockedPosition !== position) setPosition(lockedPosition);
+  }, [lockedPosition, position, setPosition]);
+
+  useEffect(() => {
+    setSelectedUserId(null);
+  }, [position]);
+
+  const selected = leaderboard.find((entry) => entry.userId === selectedUserId) ?? null;
+  const selectedIsYou = !!user && selected?.userId === user.id;
+
+  if (loading) {
+    return (
+      <div className="lg:col-span-2 glass-card p-6 flex items-center justify-center min-h-[12rem]">
+        <BrandedLoader size={32} />
+      </div>
+    );
+  }
+
+  if (entriesError) {
+    return (
+      <div className="lg:col-span-2 glass-card p-6">
+        <p className="text-sm text-destructive">{entriesError}</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <section className="glass-card p-4 sm:p-6" aria-label={pickSixCurrentTop6Heading(position)}>
+        <h3 className="font-display text-lg mb-3">{pickSixCurrentTop6Heading(position)}</h3>
+        {!liveScoringActive ? (
+          <p className="text-sm text-muted-foreground leading-relaxed">{pickSixPreSeasonNotice()}</p>
+        ) : actualTop6.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {statsReady ? 'No stats for this position yet.' : 'Loading stats…'}
+          </p>
+        ) : (
+          <ol className="space-y-2">
+            {actualTop6.map((player) => (
+              <li key={player.identityKey} className="flex items-center gap-2 min-w-0 text-sm">
+                <span className="w-5 shrink-0 text-muted-foreground font-mono tabular-nums text-xs">
+                  {player.positionRank}.
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">{player.name}</span>
+                <span className="shrink-0 font-mono tabular-nums text-xs text-muted-foreground">
+                  {formatPickSixFantasyPoints(player.fantasyPoints)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      <section className="glass-card p-4 sm:p-6" aria-label={pickSixLeaderboardHeading(position)}>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className="font-display text-lg flex items-center gap-2">
+            <Medal className="w-5 h-5 text-amber-500" aria-hidden />
+            Leaderboard
+          </h3>
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {leaderboard.length} {leaderboard.length === 1 ? 'player' : 'players'}
+          </p>
+        </div>
+        {leaderboard.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No {position} entries yet.
+          </p>
+        ) : (
+          <>
+            <div
+              className="space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin"
+              style={{ maxHeight: 'min(18rem, 42vh)' }}
+            >
+              {leaderboard.map((entry) => {
+                const isCurrentUser = !!user && entry.userId === user.id;
+                const canSelect = (PICK_SIX_VIEW_OTHERS_PICKS || isCurrentUser) && entry.picks.length > 0;
+                const isSelected = selectedUserId === entry.userId;
+                const displayName = isCurrentUser
+                  ? 'You'
+                  : entry.username?.trim() || `Player #${entry.rank}`;
+                return (
+                  <button
+                    key={entry.userId}
+                    type="button"
+                    aria-pressed={isSelected}
+                    disabled={!canSelect}
+                    onClick={() =>
+                      setSelectedUserId((prev) => (prev === entry.userId ? null : entry.userId))
+                    }
+                    className={cn(
+                      'w-full min-h-11 flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      isSelected
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border/50 hover:bg-muted/40',
+                      isCurrentUser && !isSelected && 'border-amber-500/40 bg-amber-500/5',
+                      !canSelect && 'cursor-default opacity-80'
+                    )}
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="w-6 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                        #{entry.rank}
+                      </span>
+                      <span
+                        className={cn(
+                          'truncate text-sm font-medium',
+                          isCurrentUser && 'text-amber-600 dark:text-amber-400'
+                        )}
+                      >
+                        {displayName}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0 text-xs tabular-nums">
+                      <span className="rounded bg-secondary px-1.5 py-0.5 font-medium">
+                        {entry.exactMatches}/6
+                      </span>
+                      <span className="text-muted-foreground">{entry.scoreLabel} pts</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {selected && (selectedIsYou || PICK_SIX_VIEW_OTHERS_PICKS) && (
+              <SelectedLeaderPicks
+                position={position}
+                entry={selected}
+                isCurrentUser={selectedIsYou}
+                actualTop6Keys={actualTop6Keys}
+                playersById={playersById}
+                positionRankLookup={positionRankLookup}
+              />
+            )}
+          </>
+        )}
+      </section>
+    </>
+  );
+}
