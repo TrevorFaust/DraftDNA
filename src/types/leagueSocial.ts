@@ -54,6 +54,7 @@ export type PickemGame = {
   winner_abbr: string | null;
   locked: boolean;
   my_pick: string | null;
+  seed_pick: string | null;
   member_picks: PickemMemberPick[];
 };
 
@@ -72,4 +73,7 @@ export type PickemWeekBoard = {
   week: number;
   games: PickemGame[];
   standings: PickemStanding[];
+  first_week_save: boolean;
+  this_league_saved: boolean;
+  league_count: number;
 };

@@ -49,8 +49,15 @@ export async function pickemGetWeek(
   return {
     season: board.season,
     week: board.week,
-    games: board.games ?? [],
+    games: (board.games ?? []).map((game) => ({
+      ...game,
+      seed_pick: game.seed_pick ?? null,
+      member_picks: game.member_picks ?? [],
+    })),
     standings: board.standings ?? [],
+    first_week_save: Boolean(board.first_week_save),
+    this_league_saved: Boolean(board.this_league_saved),
+    league_count: board.league_count ?? 1,
   };
 }
 
@@ -73,24 +80,27 @@ export type WeekPickInput = {
 export type WeekPicksResult = {
   saved: number;
   skipped_locked: number;
+  leagues: number;
 };
 
 export async function pickemSetWeekPicks(
   leagueId: string,
   week: number,
   picks: WeekPickInput[],
-  season: number = PICKEM_SEASON
+  opts?: { season?: number; applyAll?: boolean }
 ): Promise<WeekPicksResult> {
   const { data, error } = await supabase.rpc('pickem_set_week_picks' as never, {
     p_league_id: leagueId,
-    p_season: season,
+    p_season: opts?.season ?? PICKEM_SEASON,
     p_week: week,
     p_picks: picks,
+    p_apply_all: opts?.applyAll ?? false,
   });
   if (error) throw error;
   const result = data as WeekPicksResult | null;
   return {
     saved: result?.saved ?? 0,
     skipped_locked: result?.skipped_locked ?? 0,
+    leagues: result?.leagues ?? 1,
   };
 }

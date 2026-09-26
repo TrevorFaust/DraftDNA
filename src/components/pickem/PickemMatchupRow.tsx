@@ -16,8 +16,13 @@ type Props = {
   forceLocked?: boolean;
 };
 
-function pickCount(matchup: WeekMatchup, abbr: string): number {
-  return matchup.game?.member_picks.filter((p) => p.picked_abbr === abbr).length ?? 0;
+function pickOutcomeLabel(picked: string | null, game: WeekMatchup['game']): string {
+  if (!picked || !game || game.status !== 'final') return '';
+  if (game.winner_abbr) return picked === game.winner_abbr ? ' · Correct' : ' · Missed';
+  if (game.home_score != null && game.away_score != null && game.home_score === game.away_score) {
+    return ' · Push';
+  }
+  return '';
 }
 
 function teamLabel(abbr: string, fallbackName: string | null): string {
@@ -31,8 +36,6 @@ function TeamPick({
   locked,
   score,
   winner,
-  showCounts,
-  count,
   fill,
   onPick,
 }: {
@@ -42,8 +45,6 @@ function TeamPick({
   locked: boolean;
   score: number | null;
   winner: string | null;
-  showCounts: boolean;
-  count: number;
   fill: string;
   onPick: () => void;
 }) {
@@ -82,11 +83,6 @@ function TeamPick({
         {fullName}
       </span>
       {score != null && <span className="font-mono text-sm tabular-nums">{score}</span>}
-      {showCounts && (
-        <span className="text-[10px] leading-none text-muted-foreground">
-          {count} pick{count === 1 ? '' : 's'}
-        </span>
-      )}
     </button>
   );
 }
@@ -100,7 +96,6 @@ export function PickemMatchupRow({
 }: Props) {
   const locked = forceLocked ? true : alwaysUnlocked ? false : isMatchupLocked(matchup);
   const game = matchup.game;
-  const showCounts = Boolean(locked && game && game.member_picks.length > 0);
   const { data: jerseyColors } = useNflTeamJerseyColors();
 
   return (
@@ -117,8 +112,6 @@ export function PickemMatchupRow({
           locked={locked}
           score={game?.away_score ?? null}
           winner={game?.winner_abbr ?? null}
-          showCounts={showCounts}
-          count={pickCount(matchup, matchup.away)}
           fill={lookupJerseyNumberFill(jerseyColors, matchup.away)}
           onPick={() => onPick(matchup.away)}
         />
@@ -135,8 +128,6 @@ export function PickemMatchupRow({
           locked={locked}
           score={game?.home_score ?? null}
           winner={game?.winner_abbr ?? null}
-          showCounts={showCounts}
-          count={pickCount(matchup, matchup.home)}
           fill={lookupJerseyNumberFill(jerseyColors, matchup.home)}
           onPick={() => onPick(matchup.home)}
         />
@@ -144,6 +135,7 @@ export function PickemMatchupRow({
       {matchup.kickoffAt ? (
         <p className="pt-1 text-center text-[10px] leading-tight text-muted-foreground">
           {formatKickoff(matchup.kickoffAt)}
+          {pickOutcomeLabel(picked, game)}
         </p>
       ) : (
         <p className="pt-1 text-center text-[10px] leading-tight text-muted-foreground">Time TBD</p>

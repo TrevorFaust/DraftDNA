@@ -10,7 +10,7 @@ export default function NewsTeamDirectory() {
         <span className="edition-badge edition-weekly">Weekly Edition</span>
         <h1 className="mt-3 font-display text-4xl tracking-wide text-foreground">News</h1>
         <p className="mt-2 max-w-2xl font-sans text-base font-normal tracking-normal text-muted-foreground">
-          Pick a team to read its Monday week-in-review. Each issue shows only that franchise,
+          Pick a team to read its week recap. Each issue shows only that franchise,
           not the full 32-team digest.
         </p>
       </header>

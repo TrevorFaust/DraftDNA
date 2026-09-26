@@ -19,6 +19,32 @@ export function formatPickemRecord(wins: number, losses: number, pushes: number)
   return `${wins}-${losses}`;
 }
 
+export function pickemRecordFromGames(
+  games: Array<{
+    my_pick: string | null;
+    winner_abbr: string | null;
+    status: string;
+    home_score: number | null;
+    away_score: number | null;
+  }>
+): { wins: number; losses: number; pushes: number } {
+  let wins = 0;
+  let losses = 0;
+  let pushes = 0;
+  for (const game of games) {
+    if (!game.my_pick || game.status !== 'final') continue;
+    if (game.winner_abbr) {
+      if (game.my_pick === game.winner_abbr) wins += 1;
+      else losses += 1;
+      continue;
+    }
+    if (game.home_score != null && game.away_score != null && game.home_score === game.away_score) {
+      pushes += 1;
+    }
+  }
+  return { wins, losses, pushes };
+}
+
 export function pickemJerseyNumber(abbr: string): number {
   const key = abbr.trim().toUpperCase();
   const assigned = PICKEM_TEAM_JERSEY_NUMBERS[key];

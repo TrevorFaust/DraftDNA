@@ -99,6 +99,15 @@ export function savedPickFor(matchup: WeekMatchup): string | null {
   return matchup.game?.my_pick ?? null;
 }
 
+export function seedPickFor(matchup: WeekMatchup): string | null {
+  return matchup.game?.seed_pick ?? null;
+}
+
+export function isWeekComplete(matchups: WeekMatchup[]): boolean {
+  if (matchups.length === 0) return false;
+  return matchups.every((matchup) => matchup.game?.status === 'final');
+}
+
 export function pickemSlotFromSchedule(slot: ScheduleGame): { away_abbr: string; home_abbr: string } {
   return { away_abbr: slot.away, home_abbr: slot.home };
 }

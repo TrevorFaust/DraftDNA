@@ -93,11 +93,37 @@ export function weekRangeLabel(weeklyIssueDate: string): string {
   return `${MONTH_LONG[weekStart.m - 1]} ${dayOrdinal(weekStart.d)} through ${MONTH_LONG[sunday.m - 1]} ${dayOrdinal(sunday.d)}, ${sunday.y}`;
 }
 
+const REG_WEEK1_TUESDAY = "2026-09-15";
+
+function daysBetween(fromIso: string, toIso: string): number {
+  const a = parseCalendarDate(fromIso);
+  const b = parseCalendarDate(toIso);
+  const ms = Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d);
+  return Math.floor(ms / 86_400_000);
+}
+
+/** NFL regular-season week for a Tuesday recap. Null for preseason issues. */
+export function nflWeekNumber(weeklyIssueDate: string): number | null {
+  const delta = daysBetween(REG_WEEK1_TUESDAY, weeklyIssueDate);
+  if (delta < 0) return null;
+  return 1 + Math.floor(delta / 7);
+}
+
+/** Display title: "Week 1 Recap" in season, date-range title in preseason. */
+export function recapLabel(weeklyIssueDate: string): string {
+  const n = nflWeekNumber(weeklyIssueDate);
+  if (n) return `Week ${n} Recap`;
+  return `Week in review: ${weekRangeCompact(weeklyIssueDate)}`;
+}
+
 export function weekRecapSubtitle(weeklyIssueDate: string): string {
   const { weekStart, sunday } = weekContentRange(weeklyIssueDate);
   const fmt = ({ y, m, d }: CalendarDate) =>
     `${WEEKDAY_SHORT[utcWeekday(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`)]}, ${MONTH_SHORT[m - 1]} ${d}`;
-  return `Week in review: ${fmt(weekStart)} through ${fmt(sunday)}`;
+  const range = `${fmt(weekStart)} through ${fmt(sunday)}`;
+  const n = nflWeekNumber(weeklyIssueDate);
+  if (n) return `Week ${n} Recap · ${range}`;
+  return `Week in review: ${range}`;
 }
 
 /** e.g. "Aug 10-16, 2026" or "Jul 27-Aug 2, 2026" */
@@ -110,5 +136,12 @@ export function weekRangeCompact(weeklyIssueDate: string): string {
 }
 
 export function weekInReviewTitle(weeklyIssueDate: string): string {
-  return `Week in review: ${weekRangeCompact(weeklyIssueDate)}`;
+  return recapLabel(weeklyIssueDate);
+}
+
+/** Breadcrumb / adjacent-week label: Week N Recap in season, compact dates in preseason. */
+export function weeklyNavLabel(weeklyIssueDate: string): string {
+  const n = nflWeekNumber(weeklyIssueDate);
+  if (n) return `Week ${n} Recap`;
+  return weekRangeCompact(weeklyIssueDate);
 }

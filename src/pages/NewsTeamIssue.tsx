@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { BrandedLoader } from "@/components/BrandedLoader";
 import { NewsBreadcrumb, NewsPageFrame } from "@/components/news/NewsPageFrame";
 import { TeamSectionBody } from "@/components/news/TeamSectionBody";
-import { weekInReviewTitle, weekRangeCompact } from "@/lib/newsletter/dates";
+import { weekInReviewTitle, weeklyNavLabel } from "@/lib/newsletter/dates";
 import { fetchPlayerPositionLookup, serializePlayerLookup } from "@/lib/newsletter/playerRegistry";
 import { fetchTeamWeeklyIssue } from "@/lib/newsletter/queries";
 import { getTeamBySlug } from "@/lib/newsletter/teams";
@@ -87,7 +87,7 @@ export default function NewsTeamIssue() {
           items={[
             { to: "/news", label: "News" },
             { to: `/news/${teamSlug}`, label: teamName },
-            { label: weekRangeCompact(issue.issue_date) },
+            { label: weeklyNavLabel(issue.issue_date) },
           ]}
         />
 
@@ -107,7 +107,7 @@ export default function NewsTeamIssue() {
                 <ChevronLeft className="h-5 w-5 shrink-0 text-primary" />
                 <span className="issue-adjacent-label">
                   <span className="issue-adjacent-dir">Older week</span>
-                  <span className="issue-adjacent-date">{weekRangeCompact(prev.issue_date)}</span>
+                  <span className="issue-adjacent-date">{weeklyNavLabel(prev.issue_date)}</span>
                 </span>
               </Link>
             ) : (
@@ -117,7 +117,7 @@ export default function NewsTeamIssue() {
               <Link to={`/news/${teamSlug}/${next.slug}`} className="issue-adjacent-link issue-adjacent-next">
                 <span className="issue-adjacent-label">
                   <span className="issue-adjacent-dir">Newer week</span>
-                  <span className="issue-adjacent-date">{weekRangeCompact(next.issue_date)}</span>
+                  <span className="issue-adjacent-date">{weeklyNavLabel(next.issue_date)}</span>
                 </span>
                 <ChevronRight className="h-5 w-5 shrink-0 text-primary" />
               </Link>

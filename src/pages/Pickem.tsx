@@ -5,14 +5,16 @@ import { toast } from 'sonner';
 import { Navbar } from '@/components/Navbar';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickemMatchupRow } from '@/components/pickem/PickemMatchupRow';
+import { PickemResultsGrid } from '@/components/pickem/PickemResultsGrid';
 import { PickemWeekBubbles } from '@/components/pickem/PickemWeekBubbles';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useLeagues } from '@/hooks/useLeagues';
-import { PICKEM_SEASON, formatPickemRecord } from '@/constants/pickem';
+import { PICKEM_SEASON, formatPickemRecord, pickemRecordFromGames } from '@/constants/pickem';
 import { gamesForWeek } from '@/constants/nfl2026ScheduleGrid';
 import { pickemGetWeek, pickemSetWeekPicks, syncNflScoreboard } from '@/utils/pickemApi';
-import { isMatchupLocked, matchupsForWeek, savedPickFor } from '@/utils/nfl2026Schedule';
+import { isMatchupLocked, isWeekComplete, matchupsForWeek, savedPickFor, seedPickFor } from '@/utils/nfl2026Schedule';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
 import type { PickemGame, PickemStanding, PickemWeekBoard } from '@/types/leagueSocial';
 import { cn } from '@/lib/utils';
@@ -107,10 +109,12 @@ export default function Pickem() {
   const [board, setBoard] = useState<PickemWeekBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [draftByWeek, setDraftByWeek] = useState<Record<number, Record<string, string>>>({});
+  const [draftByKey, setDraftByKey] = useState<Record<string, Record<string, string>>>({});
   const [view, setView] = useState<'picks' | 'standings'>('picks');
+  const [applyAll, setApplyAll] = useState(false);
 
   const leagueId = selectedLeague?.id ?? null;
+  const draftKey = `${leagueId ?? 'none'}:${week}`;
 
   const loadBoard = useCallback(
     async (targetWeek: number | null, opts?: { silent?: boolean }) => {
@@ -160,25 +164,61 @@ export default function Pickem() {
 
   const boardGames = board?.week === week ? board.games : EMPTY_GAMES;
   const matchups = useMemo(() => matchupsForWeek(week, boardGames), [week, boardGames]);
+  const weekRecord = useMemo(() => pickemRecordFromGames(boardGames), [boardGames]);
+  const weekComplete = isWeekComplete(matchups);
+  const needsLiveUpdates = matchups.some((matchup) => {
+    if (!isMatchupLocked(matchup)) return false;
+    return matchup.game?.status !== 'final';
+  });
 
   useEffect(() => {
-    setDraftByWeek((prev) => {
-      const current = { ...(prev[week] ?? {}) };
+    const shouldCopy = Boolean(board?.first_week_save) && (board?.league_count ?? 1) > 1;
+    setApplyAll(shouldCopy);
+  }, [board?.first_week_save, board?.league_count, leagueId, week]);
+
+  useEffect(() => {
+    if (!leagueId || !needsLiveUpdates) return;
+
+    let cancelled = false;
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        await syncNflScoreboard({ season: PICKEM_SEASON, week });
+        if (!cancelled) await loadBoard(week, { silent: true });
+      } catch (error) {
+        console.warn('NFL scoreboard refresh failed', error);
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refresh();
+    }, 60_000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [leagueId, week, needsLiveUpdates, loadBoard]);
+
+  useEffect(() => {
+    setDraftByKey((prev) => {
+      const current = { ...(prev[draftKey] ?? {}) };
       let changed = false;
       for (const matchup of matchups) {
-        const saved = savedPickFor(matchup);
-        if (current[matchup.key] == null && saved) {
-          current[matchup.key] = saved;
+        const fill = savedPickFor(matchup) ?? seedPickFor(matchup);
+        if (current[matchup.key] == null && fill) {
+          current[matchup.key] = fill;
           changed = true;
         }
       }
-      if (!changed && prev[week]) return prev;
+      if (!changed && prev[draftKey]) return prev;
       if (!changed && Object.keys(current).length === 0) return prev;
-      return { ...prev, [week]: current };
+      return { ...prev, [draftKey]: current };
     });
-  }, [week, matchups]);
+  }, [draftKey, matchups]);
 
-  const draft = draftByWeek[week] ?? {};
+  const draft = draftByKey[draftKey] ?? {};
   const openMatchups = matchups.filter((m) => !isMatchupLocked(m));
   const pickedOpen = openMatchups.filter((m) => Boolean(draft[m.key])).length;
   const remaining = openMatchups.length - pickedOpen;
@@ -188,12 +228,23 @@ export default function Pickem() {
     () => board?.standings.find((row) => row.is_you) ?? null,
     [board]
   );
+  const headerRecord = view === 'standings' && you
+    ? { wins: you.wins, losses: you.losses, pushes: you.pushes }
+    : weekRecord;
+  const showHeaderRecord = view === 'standings' ? Boolean(you) : boardGames.length > 0;
 
   const selectWeek = (nextWeek: number) => {
     weekChosenRef.current = true;
     setView('picks');
     setWeek(nextWeek);
-    void loadBoard(nextWeek, { silent: true });
+    void (async () => {
+      try {
+        await syncNflScoreboard({ season: PICKEM_SEASON, week: nextWeek });
+      } catch (error) {
+        console.warn('NFL schedule sync failed', error);
+      }
+      await loadBoard(nextWeek, { silent: true });
+    })();
   };
 
   const selectStandings = () => {
@@ -202,9 +253,9 @@ export default function Pickem() {
   };
 
   const handlePick = (key: string, abbr: string) => {
-    setDraftByWeek((prev) => ({
+    setDraftByKey((prev) => ({
       ...prev,
-      [week]: { ...(prev[week] ?? {}), [key]: abbr },
+      [draftKey]: { ...(prev[draftKey] ?? {}), [key]: abbr },
     }));
   };
 
@@ -226,12 +277,14 @@ export default function Pickem() {
         picked: draft[m.key],
         kickoff_at: m.kickoffAt,
       }));
-      const result = await pickemSetWeekPicks(leagueId, week, picks);
+      const result = await pickemSetWeekPicks(leagueId, week, picks, { applyAll });
       await loadBoard(week, { silent: true });
       if (result.skipped_locked > 0) {
         toast.message(`Saved ${result.saved} picks. ${result.skipped_locked} already locked.`);
+      } else if (applyAll && result.leagues > 1) {
+        toast.success(`Saved week ${week} to all ${result.leagues} leagues.`);
       } else {
-        toast.success(`Saved ${result.saved} pick${result.saved === 1 ? '' : 's'} for week ${week}.`);
+        toast.success(`Saved ${result.saved} pick${result.saved === 1 ? '' : 's'} for this league.`);
       }
     } catch (error) {
       toast.error(userFacingErrorMessage(error, "Couldn't save this week's picks."));
@@ -275,7 +328,7 @@ export default function Pickem() {
   );
 
   return (
-    <div className={cn('min-h-screen bg-background', view === 'picks' && 'pb-28')}>
+    <div className={cn('min-h-screen bg-background', view === 'picks' && !weekComplete && openMatchups.length > 0 && 'pb-28')}>
       <Navbar />
       <main className="mx-auto max-w-6xl px-4 py-5">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -285,19 +338,22 @@ export default function Pickem() {
             </p>
             <h1 className="font-display text-4xl tracking-wide text-gradient md:text-5xl">PICK 'EM</h1>
             <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Pick a week, tap a winner in each game, then save. Change picks until kickoff.
+              Pick a winner in each game, then save. First save can copy to every league you are in.
+              Later edits stay in the league you have selected.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            {you && (
+            {showHeaderRecord && (
               <button
                 type="button"
                 onClick={selectStandings}
                 className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-left transition-colors hover:border-accent"
               >
-                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Your record</p>
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                  {view === 'standings' ? 'Season record' : `Week ${week} record`}
+                </p>
                 <p className="font-display text-3xl tabular-nums tracking-wide text-accent">
-                  {formatPickemRecord(you.wins, you.losses, you.pushes)}
+                  {formatPickemRecord(headerRecord.wins, headerRecord.losses, headerRecord.pushes)}
                 </p>
               </button>
             )}
@@ -349,11 +405,20 @@ export default function Pickem() {
               <h2 className="font-display text-xl tracking-wide">Week {week}</h2>
               <p className="text-sm text-muted-foreground">
                 {`${gameCount} ${gameCount === 1 ? 'game' : 'games'}`}
-                {openMatchups.length < matchups.length
-                  ? ` · ${matchups.length - openMatchups.length} locked`
-                  : ''}
+                {weekRecord.wins + weekRecord.losses + weekRecord.pushes > 0
+                  ? ` · ${formatPickemRecord(weekRecord.wins, weekRecord.losses, weekRecord.pushes)}`
+                  : openMatchups.length < matchups.length
+                    ? ` · ${matchups.length - openMatchups.length} locked`
+                    : ''}
               </p>
             </div>
+            {weekComplete ? (
+              <PickemResultsGrid
+                week={week}
+                matchups={matchups}
+                standings={board?.standings ?? []}
+              />
+            ) : null}
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {matchups.map((matchup) => (
                 <PickemMatchupRow
@@ -368,14 +433,30 @@ export default function Pickem() {
         )}
       </main>
 
-      {view === 'picks' && (
+      {view === 'picks' && !weekComplete && openMatchups.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur-md">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              {openMatchups.length === 0
-                ? 'All games this week have locked.'
-                : `${pickedOpen} of ${openMatchups.length} picked`}
-            </p>
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                {openMatchups.length === 0
+                  ? 'All games this week have locked.'
+                  : `${pickedOpen} of ${openMatchups.length} picked`}
+              </p>
+              {user && selectedLeague && (board?.league_count ?? leagues.length) > 1 && openMatchups.length > 0 && (
+                <div className="flex min-h-11 items-center gap-3">
+                  <Switch
+                    id="pickem-apply-all"
+                    checked={applyAll}
+                    onCheckedChange={setApplyAll}
+                  />
+                  <label htmlFor="pickem-apply-all" className="cursor-pointer text-sm leading-snug">
+                    {applyAll
+                      ? `Copy this card to all ${board?.league_count ?? leagues.length} leagues`
+                      : 'Save to this league only'}
+                  </label>
+                </div>
+              )}
+            </div>
             <Button onClick={() => void handleSave()} disabled={!saveEnabled} className="min-h-11 min-w-[10.5rem]">
               {saving ? 'Saving…' : saveLabel}
             </Button>

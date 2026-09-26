@@ -2,7 +2,11 @@
 // Any signed-in user can trigger it so pick'em stays current without a cron job.
 //
 // POST { "season": 2026, "week": 1 }  — one week
-// POST { "season": 2026 }             — current week, plus full season if sparse
+// POST { "season": 2026 }             — current week + previous week, plus full season if sparse
+//
+// Do not call ESPN with dates=<year> and no week. That dump returns ~100 events
+// labeled as week 18 and the matchup upsert fails with "ON CONFLICT cannot
+// affect row a second time", so finished weeks never get scores.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -29,6 +33,9 @@ const ALT_ABBR: Record<string, string> = {
   SDG: 'LAC',
 };
 
+const MAX_GAMES_PER_WEEK = 16;
+const REGULAR_SEASON_WEEKS = 18;
+
 type EspnCompetitor = {
   homeAway?: string;
   score?: string;
@@ -39,16 +46,28 @@ type EspnCompetitor = {
 type EspnEvent = {
   id?: string;
   date?: string;
+  week?: { number?: number };
   competitions?: Array<{
     date?: string;
-    status?: { type?: { state?: string; completed?: boolean } };
+    status?: { type?: { state?: string; completed?: boolean; name?: string } };
     competitors?: EspnCompetitor[];
   }>;
 };
 
+type EspnCalendarEntry = {
+  label?: string;
+  value?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
 type EspnScoreboard = {
   week?: { number?: number };
-  season?: { year?: number };
+  season?: { year?: number; type?: number };
+  leagues?: Array<{
+    season?: { year?: number; type?: { type?: number } };
+    calendar?: Array<{ label?: string; value?: string; entries?: EspnCalendarEntry[] }>;
+  }>;
   events?: EspnEvent[];
 };
 
@@ -80,15 +99,47 @@ function parseScore(raw: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function mapStatus(state: string | undefined, completed: boolean | undefined): GameRow['status'] {
-  if (completed || state === 'post') return 'final';
-  if (state === 'in') return 'in_progress';
+function mapStatus(state: string | undefined, completed: boolean | undefined, name?: string): GameRow['status'] {
+  if (completed || state === 'post' || name === 'STATUS_FINAL') return 'final';
+  if (state === 'in' || name === 'STATUS_IN_PROGRESS') return 'in_progress';
   return 'scheduled';
 }
 
+function scoreboardSeason(data: EspnScoreboard, fallback: number): number {
+  return data.season?.year ?? data.leagues?.[0]?.season?.year ?? fallback;
+}
+
+function scoreboardWeek(data: EspnScoreboard, fallback: number): number {
+  const fromPayload = data.week?.number;
+  if (typeof fromPayload === 'number' && fromPayload >= 1 && fromPayload <= 22) return fromPayload;
+
+  const now = Date.now();
+  const regular = data.leagues?.[0]?.calendar?.find(
+    (block) => block.value === '2' || /regular/i.test(block.label ?? '')
+  );
+  for (const entry of regular?.entries ?? []) {
+    const week = Number.parseInt(entry.value ?? '', 10);
+    const start = entry.startDate ? Date.parse(entry.startDate) : Number.NaN;
+    const end = entry.endDate ? Date.parse(entry.endDate) : Number.NaN;
+    if (!Number.isInteger(week) || !Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (now >= start && now <= end) return week;
+  }
+  return fallback;
+}
+
+function matchupKey(row: GameRow): string {
+  return `${row.season}:${row.season_type}:${row.week}:${row.home_abbr}@${row.away_abbr}`;
+}
+
+function statusRank(status: GameRow['status']): number {
+  if (status === 'final') return 2;
+  if (status === 'in_progress') return 1;
+  return 0;
+}
+
 function gamesFromScoreboard(data: EspnScoreboard, fallbackSeason: number, fallbackWeek: number): GameRow[] {
-  const season = data.season?.year ?? fallbackSeason;
-  const week = data.week?.number ?? fallbackWeek;
+  const season = scoreboardSeason(data, fallbackSeason);
+  const boardWeek = scoreboardWeek(data, fallbackWeek);
   const nowIso = new Date().toISOString();
   const rows: GameRow[] = [];
 
@@ -104,6 +155,10 @@ function gamesFromScoreboard(data: EspnScoreboard, fallbackSeason: number, fallb
     const kickoff = comp.date || event.date;
     if (!homeAbbr || !awayAbbr || !kickoff) continue;
 
+    const eventWeek = event.week?.number;
+    const week =
+      typeof eventWeek === 'number' && eventWeek >= 1 && eventWeek <= 22 ? eventWeek : boardWeek;
+
     rows.push({
       espn_event_id: espnId,
       season,
@@ -116,7 +171,7 @@ function gamesFromScoreboard(data: EspnScoreboard, fallbackSeason: number, fallb
       kickoff_at: kickoff,
       home_score: parseScore(home?.score),
       away_score: parseScore(away?.score),
-      status: mapStatus(comp.status?.type?.state, comp.status?.type?.completed),
+      status: mapStatus(comp.status?.type?.state, comp.status?.type?.completed, comp.status?.type?.name),
       updated_at: nowIso,
     });
   }
@@ -124,27 +179,66 @@ function gamesFromScoreboard(data: EspnScoreboard, fallbackSeason: number, fallb
   return rows;
 }
 
-async function fetchWeek(season: number, week: number): Promise<{ rows: GameRow[]; currentWeek: number }> {
-  const url = `${ESPN_SCOREBOARD}?dates=${season}&seasontype=2&week=${week}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`ESPN scoreboard ${res.status} for week ${week}`);
+function keepRegularSeasonWeeks(rows: GameRow[], expectedWeek?: number): GameRow[] {
+  const byWeek = new Map<number, GameRow[]>();
+  for (const row of rows) {
+    if (row.season_type !== 2) continue;
+    if (row.week < 1 || row.week > REGULAR_SEASON_WEEKS) continue;
+    const list = byWeek.get(row.week) ?? [];
+    list.push(row);
+    byWeek.set(row.week, list);
   }
-  const data = (await res.json()) as EspnScoreboard;
-  const currentWeek = data.week?.number ?? week;
-  return { rows: gamesFromScoreboard(data, season, week), currentWeek };
+
+  const kept: GameRow[] = [];
+  for (const [week, list] of byWeek) {
+    if (expectedWeek != null && week !== expectedWeek) continue;
+    if (list.length > MAX_GAMES_PER_WEEK) continue;
+    kept.push(...list);
+  }
+  return kept;
 }
 
-async function fetchCurrent(season: number): Promise<{ rows: GameRow[]; week: number; season: number }> {
-  const url = `${ESPN_SCOREBOARD}?dates=${season}&seasontype=2`;
+function mergeRows(allRows: GameRow[]): GameRow[] {
+  const unique = new Map<string, GameRow>();
+  for (const row of allRows) {
+    const key = matchupKey(row);
+    const existing = unique.get(key);
+    if (!existing || statusRank(row.status) >= statusRank(existing.status)) {
+      unique.set(key, row);
+    }
+  }
+  return [...unique.values()];
+}
+
+async function fetchScoreboard(url: string): Promise<EspnScoreboard> {
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`ESPN scoreboard ${res.status}`);
   }
-  const data = (await res.json()) as EspnScoreboard;
-  const resolvedSeason = data.season?.year ?? season;
-  const week = data.week?.number ?? 1;
-  return { rows: gamesFromScoreboard(data, resolvedSeason, week), week, season: resolvedSeason };
+  return (await res.json()) as EspnScoreboard;
+}
+
+async function fetchWeek(season: number, week: number): Promise<{ rows: GameRow[]; currentWeek: number; season: number }> {
+  const url = `${ESPN_SCOREBOARD}?dates=${season}&seasontype=2&week=${week}`;
+  const data = await fetchScoreboard(url);
+  const resolvedSeason = scoreboardSeason(data, season);
+  const currentWeek = scoreboardWeek(data, week);
+  return {
+    rows: keepRegularSeasonWeeks(gamesFromScoreboard(data, resolvedSeason, week), week),
+    currentWeek,
+    season: resolvedSeason,
+  };
+}
+
+async function fetchLive(): Promise<{ rows: GameRow[]; week: number; season: number }> {
+  const data = await fetchScoreboard(ESPN_SCOREBOARD);
+  const season = scoreboardSeason(data, 2026);
+  const week = scoreboardWeek(data, 1);
+  return {
+    rows: keepRegularSeasonWeeks(gamesFromScoreboard(data, season, week), week),
+    week,
+    season,
+  };
 }
 
 async function authorizeUser(req: Request, supabaseUrl: string): Promise<boolean> {
@@ -195,34 +289,44 @@ Deno.serve(async (req) => {
     let syncedWeek: number | null = body.week ?? null;
 
     if (typeof body.week === 'number') {
-      const { rows, currentWeek } = await fetchWeek(season, body.week);
-      allRows.push(...rows);
-      syncedWeek = currentWeek;
+      const requested = await fetchWeek(season, body.week);
+      allRows.push(...requested.rows);
+      syncedWeek = requested.currentWeek;
     } else {
-      const current = await fetchCurrent(season);
-      allRows.push(...current.rows);
-      syncedWeek = current.week;
+      const live = await fetchLive();
+      allRows.push(...live.rows);
+      syncedWeek = live.week;
+
+      if (live.week > 1) {
+        const previous = await fetchWeek(live.season, live.week - 1);
+        allRows.push(...previous.rows);
+      }
 
       const { count } = await admin
         .from('nfl_games')
         .select('id', { count: 'exact', head: true })
-        .eq('season', current.season)
+        .eq('season', live.season)
         .eq('season_type', 2);
 
-      const needFull = body.full === true || (count ?? 0) < 200;
+      const scored = await admin
+        .from('nfl_games')
+        .select('id', { count: 'exact', head: true })
+        .eq('season', live.season)
+        .eq('season_type', 2)
+        .eq('status', 'final');
+
+      const needFull = body.full === true || (count ?? 0) < 200 || (scored.count ?? 0) === 0;
       if (needFull) {
-        const weeks = Array.from({ length: 18 }, (_, i) => i + 1);
+        const weeks = Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => i + 1);
         const batches = [weeks.slice(0, 6), weeks.slice(6, 12), weeks.slice(12, 18)];
         for (const batch of batches) {
-          const fetched = await Promise.all(batch.map((week) => fetchWeek(current.season, week)));
+          const fetched = await Promise.all(batch.map((week) => fetchWeek(live.season, week)));
           for (const item of fetched) allRows.push(...item.rows);
         }
       }
     }
 
-    const unique = new Map<string, GameRow>();
-    for (const row of allRows) unique.set(row.espn_event_id, row);
-    const payload = [...unique.values()];
+    const payload = mergeRows(allRows);
 
     if (payload.length > 0) {
       const { error } = await admin.from('nfl_games').upsert(payload, {
