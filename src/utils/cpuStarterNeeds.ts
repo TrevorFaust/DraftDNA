@@ -36,7 +36,7 @@ function isStarterPos(pos: string): pos is StarterPosition {
  * Soft position-group value vs a standard 1QB/2RB/2WR/1TE league.
  * Not PPG tables — relative scarcity of fantasy-relevant starters.
  */
-function groupBaseline(pos: StarterPosition, starters: StarterCounts): number {
+function groupBaseline(pos: StarterPosition, starters: StarterCounts, flexSlots = 0): number {
   switch (pos) {
     case 'WR':
       return starters.WR >= 3 ? 1.12 : 1.06;
@@ -48,7 +48,8 @@ function groupBaseline(pos: StarterPosition, starters: StarterCounts): number {
       return 0.92;
     case 'TE':
       if (starters.TE >= 2) return 1.15;
-      if (starters.TE === 0) return 0.1;
+      // 0 dedicated TE still starts one in FLEX. Dead only when flex cannot hold them.
+      if (starters.TE === 0) return flexSlots > 0 ? 0.9 : 0.1;
       return 0.82;
     case 'DEF':
       return starters.DEF > 0 ? 0.55 : 0.08;
@@ -106,10 +107,23 @@ export function applyStarterLineupNeedToScores(
     const have = opts.teamCounts[pos] ?? 0;
     const deficit = Math.max(0, need - have);
     const surplus = Math.max(0, have - need);
-    let mult = groupBaseline(pos, starters);
+    let mult = groupBaseline(pos, starters, opts.flexSlots);
+    const flexEligible =
+      pos === 'RB' ||
+      pos === 'WR' ||
+      pos === 'TE' ||
+      (opts.isSuperflex && pos === 'QB');
 
-    // Unused starter slot: stay out of the way until deep bench filler.
+    // No dedicated slot. Flex can still start RB/WR/TE (and QB in superflex).
     if (need === 0) {
+      if (flexEligible && flexHoles > 0 && have === 0) {
+        if (dedicatedFilledSkill) mult *= 1.18;
+        return { ...row, adjustedScore: row.adjustedScore * mult };
+      }
+      if (flexEligible && flexHoles > 0 && have > 0 && dedicatedFilledSkill && draftPct >= 0.35) {
+        mult *= 0.72;
+        return { ...row, adjustedScore: row.adjustedScore * mult };
+      }
       if (draftPct < 0.75) mult *= 0.08;
       else mult *= 0.28;
       return { ...row, adjustedScore: row.adjustedScore * mult };
@@ -153,12 +167,6 @@ export function applyStarterLineupNeedToScores(
         mult *= pos === 'WR' ? 0.9 : 0.72;
       }
 
-      // Mild flex interest only after dedicated skill starters are filled.
-      const flexEligible =
-        pos === 'RB' ||
-        pos === 'WR' ||
-        pos === 'TE' ||
-        (opts.isSuperflex && pos === 'QB');
       if (flexHoles > 0 && dedicatedFilledSkill && flexEligible) {
         mult *= 1.08;
       }
@@ -182,6 +190,8 @@ export function applyStarterAwarePoolFilter(
     numRounds: number;
     teamCounts: Record<string, number>;
     rosterSize?: number;
+    flexSlots?: number;
+    isSuperflex?: boolean;
   }
 ): RankedPlayer[] {
   if (available.length === 0) return available;
@@ -202,13 +212,23 @@ export function applyStarterAwarePoolFilter(
     if (!isStarterPos(pos)) return true;
     const need = starters[pos];
 
+    const have = opts.teamCounts[pos] ?? 0;
     if (need === 0) {
-      // Allow unused positions only as deep bench fluff.
+      const flexSlots = opts.flexSlots ?? 0;
+      const flexEligible =
+        pos === 'RB' ||
+        pos === 'WR' ||
+        pos === 'TE' ||
+        (opts.isSuperflex && pos === 'QB');
+      // First flex-only TE/RB/WR stays on the board. A second waits until mid-draft.
+      if (flexEligible && flexSlots > 0) {
+        if (have >= 1 && draftPct < 0.4 && (pos === 'TE' || pos === 'QB')) return false;
+        return true;
+      }
       return draftPct >= 0.8;
     }
 
     // Don't stack a position once starters are filled until the back half.
-    const have = opts.teamCounts[pos] ?? 0;
     if (have >= need && draftPct < 0.45 && (pos === 'TE' || pos === 'QB')) {
       return false;
     }

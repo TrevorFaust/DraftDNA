@@ -19,6 +19,8 @@ export interface CpuRealismContext {
   teamRbCount?: number;
   /** League starting lineup; defaults to standard 1/2/2/1/1/1 */
   starters?: StarterCounts;
+  /** FLEX slots. A 0-TE lineup can still start a tight end here. */
+  flexSlots?: number;
   draftSeed: number;
 }
 
@@ -80,6 +82,8 @@ export function applyCpuExpertFilters(
   const needRb = starters.RB;
   const needQb = starters.QB;
   const needTe = starters.TE;
+  const flexSlots = ctx.flexSlots ?? 1;
+  const teCanStart = needTe > 0 || flexSlots > 0;
   const teamRbCount = ctx.teamRbCount ?? 0;
   const teamStarvedRb = needRb > 0 && teamRbCount < needRb;
   // Multi-QB leagues behave closer to superflex for early QB timing.
@@ -90,8 +94,8 @@ export function applyCpuExpertFilters(
 
     if (round1 && (pos === 'K' || pos === 'DEF' || pos === 'D/ST')) return false;
 
-    // League does not start this position — keep them out of early/mid boards.
-    if (pos === 'TE' && needTe === 0) return false;
+    // No dedicated TE and no flex that can start one: leave tight ends off the board.
+    if (pos === 'TE' && !teCanStart) return false;
     if (pos === 'QB' && needQb === 0) return false;
     if (pos === 'RB' && needRb === 0 && earlyRounds) return false;
 
@@ -224,7 +228,7 @@ export function applyMarketScarcityToScores(
         if (needRb <= 1) mult *= 1.08;
         if (starters.WR >= 3) mult *= 1.06;
       }
-      if (pos === 'TE' && starters.TE === 0) mult *= 0.15;
+      if (pos === 'TE' && starters.TE === 0 && (ctx.flexSlots ?? 1) <= 0) mult *= 0.15;
       if (pos === 'QB' && starters.QB >= 2) mult *= 1.15;
       if (pos === 'QB' && starters.QB === 0) mult *= 0.15;
 

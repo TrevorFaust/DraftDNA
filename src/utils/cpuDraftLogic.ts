@@ -176,12 +176,14 @@ export function selectCpuPick(
       numRounds: context.numRounds,
       teamCounts,
       rosterSize,
+      flexSlots,
+      isSuperflex: context.isSuperflex,
     });
     if (starterFiltered.length > 0) pool = starterFiltered;
   }
 
   if (context.realism && !context.rookieFlexDraft) {
-    const realismCtx = { ...context.realism, starters };
+    const realismCtx = { ...context.realism, starters, flexSlots };
     const realistic = applyCpuExpertFilters(pool, realismCtx);
     if (realistic.length > 0) pool = realistic;
   }
@@ -212,7 +214,7 @@ export function selectCpuPick(
 
   let adjustedPool =
     context.realism && !context.rookieFlexDraft
-      ? applyMarketScarcityToScores(scored, { ...context.realism, starters })
+      ? applyMarketScarcityToScores(scored, { ...context.realism, starters, flexSlots })
       : scored;
 
   if (!context.rookieFlexDraft) {
