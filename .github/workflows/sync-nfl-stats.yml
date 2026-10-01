@@ -1,0 +1,49 @@
+# Pull 2026 player stats, team stats, and game scores from nflverse.
+#
+# nflverse rebuilds player stats daily at 09:00 UTC (September–February), and
+# sometimes again on game days after play-by-play lands (usually 1–2 hours
+# after the final whistle). This is not a live box score.
+#
+# The 09:45 UTC run is the morning-after catch, including Tuesday morning
+# after Monday night. The other crons check once typical windows have ended
+# so a finished game can land the same night when nflverse has already pushed.
+
+name: Sync NFL stats
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '45 9 * * *'
+    - cron: '30 5 * * 5'
+    - cron: '30 21 * * 0'
+    - cron: '30 1,5 * * 1'
+    - cron: '30 5 * * 2'
+
+concurrency:
+  group: sync-nfl-stats
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APPLY_CHANGES: '1'
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Require Supabase secrets
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Add repository secrets SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run sync:weekly-stats-2026
+      - run: npm run sync:team-games-2026
