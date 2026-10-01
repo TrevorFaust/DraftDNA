@@ -192,8 +192,8 @@ function NavLinkButton({
   current?: boolean;
 }) {
   return (
-    <Link to={item.path} className="shrink-0">
-      <Button variant="ghost" size="sm" className={className} aria-current={current ? 'page' : undefined}>
+    <Link to={item.path} className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Button variant="ghost" size="sm" className={cn(className, 'h-11')} aria-current={current ? 'page' : undefined}>
         <item.icon className="h-4 w-4" />
         <span className="hidden lg:inline">{item.label}</span>
       </Button>
@@ -241,7 +241,8 @@ export const Navbar = () => {
   const menuItemClass = (path: string) =>
     cn(
       'cursor-pointer gap-2',
-      isActivePath(path) && 'bg-secondary text-primary focus:bg-secondary focus:text-primary'
+      isActivePath(path) &&
+        'bg-secondary text-primary before:scale-y-100 focus:bg-secondary focus:text-primary'
     );
 
   const renderMenuItem = (item: NavItem, className?: string) => (
@@ -259,10 +260,15 @@ export const Navbar = () => {
     <nav className="sticky top-0 z-50 glass-card border-b border-border/50 py-3 pl-5 pr-4 sm:pl-6 sm:pr-5">
       <div className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:gap-3">
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <Link to="/" className="flex shrink-0 items-center justify-center gap-[1px]">
-            <div className="hidden flex-col items-center sm:flex">
-              <span className="font-display text-2xl leading-tight tracking-wide text-gradient">Draft</span>
-              <span className="font-display text-2xl leading-tight tracking-wide text-gradient">DNA</span>
+          <Link
+            to="/"
+            className="flex shrink-0 items-center justify-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <div className="hidden flex-col leading-none sm:flex">
+              <span className="font-editorial text-[1.65rem] font-medium tracking-tight text-foreground">Draft</span>
+              <span className="-mt-1 font-editorial text-[1.65rem] font-medium italic tracking-tight text-primary">
+                DNA
+              </span>
             </div>
             <SiteLogo size={56} className="h-14 w-14 shrink-0" />
           </Link>
@@ -340,7 +346,7 @@ export const Navbar = () => {
                     ))}
                     <div className="my-1 border-t border-border" />
                     <div
-                      className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm text-primary outline-none hover:bg-accent hover:text-accent-foreground"
+                      className="relative flex min-h-11 w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-3 pr-8 text-sm text-primary outline-none before:absolute before:bottom-2 before:left-0 before:top-2 before:w-0.5 before:origin-center before:scale-y-0 before:bg-primary before:transition-transform before:duration-150 hover:bg-accent hover:text-accent-foreground hover:before:scale-y-100 focus-visible:before:scale-y-100"
                       onClick={() => navigate('/settings')}
                     >
                       <Plus className="mr-2 h-4 w-4" />
@@ -359,7 +365,7 @@ export const Navbar = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={groupTriggerClass(preSeasonActive)}
+                  className={cn(groupTriggerClass(preSeasonActive), 'h-11')}
                   aria-current={preSeasonActive ? 'true' : undefined}
                 >
                   <Layers className="h-4 w-4" />
@@ -389,7 +395,7 @@ export const Navbar = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={groupTriggerClass(inSeasonActive)}
+                  className={cn(groupTriggerClass(inSeasonActive), 'h-11')}
                   aria-current={inSeasonActive ? 'true' : undefined}
                 >
                   <CalendarDays className="h-4 w-4" />
@@ -429,7 +435,7 @@ export const Navbar = () => {
               <div className="hidden h-6 w-px bg-border sm:block" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="shrink-0 gap-2 text-muted-foreground">
+                  <Button variant="ghost" size="sm" className="h-11 shrink-0 gap-2 text-muted-foreground hover:text-foreground">
                     <User className="h-4 w-4" />
                     <span className="hidden max-w-[100px] truncate sm:inline">
                       {user.email?.split('@')[0]}
@@ -457,7 +463,7 @@ export const Navbar = () => {
             <>
               <div className="hidden h-6 w-px bg-border sm:block" />
               <Link to="/auth" className="shrink-0">
-                <Button variant="default" size="sm">
+                <Button variant="default" size="sm" className="h-11">
                   Sign In
                 </Button>
               </Link>

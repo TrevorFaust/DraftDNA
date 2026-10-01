@@ -344,7 +344,7 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsl(190_95%_50%/0.15),transparent_50%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsl(var(--primary)/0.14),transparent_50%)]" />
 
       <div className="glass-card p-8 w-full max-w-md animate-slide-up relative">
         {passwordRecoveryActive && user ? (

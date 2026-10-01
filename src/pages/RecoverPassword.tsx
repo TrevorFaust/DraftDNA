@@ -32,7 +32,7 @@ const RecoverPassword = () => {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsl(190_95%_50%/0.15),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsl(var(--primary)/0.14),transparent_50%)]" />
         <div className="glass-card p-8 w-full max-w-md relative text-center space-y-4">
           <p className="text-muted-foreground">
             Open the reset link from your email on this device, or request a new password reset from the sign-in page.
@@ -47,7 +47,7 @@ const RecoverPassword = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsl(190_95%_50%/0.15),transparent_50%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsl(var(--primary)/0.14),transparent_50%)]" />
       <div className="glass-card p-8 w-full max-w-md animate-slide-up relative">
         <PasswordRecoveryForm />
       </div>

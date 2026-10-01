@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['"Bebas Neue"', 'sans-serif'],
-        sans: ['Inter', 'sans-serif'],
+        display: ['Fraunces', 'serif'],
+        sans: ['"IBM Plex Sans"', 'sans-serif'],
+        editorial: ['Fraunces', 'serif'],
         share: ['Oswald', 'Montserrat', 'sans-serif'],
       },
       colors: {
