@@ -58,14 +58,65 @@ type PoolPlayer = {
   season: number | null;
 };
 
+type EntriesByPosition = Partial<Record<PickSixPosition, PositionEntryRow[]>>;
+
+const entryCache: EntriesByPosition = {};
+const entryInflight = new Map<PickSixPosition, Promise<PositionEntryRow[]>>();
+
+function cachedEntries(): EntriesByPosition {
+  const initial: EntriesByPosition = {};
+  for (const pos of PICK_SIX_POSITIONS) {
+    if (Object.prototype.hasOwnProperty.call(entryCache, pos)) {
+      initial[pos] = entryCache[pos];
+    }
+  }
+  return initial;
+}
+
+function mapEntryRows(data: unknown): PositionEntryRow[] {
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map((r: PositionEntryRow) => ({
+    user_id: r.user_id,
+    username: r.username ?? null,
+    rank: Number(r.rank),
+    player_id: r.player_id,
+    player_name: r.player_name ?? null,
+    player_team: r.player_team ?? null,
+  }));
+}
+
+function loadPositionEntries(pos: PickSixPosition): Promise<PositionEntryRow[]> {
+  if (Object.prototype.hasOwnProperty.call(entryCache, pos)) {
+    return Promise.resolve(entryCache[pos] ?? []);
+  }
+  const pending = entryInflight.get(pos);
+  if (pending) return pending;
+
+  const run = (async () => {
+    const { data, error } = await (supabase.rpc as any)('get_pick_six_position_entries', {
+      p_season: SEASON,
+      p_position: pos,
+    });
+    if (error) throw error;
+    const rows = mapEntryRows(data);
+    entryCache[pos] = rows;
+    return rows;
+  })().finally(() => {
+    entryInflight.delete(pos);
+  });
+
+  entryInflight.set(pos, run);
+  return run;
+}
+
 export function usePickSixPositionLeaderboard(
   currentUserId: string | undefined,
   initialPosition: PickSixPosition = 'QB'
 ) {
   const [position, setPosition] = useState<PickSixPosition>(initialPosition);
-  const [entriesLoading, setEntriesLoading] = useState(false);
+  const [heldPosition, setHeldPosition] = useState<PickSixPosition>(initialPosition);
+  const [entriesByPosition, setEntriesByPosition] = useState<EntriesByPosition>(cachedEntries);
   const [entriesError, setEntriesError] = useState<string | null>(null);
-  const [rawEntries, setRawEntries] = useState<PositionEntryRow[]>([]);
   const [players, setPlayers] = useState<PoolPlayer[]>([]);
   const [playersLoading, setPlayersLoading] = useState(PICK_SIX_LIVE_SCORING_ACTIVE);
 
@@ -114,10 +165,18 @@ export function usePickSixPositionLeaderboard(
     [mergedPlayers]
   );
 
+  const selectedLoaded = Object.prototype.hasOwnProperty.call(entriesByPosition, position);
+  if (selectedLoaded && heldPosition !== position) {
+    setHeldPosition(position);
+  }
+  const displayPosition = selectedLoaded ? position : heldPosition;
+  const rawEntries = entriesByPosition[displayPosition] ?? [];
+  const displayLoaded = Object.prototype.hasOwnProperty.call(entriesByPosition, displayPosition);
+
   const actualTop6 = useMemo(() => {
     if (!PICK_SIX_LIVE_SCORING_ACTIVE) return [];
-    return buildPickSixActualTop6(position, players, mergedPlayers, statsMap);
-  }, [position, players, mergedPlayers, statsMap]);
+    return buildPickSixActualTop6(displayPosition, players, mergedPlayers, statsMap);
+  }, [displayPosition, players, mergedPlayers, statsMap]);
 
   const actualTop6Keys = useMemo(
     () => (PICK_SIX_LIVE_SCORING_ACTIVE ? actualTop6IdentityKeys(actualTop6) : []),
@@ -126,48 +185,58 @@ export function usePickSixPositionLeaderboard(
 
   const positionRankLookup = useMemo(() => {
     if (!PICK_SIX_LIVE_SCORING_ACTIVE) {
-      return { getOverallRank: () => null };
+      return { getOverallRank: () => null, getFantasyPoints: () => null, getTiebreaker: () => null };
     }
-    return buildPickSixPositionRankLookup(position, players, mergedPlayers, statsMap);
-  }, [position, players, mergedPlayers, statsMap]);
+    return buildPickSixPositionRankLookup(displayPosition, players, mergedPlayers, statsMap);
+  }, [displayPosition, players, mergedPlayers, statsMap]);
 
   const fetchEntries = useCallback(async (pos: PickSixPosition) => {
     if (!PICK_SIX_LIVE_SCORING_ACTIVE && !currentUserId) {
-      setRawEntries([]);
-      setEntriesLoading(false);
+      entryCache[pos] = [];
+      setEntriesByPosition((prev) => ({ ...prev, [pos]: [] }));
       return;
     }
-    setEntriesLoading(true);
-    setEntriesError(null);
     try {
-      const { data, error } = await (supabase.rpc as any)('get_pick_six_position_entries', {
-        p_season: SEASON,
-        p_position: pos,
-      });
-      if (error) throw error;
-      const rows = Array.isArray(data) ? data : [];
-      setRawEntries(
-        rows.map((r: PositionEntryRow) => ({
-          user_id: r.user_id,
-          username: r.username ?? null,
-          rank: Number(r.rank),
-          player_id: r.player_id,
-          player_name: r.player_name ?? null,
-          player_team: r.player_team ?? null,
-        }))
-      );
+      const rows = await loadPositionEntries(pos);
+      setEntriesByPosition((prev) => (prev[pos] === rows ? prev : { ...prev, [pos]: rows }));
+      setEntriesError(null);
     } catch (err) {
       console.error('Failed to fetch Pick Six position entries:', err);
       setEntriesError('Could not load leaderboard.');
-      setRawEntries([]);
-    } finally {
-      setEntriesLoading(false);
     }
   }, [currentUserId]);
 
   useEffect(() => {
+    let cancelled = false;
+    if (!PICK_SIX_LIVE_SCORING_ACTIVE && !currentUserId) {
+      const empty: EntriesByPosition = {};
+      for (const pos of PICK_SIX_POSITIONS) {
+        entryCache[pos] = [];
+        empty[pos] = [];
+      }
+      setEntriesByPosition(empty);
+      return;
+    }
+    void Promise.all(
+      PICK_SIX_POSITIONS.map(async (pos) => {
+        try {
+          const rows = await loadPositionEntries(pos);
+          if (cancelled) return;
+          setEntriesByPosition((prev) => (prev[pos] === rows ? prev : { ...prev, [pos]: rows }));
+        } catch (err) {
+          console.error('Failed to fetch Pick Six position entries:', err);
+        }
+      })
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (selectedLoaded) return;
     void fetchEntries(position);
-  }, [position, fetchEntries]);
+  }, [position, selectedLoaded, fetchEntries]);
 
   const currentUserPicks = useMemo((): PickSixLeaderboardPick[] => {
     if (!currentUserId) return [];
@@ -246,6 +315,7 @@ export function usePickSixPositionLeaderboard(
 
   return {
     position,
+    displayPosition,
     setPosition,
     positions: PICK_SIX_POSITIONS,
     liveScoringActive: PICK_SIX_LIVE_SCORING_ACTIVE,
@@ -256,10 +326,10 @@ export function usePickSixPositionLeaderboard(
     leaderboard,
     currentUserEntry,
     currentUserPicks,
-    loading: entriesLoading || (PICK_SIX_LIVE_SCORING_ACTIVE && playersLoading),
-    entriesError,
+    loading: (PICK_SIX_LIVE_SCORING_ACTIVE && playersLoading) || (!displayLoaded && !entriesError),
+    entriesError: displayLoaded ? null : entriesError,
     statsReady: statsMap.size > 0,
-    refetch: () => fetchEntries(position),
+    refetch: () => fetchEntries(selectedLoaded ? position : displayPosition),
   };
 }
 

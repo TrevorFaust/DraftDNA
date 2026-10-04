@@ -49,6 +49,7 @@ import { OfficialRulesContent } from '@/components/OfficialRulesContent';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickSixMark } from '@/components/PickSixIcon';
 import { PickSixChallengeColumns, pickSixChallengeCardClass } from '@/components/PickSixDashboardLeaderboard';
+import { formatPickSixOverallRank } from '@/utils/pickSixScoring';
 import {
   SITE_NAME,
   SEASON,
@@ -727,52 +728,67 @@ ${shareUrl}`;
 
               {savedPositions.has(position) && editingPosition !== position ? (
                 <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div className={pickSixChallengeCardClass}>
-                    <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
-                      <h3 className="font-display text-lg flex items-center gap-2">
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        Your Top {TOP_N}
-                      </h3>
-                      {!SUBMISSIONS_LOCKED ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          onClick={() => setEditingPosition(position)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                          Edit
-                        </Button>
-                      ) : (
-                        <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Lock className="w-4 h-4" />
-                          Locked
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      {predictions[position].filter(Boolean).map((player, i) => (
-                        <div
-                          key={player!.id}
-                          className="flex shrink-0 items-center gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-2 sm:gap-2.5 sm:px-2.5"
-                        >
-                          <span className="w-6 shrink-0 text-sm font-mono tabular-nums text-muted-foreground">
-                            #{i + 1}
-                          </span>
-                          <PositionBadge position={player!.position} className="shrink-0" />
-                          <p className="min-w-0 flex-1 break-words text-base font-semibold leading-snug">
-                            {player!.name}
-                            {player!.team ? (
-                              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                                {player!.team}
-                              </span>
-                            ) : null}
-                          </p>
+                  <PickSixChallengeColumns
+                    position={position}
+                    renderAside={(positionRankLookup) => (
+                      <div className={pickSixChallengeCardClass}>
+                        <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
+                          <h3 className="font-display text-lg flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-green-500" />
+                            Your Top {TOP_N}
+                          </h3>
+                          {!SUBMISSIONS_LOCKED ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => setEditingPosition(position)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                              Edit
+                            </Button>
+                          ) : (
+                            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Lock className="w-4 h-4" />
+                              Locked
+                            </span>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                  <PickSixChallengeColumns position={position} />
+                        <div className="flex flex-col gap-1.5 md:min-h-0 md:flex-1">
+                          {predictions[position].filter(Boolean).map((player, i) => {
+                            const overall = positionRankLookup.getOverallRank(player!.id, player!.name);
+                            const outsideTop6 =
+                              overall != null && overall > 6 ? formatPickSixOverallRank(overall) : null;
+                            return (
+                              <div
+                                key={player!.id}
+                                className="flex shrink-0 items-center gap-2 rounded-lg border border-border/50 bg-secondary/40 px-2 py-2 sm:gap-2.5 sm:px-2.5 md:min-h-0 md:flex-1 md:py-1.5"
+                              >
+                                <span className="w-6 shrink-0 text-sm font-mono tabular-nums text-muted-foreground">
+                                  #{i + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-base font-semibold leading-snug">
+                                    {player!.name}
+                                    {player!.team ? (
+                                      <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                        {player!.team}
+                                      </span>
+                                    ) : null}
+                                  </p>
+                                  {outsideTop6 ? (
+                                    <p className="truncate text-xs leading-snug text-muted-foreground">
+                                      ({outsideTop6})
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  />
                 </div>
               ) : (
                 <>

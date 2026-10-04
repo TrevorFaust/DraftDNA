@@ -49,6 +49,13 @@ export type DraftAvailablePlayerRowProps = {
   meta?: ReactNode;
 };
 
+/**
+ * Rank, name, position, positional rank, draft. The name track is the only
+ * one that flexes, and it is allowed to shrink so the row never scrolls sideways.
+ */
+export const draftAvailableListClass =
+  'grid min-h-0 flex-1 content-start grid-cols-[2.5rem_minmax(0,1fr)_2.75rem_5.75rem_max-content] gap-x-2.5 gap-y-0.5 overflow-x-hidden overflow-y-auto pr-1 scrollbar-thin';
+
 /** Available-player row for solo + multiplayer mock drafts (personal rank + tier). */
 export const DraftAvailablePlayerRow = memo(function DraftAvailablePlayerRow({
   player,
@@ -74,10 +81,10 @@ export const DraftAvailablePlayerRow = memo(function DraftAvailablePlayerRow({
       : null;
 
   return (
-    <div className="[content-visibility:auto] [contain-intrinsic-size:0_60px]">
+    <>
       {breakTone != null && (
         <div
-          className="flex items-center gap-2 px-1 py-1 mb-0.5"
+          className="col-span-full flex items-center gap-2 px-1 py-1"
           role="separator"
           aria-label={`End of tier ${breakTone.tier}`}
         >
@@ -104,7 +111,7 @@ export const DraftAvailablePlayerRow = memo(function DraftAvailablePlayerRow({
 
       <div
         className={cn(
-          'flex items-center gap-1.5 sm:gap-2.5 px-1.5 sm:px-2 py-1.5 rounded-lg hover:bg-secondary/50 transition-colors group min-h-11',
+          'col-span-full grid grid-cols-subgrid items-center px-1.5 py-1.5 rounded-lg hover:bg-secondary/50 transition-colors group min-h-11 sm:px-2',
           highlighted && 'bg-accent/20 border-2 border-accent/50 ring-2 ring-accent/30',
           borderTone && 'border-l-4',
           !borderTone && 'border-l-4 border-l-transparent'
@@ -113,7 +120,7 @@ export const DraftAvailablePlayerRow = memo(function DraftAvailablePlayerRow({
       >
         <div
           className={cn(
-            'w-7 h-7 rounded flex items-center justify-center text-xs font-bold shrink-0',
+            'flex h-7 min-w-7 items-center justify-center justify-self-center rounded px-1 text-xs font-bold tabular-nums',
             positionRankClass(player.position)
           )}
           title="Your overall ranking"
@@ -121,25 +128,23 @@ export const DraftAvailablePlayerRow = memo(function DraftAvailablePlayerRow({
           {displayRank}
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span
-              className={cn(
-                'font-medium truncate text-sm',
-                onNameClick && 'cursor-pointer hover:text-primary transition-colors'
-              )}
-              onClick={
-                onNameClick
-                  ? () => {
-                      onNameClick(player);
-                    }
-                  : undefined
-              }
-            >
-              {player.name}
-            </span>
-            <PositionBadge position={player.position} />
-          </div>
+        <div className="min-w-0">
+          <span
+            className={cn(
+              'block truncate font-medium text-sm',
+              onNameClick && 'cursor-pointer hover:text-primary transition-colors'
+            )}
+            title={player.name}
+            onClick={
+              onNameClick
+                ? () => {
+                    onNameClick(player);
+                  }
+                : undefined
+            }
+          >
+            {player.name}
+          </span>
           {meta ?? (
             <PlayerHeaderStatsLine
               position={player.position}
@@ -147,33 +152,39 @@ export const DraftAvailablePlayerRow = memo(function DraftAvailablePlayerRow({
               adp={player.adp}
               byeWeek={player.bye_week}
               layout="compact"
-              className="text-[11px] mt-0 leading-tight"
+              className="mt-0 truncate text-[11px] leading-tight"
             />
           )}
         </div>
 
-        <RankingsPosRankCompare
-          position={player.position}
-          myPosRank={myPosRank}
-          tier={showPlayerTier ? tier : null}
-          tierSource="personal"
-          className="hidden md:flex"
-        />
-        {badgeTone != null && (
-          <span
-            className="md:hidden inline-flex items-center justify-center min-w-[1.75rem] h-6 px-1.5 rounded-md border border-border/60 text-[11px] font-display font-bold tracking-wide shrink-0"
-            style={{ color: badgeTone.color, backgroundColor: badgeTone.bgColor }}
-            title={`Your tier ${badgeTone.tier}`}
-          >
-            {badgeTone.label}
-          </span>
-        )}
+        <div className="flex items-center justify-center">
+          <PositionBadge position={player.position} />
+        </div>
+
+        <div className="flex items-center justify-center">
+          <RankingsPosRankCompare
+            position={player.position}
+            myPosRank={myPosRank}
+            tier={showPlayerTier ? tier : null}
+            tierSource="personal"
+            className="border-0 px-0"
+          />
+          {badgeTone != null && myPosRank == null && (
+            <span
+              className="inline-flex h-6 min-w-[1.75rem] items-center justify-center rounded-md border border-border/60 px-1.5 font-display text-[11px] font-bold tracking-wide"
+              style={{ color: badgeTone.color, backgroundColor: badgeTone.bgColor }}
+              title={`Your tier ${badgeTone.tier}`}
+            >
+              {badgeTone.label}
+            </span>
+          )}
+        </div>
 
         <Button
           size="sm"
           variant="ghost"
           disabled={draftDisabled}
-          className="shrink-0 h-9 px-2 sm:px-3"
+          className="h-9 shrink-0 justify-self-end px-2 sm:px-3"
           aria-label={draftLabel}
           onClick={(e) => {
             e.stopPropagation();
@@ -184,6 +195,6 @@ export const DraftAvailablePlayerRow = memo(function DraftAvailablePlayerRow({
           <span className="hidden sm:inline">{draftLabel}</span>
         </Button>
       </div>
-    </div>
+    </>
   );
 });

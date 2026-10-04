@@ -3,17 +3,26 @@ import { Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 
+const FRAME_WIDTH = {
+  narrow: "max-w-3xl",
+  reading: "max-w-5xl",
+  wide: "max-w-6xl",
+} as const;
+
 export function NewsPageFrame({
   children,
   wide,
+  width,
 }: {
   children: ReactNode;
   wide?: boolean;
+  width?: keyof typeof FRAME_WIDTH;
 }) {
+  const size = width ?? (wide ? "wide" : "narrow");
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className={cn("mx-auto w-full px-4 py-8 sm:px-6", wide ? "max-w-6xl" : "max-w-3xl")}>
+      <div className={cn("mx-auto w-full px-4 py-8 sm:px-6 lg:px-8", FRAME_WIDTH[size])}>
         {children}
       </div>
     </div>

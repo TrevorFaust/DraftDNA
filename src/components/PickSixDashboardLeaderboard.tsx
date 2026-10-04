@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { usePickSixPositionLeaderboard } from '@/hooks/usePickSixPositionLeaderboard';
@@ -9,7 +9,6 @@ import {
   SEASON,
 } from '@/constants/contest';
 import { BrandedLoader } from '@/components/BrandedLoader';
-import { PickSixPointsInfo } from '@/components/PickSixPointsInfo';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Medal, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -23,7 +22,11 @@ import {
   pickSixYourTop6Heading,
   type PickSixPosition,
 } from '@/utils/pickSixScoring';
-import { formatPickSixFantasyPoints } from '@/utils/pickSixActualTop6';
+import {
+  formatPickSixFantasyPoints,
+  formatPickSixTiebreaker,
+  pickSixTiebreakerLabel,
+} from '@/utils/pickSixActualTop6';
 import type {
   PickSixLeaderboardEntry,
   PickSixLeaderboardPick,
@@ -31,6 +34,57 @@ import type {
 import type { PickSixTopPlayer } from '@/utils/pickSixActualTop6';
 
 const RANKS = [1, 2, 3, 4, 5, 6] as const;
+
+function CurrentTopSixBox({
+  position,
+  liveScoringActive,
+  actualTop6,
+  statsReady,
+}: {
+  position: PickSixPosition;
+  liveScoringActive: boolean;
+  actualTop6: PickSixTopPlayer[];
+  statsReady: boolean;
+}) {
+  return (
+    <section
+      className="flex h-full min-h-0 flex-col rounded-lg border border-border/60 bg-secondary/30 px-3 py-3"
+      aria-label={pickSixCurrentTop6Heading(position)}
+    >
+      <h4 className="mb-2 shrink-0 font-display text-lg leading-snug">{pickSixCurrentTop6Heading(position)}</h4>
+      {!liveScoringActive ? (
+        <p className="text-sm leading-relaxed text-muted-foreground">{pickSixPreSeasonNotice()}</p>
+      ) : actualTop6.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {statsReady ? 'No stats for this position yet.' : 'Loading stats…'}
+        </p>
+      ) : (
+        <ol className="grid min-h-0 flex-1 grid-cols-[1.75rem_auto_auto_auto] content-between gap-x-4 text-sm">
+          <span />
+          <span />
+          <span className="whitespace-nowrap text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {pickSixTiebreakerLabel(position)}
+          </span>
+          <span className="whitespace-nowrap text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Fantasy points
+          </span>
+          {actualTop6.map((player) => (
+            <li key={player.identityKey} className="contents">
+              <span className="font-mono tabular-nums text-muted-foreground">{player.positionRank}.</span>
+              <span className="whitespace-nowrap font-medium">{player.name}</span>
+              <span className="text-center font-mono tabular-nums text-muted-foreground">
+                {player.tiebreaker == null ? '—' : formatPickSixTiebreaker(player.tiebreaker)}
+              </span>
+              <span className="text-center font-mono tabular-nums text-muted-foreground">
+                {formatPickSixFantasyPoints(player.fantasyPoints)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
 
 function pickSixPreSeasonNotice(): string {
   const kickoff = formatPickSixKickoffDisplay();
@@ -73,131 +127,77 @@ function PickSixYourPicksOnlyTable({
   );
 }
 
-function PickSixComparisonTable({
+function TheirPicksTable({
   position,
-  actualTop6,
-  actualTop6Keys,
   picks,
   picksHeading,
+  actualTop6Keys,
   playersById,
   positionRankLookup,
-  hidden,
 }: {
   position: PickSixPosition;
-  actualTop6: PickSixTopPlayer[];
-  actualTop6Keys: string[];
   picks: PickSixLeaderboardPick[];
   picksHeading: string;
+  actualTop6Keys: string[];
   playersById: Map<string, { espn_id?: string | null }>;
   positionRankLookup: PickSixPositionRankLookup;
-  hidden: boolean;
 }) {
-  const pickByRank = new Map(picks.map((p) => [p.rank, p]));
-  const actualByRank = new Map(actualTop6.map((p) => [p.positionRank, p]));
-
-  if (hidden) {
-    return (
-      <p className="text-sm text-muted-foreground italic py-2">
-        Picks hidden until the entry deadline.
-      </p>
-    );
-  }
-
-  if (picks.length === 0) {
-    return <p className="text-sm text-muted-foreground py-2">No picks submitted.</p>;
-  }
+  const pickByRank = new Map(picks.map((pick) => [pick.rank, pick]));
+  const tieLabel = pickSixTiebreakerLabel(position);
 
   return (
-    <div className="text-xs sm:text-sm">
-      <div className="flex gap-2 sm:gap-3 mb-1.5 pb-1.5 border-b border-border/50 text-muted-foreground font-medium text-xs">
-        <span className="w-5 shrink-0" />
-        <div className="flex-[1.15] min-w-0 flex gap-1.5 sm:gap-2 border-r border-border/50 pr-3 sm:pr-4">
-          <span className="flex-1 min-w-0 leading-snug">
-            {pickSixCurrentTop6Heading(position)}
-          </span>
-          <span className="w-[4.75rem] sm:w-[5.25rem] shrink-0 text-right leading-snug">
-            Fantasy points
-          </span>
-        </div>
-        <div className="flex-1 min-w-0 flex gap-2">
-          <span className="flex-1 min-w-0 leading-snug">{picksHeading}</span>
-          <span className="w-9 shrink-0 text-right">Pts</span>
-        </div>
-      </div>
-      <ol className="space-y-1">
+    <div className="pt-1.5">
+      <p className="pb-1 text-sm font-medium text-foreground">{picksHeading}</p>
+      <div className="grid w-full grid-cols-[1.25rem_minmax(0,1fr)_auto_auto_auto] items-baseline gap-x-4 gap-y-0.5 text-sm leading-tight">
+        <span />
+        <span />
+        <span className="whitespace-nowrap text-center text-xs font-medium text-muted-foreground">
+          Fantasy points
+        </span>
+        <span className="whitespace-nowrap text-center text-xs font-medium text-muted-foreground">
+          {tieLabel}
+        </span>
+        <span className="whitespace-nowrap text-center text-xs font-medium text-muted-foreground">Pts</span>
         {RANKS.map((rank) => {
-          const actual = actualByRank.get(rank);
           const pick = pickByRank.get(rank);
           const status = pick
-            ? evaluatePickSixSlot(
-                actualTop6Keys,
-                pick.playerId,
-                pick.rank,
-                playersById
-              )
+            ? evaluatePickSixSlot(actualTop6Keys, pick.playerId, pick.rank, playersById)
             : null;
-
-          let pickAnnotation: string | null = null;
-          if (pick && status?.kind === 'miss') {
-            const overall = positionRankLookup.getOverallRank(
-              pick.playerId,
-              pick.playerName
-            );
-            if (overall != null && overall > 6) {
-              pickAnnotation = formatPickSixOverallRank(overall);
-            }
-          }
-
+          const fantasyPoints = pick
+            ? positionRankLookup.getFantasyPoints(pick.playerId, pick.playerName)
+            : null;
+          const tiebreaker = pick
+            ? positionRankLookup.getTiebreaker(pick.playerId, pick.playerName)
+            : null;
           return (
-            <li key={rank} className="flex gap-2 sm:gap-3 items-center min-w-0">
-              <span className="w-5 shrink-0 text-muted-foreground font-mono tabular-nums text-xs">
-                {rank}.
+            <div key={rank} className="contents">
+              <span className="font-mono text-xs tabular-nums text-muted-foreground">{rank}.</span>
+              <span
+                className={cn(
+                  'min-w-0 truncate font-medium',
+                  status?.kind === 'exact' && 'text-green-600 dark:text-green-400'
+                )}
+              >
+                {pick?.playerName ?? '—'}
               </span>
-              <div className="flex-[1.15] min-w-0 flex gap-1.5 sm:gap-2 items-center border-r border-border/50 pr-3 sm:pr-4">
-                <span className="flex-1 min-w-0 truncate font-medium">
-                  {actual?.name ?? '—'}
-                </span>
-                <span className="w-[4.75rem] sm:w-[5.25rem] shrink-0 text-right font-mono tabular-nums text-xs text-muted-foreground">
-                  {actual ? formatPickSixFantasyPoints(actual.fantasyPoints) : '—'}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0 flex gap-2 items-center">
-                <div className="flex-1 min-w-0">
-                  {pick ? (
-                    <span
-                      className={cn(
-                        'block min-w-0',
-                        status?.kind === 'exact' &&
-                          'text-green-600 dark:text-green-400 font-medium'
-                      )}
-                    >
-                      <span className="truncate">{pick.playerName}</span>
-                      {pickAnnotation && (
-                        <span className="text-[10px] text-muted-foreground/80 font-normal whitespace-nowrap">
-                          {' '}
-                          ({pickAnnotation})
-                        </span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    'w-9 shrink-0 text-right font-mono tabular-nums text-sm font-semibold leading-none',
-                    status && status.points > 0
-                      ? 'text-foreground'
-                      : 'text-muted-foreground/70'
-                  )}
-                >
-                  {status ? formatPickSixSlotPoints(status.points) : '—'}
-                </span>
-              </div>
-            </li>
+              <span className="text-center font-mono tabular-nums text-muted-foreground">
+                {fantasyPoints == null ? '—' : formatPickSixFantasyPoints(fantasyPoints)}
+              </span>
+              <span className="text-center font-mono tabular-nums text-muted-foreground">
+                {tiebreaker == null ? '—' : formatPickSixTiebreaker(tiebreaker)}
+              </span>
+              <span
+                className={cn(
+                  'text-center font-mono font-semibold tabular-nums',
+                  status && status.points > 0 ? 'text-foreground' : 'text-muted-foreground/70'
+                )}
+              >
+                {status ? formatPickSixSlotPoints(status.points) : '—'}
+              </span>
+            </div>
           );
         })}
-      </ol>
+      </div>
     </div>
   );
 }
@@ -280,19 +280,17 @@ function LeaderboardListRow({
       </button>
       {expanded && canExpand && (
         <div className="px-3 pb-3 pt-0 border-t border-border/40">
-          <PickSixComparisonTable
+          <TheirPicksTable
             position={position}
-            actualTop6={actualTop6}
-            actualTop6Keys={actualTop6Keys}
             picks={entry.picks}
             picksHeading={
               isCurrentUser
                 ? pickSixYourTop6Heading(position)
                 : pickSixTheirTop6Heading(position)
             }
+            actualTop6Keys={actualTop6Keys}
             playersById={playersById}
             positionRankLookup={positionRankLookup}
-            hidden={false}
           />
         </div>
       )}
@@ -308,7 +306,8 @@ export function PickSixDashboardLeaderboard({
 } = {}) {
   const { user } = useAuth();
   const {
-    position,
+    position: selectedPosition,
+    displayPosition: position,
     setPosition,
     positions,
     liveScoringActive,
@@ -317,7 +316,6 @@ export function PickSixDashboardLeaderboard({
     positionRankLookup,
     playersById,
     leaderboard,
-    currentUserEntry,
     currentUserPicks,
     loading,
     entriesError,
@@ -331,17 +329,17 @@ export function PickSixDashboardLeaderboard({
   }, []);
 
   useEffect(() => {
-    if (lockedPosition && lockedPosition !== position) setPosition(lockedPosition);
-  }, [lockedPosition, position, setPosition]);
+    if (lockedPosition && lockedPosition !== selectedPosition) setPosition(lockedPosition);
+  }, [lockedPosition, selectedPosition, setPosition]);
 
   useEffect(() => {
     setExpandedUserId(null);
-  }, [position]);
+  }, [selectedPosition]);
 
   const entryCount = leaderboard.length;
 
   return (
-    <div className="flex flex-col h-full min-h-[280px]">
+    <div className="flex min-h-0 flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
         <h3 className="font-display text-sm font-medium text-foreground flex items-center gap-2">
           <Medal className="w-4 h-4 text-amber-500" />
@@ -349,16 +347,16 @@ export function PickSixDashboardLeaderboard({
         </h3>
         {!lockedPosition && (
         <Tabs
-          value={position}
+          value={selectedPosition}
           onValueChange={(v) => setPosition(v as PickSixPosition)}
           className="w-auto"
         >
-          <TabsList className="h-8 p-0.5 grid grid-cols-6 gap-0">
+          <TabsList className="grid h-11 grid-cols-6 gap-0.5 p-1">
             {positions.map((pos) => (
               <TabsTrigger
                 key={pos}
                 value={pos}
-                className="px-1.5 py-1 text-[10px] sm:text-xs h-7 data-[state=active]:shadow-sm"
+                className="h-9 px-1.5 text-xs data-[state=active]:shadow-sm"
                 aria-label={`${pos} leaderboard`}
               >
                 {pos === 'D/ST' ? 'DST' : pos}
@@ -376,7 +374,16 @@ export function PickSixDashboardLeaderboard({
         </div>
       ) : entriesError ? (
         <p className="text-sm text-destructive">{entriesError}</p>
-      ) : !liveScoringActive ? (
+      ) : (
+        <div className="grid items-stretch gap-4 lg:min-h-[24rem] lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <CurrentTopSixBox
+            position={position}
+            liveScoringActive={liveScoringActive}
+            actualTop6={actualTop6}
+            statsReady={statsReady}
+          />
+          <div className="flex min-w-0 flex-col lg:h-0 lg:min-h-full lg:overflow-hidden">
+      {!liveScoringActive ? (
         <div className="flex flex-col gap-3 flex-1">
           {!user ? (
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -416,39 +423,7 @@ export function PickSixDashboardLeaderboard({
           No {position} entries yet. Submit your top 6 to appear here.
         </p>
       ) : (
-        <div className="flex flex-col gap-3 min-h-0 flex-1">
-          {currentUserEntry && (
-            <div className="shrink-0 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-2">
-                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                  Your {position} picks
-                </span>
-                <div className="flex items-center gap-2 text-xs shrink-0">
-                  <span className="rounded bg-secondary px-1.5 py-0.5 font-medium tabular-nums">
-                    {currentUserEntry.exactMatches}/6 exact
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">
-                    Rank #{currentUserEntry.rank}
-                  </span>
-                  <PickSixPointsInfo
-                    scoreLabel={currentUserEntry.scoreLabel}
-                    className="text-xs"
-                  />
-                </div>
-              </div>
-              <PickSixComparisonTable
-                position={position}
-                actualTop6={actualTop6}
-                actualTop6Keys={actualTop6Keys}
-                picks={currentUserEntry.picks}
-                picksHeading={pickSixYourTop6Heading(position)}
-                playersById={playersById}
-                positionRankLookup={positionRankLookup}
-                hidden={false}
-              />
-            </div>
-          )}
-
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="flex flex-col min-h-0 flex-1">
             <div className="flex items-center justify-between gap-2 mb-1.5 shrink-0">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -458,10 +433,7 @@ export function PickSixDashboardLeaderboard({
                 {entryCount} {entryCount === 1 ? 'player' : 'players'}
               </p>
             </div>
-            <div
-              className="space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin flex-1 min-h-0"
-              style={{ maxHeight: 'min(26rem, 50vh)' }}
-            >
+            <div className="scrollbar-thin min-h-0 flex-1 space-y-1.5 overflow-x-hidden pr-1 lg:overflow-y-auto">
               {leaderboard.map((entry) => {
                 const isCurrentUser = !!user && entry.userId === user.id;
                 const showPicks =
@@ -485,10 +457,13 @@ export function PickSixDashboardLeaderboard({
               })}
             </div>
             {entryCount > 12 && (
-              <p className="text-[11px] text-muted-foreground mt-1.5 shrink-0">
-                Showing every entrant in rank order — scroll to find your spot.
+              <p className="text-xs text-muted-foreground mt-1.5 shrink-0">
+                Showing every entrant in rank order. Scroll to find your spot.
               </p>
             )}
+          </div>
+        </div>
+      )}
           </div>
         </div>
       )}
@@ -522,7 +497,7 @@ function SelectedLeaderPicks({
   return (
     <>
       <h3 className="mb-3 shrink-0 break-words font-display text-lg leading-snug">{heading}</h3>
-      <ol className="grid w-max max-w-full grid-cols-[1.25rem_minmax(0,max-content)_auto] gap-x-3 gap-y-1.5">
+      <ol className="flex w-full flex-col gap-1.5 md:min-h-0 md:flex-1">
         {RANKS.map((rank) => {
           const pick = pickByRank.get(rank);
           const status = pick
@@ -533,26 +508,29 @@ function SelectedLeaderPicks({
               ? positionRankLookup.getOverallRank(pick.playerId, pick.playerName)
               : null;
           return (
-            <li key={rank} className="col-span-3 grid grid-cols-subgrid items-start gap-x-3 text-sm">
-              <span className="pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+            <li
+              key={rank}
+              className="grid shrink-0 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg border border-border/50 bg-secondary/40 px-2.5 py-2 text-base md:min-h-0 md:flex-1 md:py-1.5"
+            >
+              <span className="font-mono text-sm tabular-nums text-muted-foreground">
                 {rank}.
               </span>
               <div className="min-w-0">
                 <p
                   className={cn(
-                    'break-words leading-snug',
+                    'truncate leading-snug',
                     status?.kind === 'exact' && 'font-medium text-green-600 dark:text-green-400'
                   )}
                 >
                   {pick?.playerName ?? '—'}
                 </p>
                 {overall != null && overall > 6 && (
-                  <p className="break-words text-xs leading-snug text-muted-foreground">
+                  <p className="truncate text-xs leading-snug text-muted-foreground">
                     ({formatPickSixOverallRank(overall)})
                   </p>
                 )}
               </div>
-              <span className="pt-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
+              <span className="text-right font-mono text-sm tabular-nums text-muted-foreground">
                 {status ? formatPickSixSlotPoints(status.points) : '—'}
               </span>
             </li>
@@ -563,12 +541,22 @@ function SelectedLeaderPicks({
   );
 }
 
-/** Equal-height challenge cards. The leaderboard scrolls instead of stretching the row. */
+/**
+ * Same card size on every position tab. Height fits six leaderboard rows;
+ * extra entrants scroll inside the leaderboard instead of growing the row.
+ */
 export const pickSixChallengeCardClass =
-  'glass-card flex w-full flex-col p-4';
+  'glass-card flex w-full flex-col overflow-hidden p-4 md:h-[29rem]';
 
 /** Challenge page: actual top 6, a scrollable leader list, and the selected entry's picks. */
-export function PickSixChallengeColumns({ position: lockedPosition }: { position: PickSixPosition }) {
+export function PickSixChallengeColumns({
+  position: lockedPosition,
+  renderAside,
+}: {
+  position: PickSixPosition;
+  /** First column on the challenge grid. Receives live position ranks for the saved picks. */
+  renderAside?: (positionRankLookup: PickSixPositionRankLookup) => ReactNode;
+}) {
   const { user } = useAuth();
   const {
     position,
@@ -600,28 +588,36 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
 
   const selected = leaderboard.find((entry) => entry.userId === selectedUserId) ?? null;
   const selectedIsYou = !!user && selected?.userId === user.id;
+  const aside = renderAside?.(positionRankLookup) ?? null;
 
   if (loading) {
     return (
-      <div className={`${pickSixChallengeCardClass} items-center justify-center lg:col-span-3`}>
-        <BrandedLoader size={32} />
-      </div>
+      <>
+        {aside}
+        <div className={`${pickSixChallengeCardClass} items-center justify-center lg:col-span-3`}>
+          <BrandedLoader size={32} />
+        </div>
+      </>
     );
   }
 
   if (entriesError) {
     return (
-      <div className={`${pickSixChallengeCardClass} lg:col-span-3`}>
-        <p className="text-sm text-destructive">{entriesError}</p>
-      </div>
+      <>
+        {aside}
+        <div className={`${pickSixChallengeCardClass} lg:col-span-3`}>
+          <p className="text-sm text-destructive">{entriesError}</p>
+        </div>
+      </>
     );
   }
 
   return (
     <>
+      {aside}
       <section className={pickSixChallengeCardClass} aria-label={pickSixCurrentTop6Heading(position)}>
         <h3 className="mb-3 shrink-0 break-words font-display text-lg leading-snug">{pickSixCurrentTop6Heading(position)}</h3>
-        <div>
+        <div className="flex flex-col md:min-h-0 md:flex-1">
           {!liveScoringActive ? (
             <p className="text-sm leading-relaxed text-muted-foreground">{pickSixPreSeasonNotice()}</p>
           ) : actualTop6.length === 0 ? (
@@ -629,19 +625,32 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
               {statsReady ? 'No stats for this position yet.' : 'Loading stats…'}
             </p>
           ) : (
-            <ol className="grid w-max max-w-full grid-cols-[1.25rem_minmax(0,max-content)_auto] gap-x-3 gap-y-1.5">
-              {actualTop6.map((player) => (
-                <li key={player.identityKey} className="col-span-3 grid grid-cols-subgrid items-baseline gap-x-3 text-sm">
-                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                    {player.positionRank}.
-                  </span>
-                  <span className="min-w-0 break-words font-medium leading-snug">{player.name}</span>
-                  <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
-                    {formatPickSixFantasyPoints(player.fantasyPoints)}
-                  </span>
-                </li>
-              ))}
-            </ol>
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="mb-1 grid shrink-0 grid-cols-[1.25rem_minmax(0,1fr)_4.5rem_4.25rem] items-end gap-x-2 px-2.5 text-[10px] font-medium leading-tight text-muted-foreground">
+                <span className="col-span-2" />
+                <span className="text-right">{pickSixTiebreakerLabel(position)}</span>
+                <span className="text-right">Fantasy pts</span>
+              </div>
+              <ol className="flex w-full flex-col gap-1.5 md:min-h-0 md:flex-1">
+                {actualTop6.map((player) => (
+                  <li
+                    key={player.identityKey}
+                    className="grid shrink-0 grid-cols-[1.25rem_minmax(0,1fr)_4.5rem_4.25rem] items-center gap-x-2 rounded-lg border border-border/50 bg-secondary/40 px-2.5 py-2 text-base md:min-h-0 md:flex-1 md:py-1.5"
+                  >
+                    <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                      {player.positionRank}.
+                    </span>
+                    <span className="min-w-0 truncate font-medium leading-snug">{player.name}</span>
+                    <span className="text-right font-mono text-sm tabular-nums text-muted-foreground">
+                      {player.tiebreaker == null ? '—' : formatPickSixTiebreaker(player.tiebreaker)}
+                    </span>
+                    <span className="text-right font-mono text-sm tabular-nums text-muted-foreground">
+                      {formatPickSixFantasyPoints(player.fantasyPoints)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
           )}
         </div>
       </section>
@@ -662,7 +671,10 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
           </p>
         ) : (
           <div
-            className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin"
+            className={cn(
+              'pick-six-leader-scroll flex min-h-0 flex-col gap-1.5 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin md:flex-1',
+              leaderboard.length > 6 && 'is-capped max-h-[18.375rem] md:max-h-none'
+            )}
             tabIndex={leaderboard.length > 6 ? 0 : undefined}
             aria-label={leaderboard.length > 6 ? 'Leaderboard, scroll for more players' : undefined}
           >
@@ -682,8 +694,11 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
                   disabled={!canSelect}
                   onClick={() => setSelectedUserId(entry.userId)}
                   className={cn(
-                    'flex min-h-11 w-full shrink-0 items-start justify-between gap-2 rounded-lg border px-3 py-2 text-left',
+                    'flex w-full shrink-0 items-center justify-between gap-2 overflow-hidden rounded-lg border px-3 py-2 text-left',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    leaderboard.length > 6
+                      ? 'h-11 md:h-auto md:min-h-0'
+                      : 'min-h-11 md:min-h-0 md:flex-1',
                     isSelected
                       ? 'border-primary bg-primary/10'
                       : 'border-border/50 hover:bg-muted/40',
@@ -691,20 +706,20 @@ export function PickSixChallengeColumns({ position: lockedPosition }: { position
                     !canSelect && 'cursor-default opacity-80'
                   )}
                 >
-                  <span className="flex min-w-0 flex-1 items-start gap-2">
-                    <span className="w-6 shrink-0 pt-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="w-6 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
                       #{entry.rank}
                     </span>
                     <span
                       className={cn(
-                        'min-w-0 break-words text-sm font-medium leading-snug',
+                        'min-w-0 truncate text-sm font-medium leading-snug',
                         isCurrentUser && 'text-amber-600 dark:text-amber-400'
                       )}
                     >
                       {displayName}
                     </span>
                   </span>
-                  <span className="flex shrink-0 items-center gap-2 pt-0.5 text-xs tabular-nums">
+                  <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
                     <span className="rounded bg-secondary px-1.5 py-0.5 font-medium">
                       {entry.exactMatches}/6
                     </span>

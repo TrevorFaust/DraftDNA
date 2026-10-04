@@ -14,6 +14,8 @@ export type PickSixTopPlayer = {
   identityKey: string;
   /** Rank by half-PPR fantasy points at this position (1 = most points). */
   positionRank: number;
+  /** Contest tiebreaker stat for this position (pass yards, rush yards, and so on). */
+  tiebreaker: number | null;
 };
 
 type PoolPlayer = {
@@ -50,6 +52,53 @@ function statsPositionMatches(
     return positionMatchesPickSix(stats.position, position);
   }
   return positionLabelMatchesPickSix(stats.positionRank, position);
+}
+
+/** Short column label for the position's contest tiebreaker. */
+export function pickSixTiebreakerLabel(position: PickSixPosition): string {
+  switch (position) {
+    case 'QB':
+      return 'Pass yds';
+    case 'RB':
+      return 'Rush yds';
+    case 'WR':
+    case 'TE':
+      return 'Rec yds';
+    case 'K':
+      return 'FGs';
+    case 'D/ST':
+      return 'Pts allowed';
+    default:
+      return 'Tiebreaker';
+  }
+}
+
+function finiteStat(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  return value;
+}
+
+function tiebreakerFromStats(position: PickSixPosition, stats: Player2025Stats): number | null {
+  switch (position) {
+    case 'QB':
+      return finiteStat(stats.totalPassYards);
+    case 'RB':
+      return finiteStat(stats.totalRushYards);
+    case 'WR':
+    case 'TE':
+      return finiteStat(stats.totalRecYards);
+    case 'K':
+      return finiteStat(stats.kickerSeason?.fgMade);
+    case 'D/ST':
+      return finiteStat(stats.totalPointsAllowed);
+    default:
+      return null;
+  }
+}
+
+export function formatPickSixTiebreaker(value: number): string {
+  if (!Number.isFinite(value)) return '—';
+  return Math.round(value).toLocaleString('en-US');
 }
 
 function fantasyPointsFromStats(stats: Player2025Stats | undefined): number | null {
@@ -188,6 +237,7 @@ function collectPlayersByFantasyPoints(
       fantasyPoints: fp,
       identityKey,
       positionRank: 0,
+      tiebreaker: tiebreakerFromStats(position, stats),
     };
 
     const existing = byIdentity.get(identityKey);
@@ -220,6 +270,8 @@ export function buildPickSixActualTop6(
 
 export type PickSixPositionRankLookup = {
   getOverallRank: (playerId: string, playerName: string) => number | null;
+  getFantasyPoints: (playerId: string, playerName: string) => number | null;
+  getTiebreaker: (playerId: string, playerName: string) => number | null;
 };
 
 export function buildPickSixPositionRankLookup(
@@ -234,28 +286,36 @@ export function buildPickSixPositionRankLookup(
 
   const ranked = collectPlayersByFantasyPoints(position, allPlayers, mergedPlayers, statsMap);
 
-  const byIdentityKey = new Map<string, number>();
-  const byPlayerId = new Map<string, number>();
-  const byNameKey = new Map<string, number>();
+  type RankHit = { rank: number; points: number; tiebreaker: number | null };
+  const byIdentityKey = new Map<string, RankHit>();
+  const byPlayerId = new Map<string, RankHit>();
+  const byNameKey = new Map<string, RankHit>();
 
-  const indexRank = (poolId: string, name: string, rank: number) => {
-    byPlayerId.set(poolId, rank);
-    byIdentityKey.set(pickSixPlayerIdentityKey(poolId, mergedPlayersById), rank);
+  const indexRank = (
+    poolId: string,
+    name: string,
+    rank: number,
+    points: number,
+    tiebreaker: number | null
+  ) => {
+    const hit = { rank, points, tiebreaker };
+    byPlayerId.set(poolId, hit);
+    byIdentityKey.set(pickSixPlayerIdentityKey(poolId, mergedPlayersById), hit);
     const loose = normalizePickSixPlayerName(name);
-    if (loose) byNameKey.set(loose, rank);
+    if (loose) byNameKey.set(loose, hit);
     const tight = name.trim().toLowerCase();
-    if (tight) byNameKey.set(tight, rank);
+    if (tight) byNameKey.set(tight, hit);
   };
 
   for (const p of ranked) {
-    indexRank(p.id, p.name, p.positionRank);
+    indexRank(p.id, p.name, p.positionRank, p.fantasyPoints, p.tiebreaker);
 
     const merged = mergedPlayersById.get(p.id);
     const espn = merged?.espn_id;
     if (espn) {
       for (const row of allPlayers) {
         if (row.espn_id && String(row.espn_id) === String(espn)) {
-          indexRank(row.id, row.name, p.positionRank);
+          indexRank(row.id, row.name, p.positionRank, p.fantasyPoints, p.tiebreaker);
         }
       }
     }
@@ -268,7 +328,7 @@ export function buildPickSixPositionRankLookup(
           if (!positionMatchesPickSix(row.position, 'D/ST')) continue;
           const rowAbbr = resolveTeamAbbrForDisplay(row.team, row.position, row.name);
           if (rowAbbr && (canonicalTeamAbbr(rowAbbr) ?? rowAbbr) === canon) {
-            indexRank(row.id, row.name, p.positionRank);
+            indexRank(row.id, row.name, p.positionRank, p.fantasyPoints, p.tiebreaker);
           }
         }
       }
@@ -278,13 +338,12 @@ export function buildPickSixPositionRankLookup(
     for (const row of allPlayers) {
       if (!positionMatchesPickSix(row.position, position)) continue;
       if (normalizePickSixPlayerName(row.name) === loose) {
-        indexRank(row.id, row.name, p.positionRank);
+        indexRank(row.id, row.name, p.positionRank, p.fantasyPoints, p.tiebreaker);
       }
     }
   }
 
-  return {
-    getOverallRank(playerId: string, playerName: string) {
+  const findHit = (playerId: string, playerName: string): RankHit | null => {
       const fromId = byPlayerId.get(playerId);
       if (fromId != null) return fromId;
 
@@ -330,9 +389,22 @@ export function buildPickSixPositionRankLookup(
         );
         return rStatsId === statsId;
       });
-      if (idx >= 0) return idx + 1;
+      if (idx >= 0) {
+        return { rank: idx + 1, points: ranked[idx].fantasyPoints, tiebreaker: ranked[idx].tiebreaker };
+      }
 
       return null;
+  };
+
+  return {
+    getOverallRank(playerId: string, playerName: string) {
+      return findHit(playerId, playerName)?.rank ?? null;
+    },
+    getFantasyPoints(playerId: string, playerName: string) {
+      return findHit(playerId, playerName)?.points ?? null;
+    },
+    getTiebreaker(playerId: string, playerName: string) {
+      return findHit(playerId, playerName)?.tiebreaker ?? null;
     },
   };
 }

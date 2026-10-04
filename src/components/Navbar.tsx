@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLeagues } from '@/hooks/useLeagues';
@@ -32,7 +32,6 @@ import {
   BarChart3,
   Home,
   Award,
-  ClipboardList,
   Table2,
   Menu,
   ChevronRight,
@@ -45,11 +44,13 @@ import {
   Target,
   CalendarRange,
 } from 'lucide-react';
+import { DraftBoardIcon } from '@/components/icons/DraftBoardIcon';
 import { SiteLogo } from '@/components/SiteLogo';
 import { NewsTeamPicker } from '@/components/news/NewsTeamPicker';
 import { cn } from '@/lib/utils';
 
-type NavItem = { path: string; label: string; icon: LucideIcon };
+type NavIcon = LucideIcon | ComponentType<{ className?: string }>;
+type NavItem = { path: string; label: string; icon: NavIcon };
 
 const homeItem: NavItem = { path: '/dashboard', label: 'Home', icon: Home };
 const pickSixItem: NavItem = { path: '/prediction-challenge', label: 'Pick Six', icon: Target };
@@ -61,7 +62,7 @@ const leagueSettingsItem: NavItem = {
 const newsItem: NavItem = { path: '/news', label: 'News', icon: Newspaper };
 
 const preSeasonItems: NavItem[] = [
-  { path: '/mock-draft', label: 'Mock Draft', icon: ClipboardList },
+  { path: '/mock-draft', label: 'Mock Draft', icon: DraftBoardIcon },
   { path: '/rankings', label: 'Rankings', icon: ListOrdered },
   { path: '/players', label: 'Player Stats', icon: Table2 },
   { path: '/statistics', label: 'Draft Stats', icon: BarChart3 },

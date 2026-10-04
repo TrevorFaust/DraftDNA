@@ -1,8 +1,8 @@
 import { newsletterDb } from "./db";
 import { sectionHasContent, type TeamSectionContent } from "./sections";
 
-/** First weekly shown on Pick Six: Jul 27-Aug 2 recap (Monday issue date). */
-export const NEWS_WEEKLY_FROM_ISSUE_DATE = "2026-08-03";
+/** First published weekly: the Jun 8 training-camp edition. */
+export const NEWS_WEEKLY_FROM_ISSUE_DATE = "2026-06-08";
 
 export type IssueSummary = {
   issue_date: string;

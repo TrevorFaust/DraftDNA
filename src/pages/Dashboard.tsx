@@ -1,85 +1,30 @@
-import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLeagues } from '@/hooks/useLeagues';
-import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
-import {
-  ListOrdered,
-  Trophy,
-  Plus,
-  ArrowRight,
-  Users,
-  BarChart3,
-  Table2,
-} from 'lucide-react';
-import { ClipboardList, Medal, ListChecks, CalendarRange } from 'lucide-react';
-import { PICK_SIX_TOTAL_PRIZE_POOL_USD } from '@/constants/contest';
+import { Plus, Users } from 'lucide-react';
+import { LeagueCabinet } from '@/components/LeagueCabinet';
+import { PICK_SIX_CATEGORY_PRIZE_USD, PICK_SIX_TOTAL_PRIZE_POOL_USD, SEASON } from '@/constants/contest';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import { PickSixMark } from '@/components/PickSixIcon';
 import { PickSixDashboardLeaderboard } from '@/components/PickSixDashboardLeaderboard';
 import { ClaimTeamPanel } from '@/components/league/ClaimTeamPanel';
+import { Playbook, type PlaybookPage } from '@/components/Playbook';
+import { RankingsStage } from '@/components/playbook/RankingsStage';
+import { MockDraftStage } from '@/components/playbook/MockDraftStage';
+import { DraftStatsStage } from '@/components/playbook/DraftStatsStage';
+import { PlayerStatsStage } from '@/components/playbook/PlayerStatsStage';
+import { SeasonStage } from '@/components/playbook/SeasonStage';
+import { BadgesStage } from '@/components/playbook/BadgesStage';
 import { usePendingTeamClaim } from '@/hooks/usePendingTeamClaim';
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
-  const { leagues, loading: leaguesLoading, setSelectedLeague } = useLeagues();
+  const { leagues, selectedLeague, loading: leaguesLoading, setSelectedLeague } = useLeagues();
   const { claim, loading: claimLoading, saving, error, pickedTeam, setPickedTeam, submit } =
     usePendingTeamClaim();
   const navigate = useNavigate();
-  const [teamNamesByLeagueId, setTeamNamesByLeagueId] = useState<Record<string, string>>({});
-  const [draftCountByLeagueId, setDraftCountByLeagueId] = useState<Record<string, number>>({});
-
-  const fetchLeagueDetails = useCallback(async () => {
-    if (!user || leagues.length === 0) {
-      setTeamNamesByLeagueId({});
-      setDraftCountByLeagueId({});
-      return;
-    }
-    try {
-      // Fetch team names from league_teams (user's team = team_number matching user_pick_position)
-      const leagueIds = leagues.map((l) => l.id);
-      const { data: teamData } = await supabase
-        .from('league_teams')
-        .select('league_id, team_number, team_name')
-        .in('league_id', leagueIds);
-
-      const namesByLeague: Record<string, string> = {};
-      leagues.forEach((league) => {
-        const userTeam = teamData?.find(
-          (t) => t.league_id === league.id && t.team_number === league.user_pick_position
-        );
-        namesByLeague[league.id] =
-          userTeam?.team_name?.trim() || `Team #${league.user_pick_position}`;
-      });
-      setTeamNamesByLeagueId(namesByLeague);
-
-      // Fetch completed mock drafts and count per league
-      const { data: draftsData } = await supabase
-        .from('mock_drafts')
-        .select('league_id')
-        .eq('user_id', user.id)
-        .eq('status', 'completed');
-
-      const countByLeague: Record<string, number> = {};
-      leagues.forEach((l) => {
-        countByLeague[l.id] = 0;
-      });
-      draftsData?.forEach((d) => {
-        if (d.league_id) {
-          countByLeague[d.league_id] = (countByLeague[d.league_id] ?? 0) + 1;
-        }
-      });
-      setDraftCountByLeagueId(countByLeague);
-    } catch (err) {
-      console.error('Failed to fetch league details:', err);
-    }
-  }, [user, leagues]);
-
-  useEffect(() => {
-    fetchLeagueDetails();
-  }, [fetchLeagueDetails]);
 
   if (authLoading || (user && (leaguesLoading || claimLoading))) {
     return (
@@ -111,70 +56,54 @@ const Dashboard = () => {
     );
   }
 
-  const quickActions = [
+  const plays: PlaybookPage[] = [
     {
+      id: 'rankings',
       title: 'Rankings',
-      description: 'Build your custom player rankings with drag-and-drop reordering',
-      icon: ListOrdered,
-      path: '/rankings',
-      gradient: 'bg-gradient-primary',
-      hoverBorder: 'hover:border-primary/50',
-      iconColor: 'text-primary-foreground',
+      body: "Line your board up against consensus and find the players you're willing to reach for.",
+      href: '/rankings',
+      actionLabel: 'Open rankings',
+      preview: <RankingsStage />,
     },
     {
-      title: 'Mock Draft',
-      description: 'Start a new mock draft with customizable settings',
-      icon: ClipboardList,
-      path: '/mock-draft',
-      gradient: 'bg-gradient-gold',
-      hoverBorder: 'hover:border-accent/50',
-      iconColor: 'text-primary-foreground',
+      id: 'mock',
+      title: 'Mock draft',
+      body: 'Run mocks until you are confident in your draft strategy.',
+      href: '/mock-draft',
+      actionLabel: 'Start a mock',
+      preview: <MockDraftStage />,
     },
     {
-      title: 'Draft Stats',
-      description: 'View draft faves and fades with in-depth player analysis',
-      icon: BarChart3,
-      path: '/statistics',
-      gradient: 'bg-gradient-to-br from-violet-500 to-purple-600',
-      hoverBorder: 'hover:border-violet-500/50',
-      iconColor: 'text-white',
+      id: 'draft-stats',
+      title: 'Draft stats',
+      body: 'See who you draft, who you are high on, and who you avoid.',
+      href: '/statistics',
+      actionLabel: 'Open draft stats',
+      preview: <DraftStatsStage />,
     },
     {
-      title: 'Player Stats',
-      description:
-        'Spreadsheet-style view: sort, filter, and compare the full player pool with all fantasy-relevant stats',
-      icon: Table2,
-      path: '/players',
-      gradient: 'bg-gradient-to-br from-[hsl(350_78%_72%)] to-[hsl(28_92%_58%)]',
-      hoverBorder: 'hover:border-[hsl(350_50%_50%/0.45)]',
-      iconColor: 'text-primary-foreground',
+      id: 'players',
+      title: 'Player stats',
+      body: 'Look through the stats and find the gems hiding behind the numbers.',
+      href: '/players',
+      actionLabel: 'Open stat sheet',
+      preview: <PlayerStatsStage />,
     },
     {
-      title: 'Season Predictions',
-      description: 'Pick every NFL game before the season and reveal projected division records',
-      icon: CalendarRange,
-      path: '/season-predictions',
-      gradient: 'bg-gradient-to-br from-orange-500 to-amber-600',
-      hoverBorder: 'hover:border-orange-500/50',
-      iconColor: 'text-white',
+      id: 'season',
+      title: 'Season predictions',
+      body: 'Pick how you think the season plays out, then follow along and see how close you were.',
+      href: '/season-predictions',
+      actionLabel: 'Open predictions',
+      preview: <SeasonStage />,
     },
     {
-      title: "Pick'em",
-      description: 'Pick NFL winners each week and keep a season record against your league',
-      icon: ListChecks,
-      path: '/pickem',
-      gradient: 'bg-gradient-to-br from-sky-500 to-cyan-600',
-      hoverBorder: 'hover:border-sky-500/50',
-      iconColor: 'text-white',
-    },
-    {
-      title: 'Team Rankings',
-      description: 'Rank every team QB/RB/WR/TE room after the draft and get a computed board',
-      icon: Medal,
-      path: '/league-ranker',
-      gradient: 'bg-gradient-to-br from-emerald-500 to-teal-600',
-      hoverBorder: 'hover:border-emerald-500/50',
-      iconColor: 'text-white',
+      id: 'badges',
+      title: 'Badges',
+      body: 'Figure out your draft strategies and which badges fit your scheme.',
+      href: '/badges',
+      actionLabel: 'Open badges',
+      preview: <BadgesStage />,
     },
   ];
 
@@ -182,152 +111,89 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Welcome Section */}
-        <div className="mb-10">
-          <h1 className="font-display text-4xl md:text-5xl tracking-wide mb-2">
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mb-6">
+          <h1 className="font-display text-4xl tracking-wide md:text-5xl">
             {user ? 'Welcome back' : 'Welcome'}
           </h1>
-          <p className="text-muted-foreground text-lg">
-            What would you like to do today?
+          <p className="mt-2 text-muted-foreground">
+            Browse the features and get a read on the draft before it's game time.
           </p>
         </div>
 
-        {/* Quick Actions Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {quickActions.map((action) => (
-            <Link 
-              key={action.path} 
-              to={action.path}
-              className={`glass-card p-6 group ${action.hoverBorder} transition-all duration-300 block`}
-            >
-              <div className={`w-14 h-14 rounded-xl ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-105 transition-transform overflow-hidden`}>
-                <action.icon className={`w-7 h-7 ${action.iconColor}`} />
-              </div>
-              <h3 className="font-display text-2xl mb-2 group-hover:text-primary transition-colors">
-                {action.title}
-              </h3>
-              <p className="text-muted-foreground text-sm">
-                {action.description}
-              </p>
-              <div className="mt-4 flex items-center text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                Go to {action.title} <ArrowRight className="w-4 h-4 ml-1" />
-              </div>
-            </Link>
-          ))}
-        </div>
+        <Playbook
+          label="Play"
+          spineTitle="Features"
+          numbered={false}
+          showIndex={false}
+          pages={plays}
+          emptyTitle="No pages"
+          emptyBody="Nothing to open yet."
+          autoAdvanceMs={10_000}
+        />
 
-        {/* Pick Six Challenge + position leaderboard */}
-        <div className="flex flex-col lg:flex-row gap-6 mb-12">
+        <section className="mt-8 space-y-4">
           <Link
             to="/prediction-challenge"
-            className="lg:w-[38%] shrink-0 glass-card p-6 group hover:border-primary/50 transition-all duration-300 flex flex-col items-center text-center"
+            className="glass-card group flex items-center gap-4 p-4 transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-5"
           >
-            <PickSixMark frameClassName="h-16 w-16 rounded-xl bg-gradient-primary transition-transform group-hover:scale-105 mb-4" />
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <h2 className="font-display text-2xl group-hover:text-primary transition-colors">
-                Pick Six Challenge
-              </h2>
-              <ArrowRight className="w-5 h-5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+            <PickSixMark
+              fit="contain"
+              tone="gold"
+              hug
+              frameClassName="h-[5.5rem] w-[5.34rem] shrink-0 rounded-md border border-border bg-background sm:h-[6.29rem] sm:w-[6.1rem]"
+            />
+            <div className="flex min-w-0 flex-1 flex-col justify-center">
+              <h2 className="font-display text-2xl group-hover:text-primary sm:text-3xl">Pick Six</h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                {`Predict the top 6 players for the ${SEASON} season at QB, RB, WR, TE, K, and D/ST in the order you think they finish. A perfect board at any one position pays out $${PICK_SIX_CATEGORY_PRIZE_USD / 1000}k, pull out a miracle and hit all six boards for the full pool of $${PICK_SIX_TOTAL_PRIZE_POOL_USD / 1000}k.`}
+              </p>
             </div>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              {`Win up to $${PICK_SIX_TOTAL_PRIZE_POOL_USD / 1000}k by correctly guessing the top fantasy players at each position for this upcoming 2026 season.`}
-            </p>
-            <p className="text-muted-foreground text-sm leading-relaxed mt-2">
-              Lock in your top 6 per position before the deadline, then track how they stack up against live fantasy leaders as the season plays out.
-            </p>
           </Link>
-          <div className="flex-1 min-w-0 glass-card p-5">
+          <div className="glass-card min-w-0 p-4">
             <PickSixDashboardLeaderboard />
           </div>
-        </div>
+        </section>
 
-        {/* Leagues Section */}
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-                <Trophy className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="font-display text-2xl">Your Leagues</h2>
-                <p className="text-sm text-muted-foreground">Manage your fantasy leagues</p>
-              </div>
-            </div>
+        <section className="mt-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="font-display text-2xl">Your leagues</h2>
             <Link to="/settings">
-              <Button variant="outline" size="sm" className="gap-2">
-                <Plus className="w-4 h-4" /> Create League
+              <Button variant="outline" size="sm" className="h-11 gap-2">
+                <Plus className="h-4 w-4" /> Create league
               </Button>
             </Link>
           </div>
-
           {leagues.length === 0 ? (
-            <div className="text-center py-8 border border-dashed border-border rounded-lg">
-              <Users className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground mb-4">No leagues yet</p>
+            <div className="rounded-md border border-dashed border-border px-4 py-8 text-center">
+              <Users className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+              <p className="mb-4 text-muted-foreground">No leagues yet.</p>
               <Link to="/settings">
-                <Button variant="default" size="sm">
-                  Create Your First League
+                <Button size="sm" className="h-11">
+                  Create your first league
                 </Button>
               </Link>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {leagues.map((league) => (
-                <div
-                  key={league.id}
-                  className="rounded-lg border border-border/50 bg-secondary/30 transition-colors hover:border-primary/30"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedLeague(league);
-                    }}
-                    className="w-full cursor-pointer p-4 text-left"
-                  >
-                    <div className="mb-2 flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <Trophy className="h-5 w-5 flex-shrink-0 text-primary" />
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate font-medium">{league.name}</h3>
-                          <p className="truncate text-sm text-primary">
-                            {teamNamesByLeagueId[league.id] ?? `Team #${league.user_pick_position}`}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex-shrink-0 text-right text-sm text-muted-foreground">
-                        {league.user_id === user?.id
-                          ? `${league.num_teams} teams • Pick #${league.user_pick_position}`
-                          : `${league.num_teams} teams • Joined`}
-                      </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {draftCountByLeagueId[league.id] ?? 0} mock draft
-                      {(draftCountByLeagueId[league.id] ?? 0) !== 1 ? 's' : ''} completed
-                    </div>
-                  </button>
-                  {league.user_id === user?.id ? (
-                    <div className="px-4 pb-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-11 w-full"
-                        onClick={() => {
-                          setSelectedLeague(league);
-                          navigate('/league-settings?tab=members');
-                        }}
-                      >
-                        Invite friends
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
+            <LeagueCabinet
+              leagues={leagues}
+              userId={user?.id}
+              initialLeagueId={selectedLeague?.id}
+              onOpen={(league) => {
+                const match = leagues.find((item) => item.id === league.id);
+                if (!match) return;
+                setSelectedLeague(match);
+                navigate('/rankings');
+              }}
+              onInvite={(league) => {
+                const match = leagues.find((item) => item.id === league.id);
+                if (!match) return;
+                setSelectedLeague(match);
+                navigate('/league-settings?tab=members');
+              }}
+            />
           )}
-        </div>
-
+        </section>
       </main>
     </div>
   );

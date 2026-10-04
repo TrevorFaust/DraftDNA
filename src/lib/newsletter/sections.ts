@@ -15,6 +15,8 @@ const PLACEHOLDER_PREFIXES = [
   "_No verified",
   "No verified updates",
   "_Section not composed",
+  "_No composed",
+  "No composed daily",
   "No rookie-specific updates",
   "No items collected",
   "Compose response was not valid JSON",

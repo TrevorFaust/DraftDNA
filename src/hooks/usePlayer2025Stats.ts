@@ -51,6 +51,8 @@ export interface Player2025Stats {
   totalDefInterceptions: number;
   totalDefFumbleRecoveries: number;
   totalDefTds: number;
+  /** Season points allowed. Set for D/ST rows; the Pick Six tiebreaker for defenses. */
+  totalPointsAllowed?: number | null;
   gamesPlayed: number;
   avgPointsPerGame: number | null; // null if no games played
   /** Populated for kickers when RPC returns k_* aggregates. */
@@ -369,6 +371,7 @@ function buildPlayer2025StatsMap(
         interceptions: number;
         fumbleRecoveries: number;
         tds: number;
+        pointsAllowed: number;
       }
     >();
     for (const p of defenseBundle.players) {
@@ -386,6 +389,7 @@ function buildPlayer2025StatsMap(
       let interceptions = 0;
       let fumbleRecoveries = 0;
       let tds = 0;
+      let pointsAllowed = 0;
       for (let week = 1; week <= 18; week++) {
         const game = teamGames.get(week);
         const s = ownByWeek?.get(week);
@@ -414,6 +418,7 @@ function buildPlayer2025StatsMap(
           (input.def_tds ?? 0) +
           (input.def_fumble_recovery_tds ?? 0) +
           (input.def_special_teams_tds ?? 0);
+        if (game?.pointsAllowed != null) pointsAllowed += game.pointsAllowed;
       }
 
       if (gamesPlayed <= 0) continue;
@@ -425,6 +430,7 @@ function buildPlayer2025StatsMap(
         interceptions,
         fumbleRecoveries,
         tds,
+        pointsAllowed,
       });
     }
 
@@ -460,6 +466,7 @@ function buildPlayer2025StatsMap(
         totalDefInterceptions: d.interceptions,
         totalDefFumbleRecoveries: d.fumbleRecoveries,
         totalDefTds: d.tds,
+        totalPointsAllowed: d.pointsAllowed,
         gamesPlayed: d.gamesPlayed,
         avgPointsPerGame: d.gamesPlayed > 0 ? d.totalFp / d.gamesPlayed : null,
         kickerSeason: null,

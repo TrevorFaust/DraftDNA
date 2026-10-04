@@ -94,7 +94,8 @@ import {
   buildPositionAdpRankMap,
   resolvePositionAdpRankForDisplay,
 } from '@/utils/positionAdpRank';
-import { DraftAvailablePlayerRow } from '@/components/DraftAvailablePlayerRow';
+import { DraftAvailablePlayerRow, draftAvailableListClass } from '@/components/DraftAvailablePlayerRow';
+import { FitClockName } from '@/components/FitClockName';
 import {
   buildDraftListTierBreakBeforeIds,
   loadPersonalDraftBoardOverlay,
@@ -2543,7 +2544,7 @@ const DraftRoom = () => {
                     <div className="flex items-center gap-2">
                       <div className={cn(
                         "font-display text-xl sm:text-2xl leading-none transition-colors",
-                        timeRemaining <= 5 ? "text-destructive animate-pulse" : "text-accent"
+                        timeRemaining <= 5 ? "text-destructive animate-pulse" : "text-primary"
                       )}>
                         {timeRemaining}s
                       </div>
@@ -2602,19 +2603,16 @@ const DraftRoom = () => {
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none mb-0.5">Pick</div>
               <div className="font-display text-xl sm:text-2xl text-gradient leading-none">{currentPick}</div>
             </div>
-            <div className="text-center min-w-0">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none mb-0.5">On the Clock</div>
-              <div className={cn(
-                "font-display text-xl sm:text-2xl leading-none truncate max-w-[9rem] sm:max-w-[14rem]",
-                isUserPick ? "text-accent" : "text-foreground"
-              )}>
-                {getTeamName(getCurrentTeam())}
-                {isUserPick && <span className="text-xs ml-1 font-sans font-medium">(YOU)</span>}
-              </div>
-            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 sm:gap-8">
+            <div className="shrink-0 text-center">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none mb-0.5">On the Clock</div>
+              <FitClockName className="text-primary">
+                {getTeamName(getCurrentTeam())}
+                {isUserPick && <span className="ml-1 font-sans text-xs font-medium">(YOU)</span>}
+              </FitClockName>
+            </div>
             {currentPick > totalPicks && !isDraftComplete && (
               <Button 
                 variant="gold" 
@@ -2715,11 +2713,11 @@ const DraftRoom = () => {
 
         <DraftMobilePanelTabs value={mobilePanel} onChange={setMobilePanel} />
 
-        <div className="flex flex-col lg:grid lg:grid-cols-4 gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(13rem,1fr)_minmax(18rem,1.84fr)_minmax(11rem,1.16fr)] gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden">
           {/* My Roster: align to top of row; scroll inside cell if roster is taller than the players column */}
           <div
             className={cn(
-              'lg:col-span-1 flex-col justify-start overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin',
+              'flex-col justify-start overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin',
               draftMobilePanelClass(mobilePanel, 'roster')
             )}
           >
@@ -2738,7 +2736,7 @@ const DraftRoom = () => {
           {/* Available Players */}
           <div
             className={cn(
-              'lg:col-span-2 glass-card p-2.5 sm:p-3 flex-col overflow-hidden',
+              'glass-card p-2.5 sm:p-3 flex-col overflow-hidden',
               draftMobilePanelClass(mobilePanel, 'players')
             )}
           >
@@ -2783,7 +2781,7 @@ const DraftRoom = () => {
               </p>
             )}
 
-            <div className="space-y-0.5 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
+            <div className={draftAvailableListClass}>
               {availableListRows.map((row) => (
                 <DraftAvailablePlayerRow
                   key={row.player.id}
@@ -2813,36 +2811,41 @@ const DraftRoom = () => {
               ref={draftBoardRef}
               onScroll={handleDraftBoardScroll}
               className={cn(
-                "space-y-1 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2",
-                draftBoardScrolledUp ? "scrollbar-thin" : "scrollbar-hide"
+                'grid flex-1 min-h-0 content-start grid-cols-[2.75rem_minmax(0,14ch)_minmax(0,1fr)_max-content] gap-x-2.5 gap-y-1 overflow-y-auto overflow-x-hidden pr-2',
+                draftBoardScrolledUp ? 'scrollbar-thin' : 'scrollbar-hide'
               )}
             >
               {picks.map((pick) => {
                 const player = players.find((p) => p.id === pick.player_id);
                 if (!player) return null;
+                const teamName = getTeamName(pick.team_number);
 
                 return (
                   <div
                     key={pick.id}
                     className={cn(
-                      "flex items-center gap-2 p-2 rounded-lg text-sm min-w-0",
+                      'col-span-full grid grid-cols-subgrid items-center rounded-lg px-2 py-2 text-sm',
                       pick.team_number === draft?.user_pick_position
-                        ? "bg-accent/10 border border-accent/30"
-                        : "bg-secondary/30"
+                        ? 'bg-accent/10 border border-accent/30'
+                        : 'bg-secondary/30'
                     )}
                   >
-                    <div className="w-6 shrink-0 text-muted-foreground text-xs">
+                    <div className="text-right text-xs tabular-nums text-muted-foreground">
                       {pick.round_number}.{((pick.pick_number - 1) % (draft?.num_teams || 12)) + 1}
                     </div>
-                    <div className="font-medium w-16 shrink-0 truncate">{getTeamName(pick.team_number)}</div>
-                    <div className="flex-1 min-w-0 truncate text-muted-foreground">{player.name}</div>
-                    <PositionBadge position={player.position} className="shrink-0 text-[10px]" />
+                    <div className="min-w-0 truncate text-xs text-muted-foreground" title={teamName}>
+                      {teamName}
+                    </div>
+                    <div className="min-w-0 truncate font-medium" title={player.name}>
+                      {player.name}
+                    </div>
+                    <PositionBadge position={player.position} className="justify-self-end text-[10px]" />
                   </div>
                 );
               })}
 
               {picks.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="col-span-full py-8 text-center text-muted-foreground">
                   No picks yet. Click a player to draft them.
                 </div>
               )}

@@ -53,6 +53,31 @@ export function getTeamNameLexicon(): TeamNameLexicon {
   return teamNameLexicon;
 }
 
+/** ESPN logo file codes. Washington is wsh, not was. */
+export function espnLogoAbbr(abbrev: string): string {
+  const key = abbrev.toLowerCase();
+  if (key === "was" || key === "wsh") return "wsh";
+  return key;
+}
+
+export type ConferenceBlock = {
+  conference: "AFC" | "NFC";
+  divisions: { name: string; teams: TeamRow[] }[];
+};
+
+/** AFC then NFC, each split into East / North / South / West. */
+export function getConferenceBlocks(): ConferenceBlock[] {
+  const grouped = getDivisionGroups();
+  const divisions = ["East", "North", "South", "West"] as const;
+  return (["AFC", "NFC"] as const).map((conference) => ({
+    conference,
+    divisions: divisions.map((name) => ({
+      name,
+      teams: grouped[`${conference} ${name}`] ?? [],
+    })),
+  }));
+}
+
 export function getDivisionGroups(): Record<string, TeamRow[]> {
   const order = { East: 0, North: 1, South: 2, West: 3 };
   const teams = teamsData as TeamRow[];

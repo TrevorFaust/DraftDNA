@@ -1,0 +1,34 @@
+---
+description: Prompt template for every generated illustration, icon, and image asset
+alwaysApply: true
+---
+
+# Illustration template
+
+Every generated image for this project uses the vintage editorial ink style. Fill the
+brackets and send this as the prompt, unchanged otherwise:
+
+```
+A [OBJECT] drawn as a vintage editorial ink illustration: bold black hand-inked
+outlines with slightly varied line weight, fine crosshatch shading, realistic
+material detail ([MATERIAL 1, e.g. walnut wood grain], [MATERIAL 2, e.g. brushed
+steel with specular highlights], aged cream paper with stacked sheets and a
+curled corner). Slight 3/4 tilt, about 8 degrees. Muted palette of cream, warm
+brown, steel gray and black, with a single forest green (#2f5d46) accent on
+[ACCENT DETAIL]. Minimal readable text: only the word "[LABEL]". Isolated on a
+pure white background, no cast shadow, no scenery, centered, icon composition.
+```
+
+## Brackets
+
+- `[OBJECT]` — the subject, named plainly ("a clipboard holding a draft list").
+- `[MATERIAL 1]` / `[MATERIAL 2]` — the two materials to render with real texture.
+- `[ACCENT DETAIL]` — the one element that gets the forest green; everything else
+  stays in the muted palette.
+- `[LABEL]` — one word of readable text, or drop the text sentence entirely.
+
+## Using the result
+
+The art comes back on white, so it needs a light plate to sit on in this dark UI.
+Hand-drawn SVG is still fine for line-art UI icons such as nav glyphs; this template
+covers illustrations and image assets.

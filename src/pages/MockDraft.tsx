@@ -15,8 +15,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Users, Layers, Trophy, Target, Timer } from 'lucide-react';
+import { Users, Layers, Trophy, Target, Timer, Gauge } from 'lucide-react';
 import { ClipboardList } from 'lucide-react';
+import { DraftBoardIcon } from '@/components/icons/DraftBoardIcon';
+import { DraftClipboardArt } from '@/components/icons/DraftClipboardArt';
 import { tempDraftStorage, generateTempDraftId, tempSettingsStorage } from '@/utils/temporaryStorage';
 import { BrandedLoader } from '@/components/BrandedLoader';
 import type { MockDraft } from '@/types/database';
@@ -642,11 +644,9 @@ const MockDraft = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-5xl mx-auto px-4 py-8 sm:px-6">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
-            <ClipboardList className="w-10 h-10 text-primary-foreground" />
-          </div>
+          <DraftClipboardArt className="w-24 h-24 mx-auto mb-4 drop-shadow-[0_10px_22px_hsl(var(--primary)/0.28)]" />
           <h1 className="font-display text-4xl tracking-wide mb-2">NEW MOCK DRAFT</h1>
           <p className="text-muted-foreground">Configure your draft settings</p>
         </div>
@@ -799,7 +799,7 @@ const MockDraft = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
               <Label className="flex items-center gap-2" htmlFor="numTeams">
                 <Users className="w-4 h-4 text-muted-foreground" />
@@ -908,10 +908,92 @@ const MockDraft = () => {
                 </SelectContent>
               </Select>
             </div>
-            
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Timer className="w-4 h-4 text-muted-foreground" />
+                Pick Timer
+              </Label>
+              <Select value={pickTimer} onValueChange={setPickTimer}>
+                <SelectTrigger className="bg-secondary/50 border-border/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">None</SelectItem>
+                  <SelectItem value="15">15 seconds</SelectItem>
+                  <SelectItem value="30">30 seconds</SelectItem>
+                  <SelectItem value="45">45 seconds</SelectItem>
+                  <SelectItem value="60">60 seconds</SelectItem>
+                  <SelectItem value="90">90 seconds</SelectItem>
+                  <SelectItem value="120">120 seconds</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <DraftBoardIcon className="w-4 h-4 text-muted-foreground" />
+                Your board
+              </Label>
+              <Select value={yourBoardSource} onValueChange={setYourBoardSource}>
+                <SelectTrigger className="bg-secondary/50 border-border/50 min-h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yourBoardOptions(boardSourceOptions).map((src) => (
+                    <SelectItem key={src} value={src}>
+                      {boardSourceLabel(src)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Order of the available list on your screen. Drafted players leave this list the same as everyone else.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-muted-foreground" />
+                Draft against
+              </Label>
+              <Select value={cpuBoardSource} onValueChange={setCpuBoardSource}>
+                <SelectTrigger className="bg-secondary/50 border-border/50 min-h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {draftAgainstOptions(boardSourceOptions).map((src) => (
+                    <SelectItem key={src} value={src}>
+                      {boardSourceLabel(src)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {draftMode === 'multiplayer'
+                  ? 'Room board for CPU seats and the frozen pick order. Your available list uses Your board.'
+                  : 'CPUs pick from this board. Your board can stay on Your rankings.'}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Gauge className="w-4 h-4 text-muted-foreground" />
+                CPU Selection Speed
+              </Label>
+              <Select value={cpuSpeed} onValueChange={(value: 'slow' | 'normal' | 'fast' | 'rapid') => setCpuSpeed(value)}>
+                <SelectTrigger className="bg-secondary/50 border-border/50 min-h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="slow">Slow</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="fast">Fast</SelectItem>
+                  <SelectItem value="rapid">Rapid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {isDynasty && !isRookiesOnlyFromLeague && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
@@ -940,95 +1022,6 @@ const MockDraft = () => {
                 </div>
               </div>
             )}
-
-            <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Timer className="w-4 h-4 text-muted-foreground" />
-                Pick Timer
-              </Label>
-              <Select value={pickTimer} onValueChange={setPickTimer}>
-                <SelectTrigger className="bg-secondary/50 border-border/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">None</SelectItem>
-                  <SelectItem value="15">15 seconds</SelectItem>
-                  <SelectItem value="30">30 seconds</SelectItem>
-                  <SelectItem value="45">45 seconds</SelectItem>
-                  <SelectItem value="60">60 seconds</SelectItem>
-                  <SelectItem value="90">90 seconds</SelectItem>
-                  <SelectItem value="120">120 seconds</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-muted-foreground" />
-                CPU Selection Speed
-              </Label>
-              <Select value={cpuSpeed} onValueChange={(value: 'slow' | 'normal' | 'fast' | 'rapid') => setCpuSpeed(value)}>
-                <SelectTrigger className="bg-secondary/50 border-border/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="slow">Slow</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="fast">Fast</SelectItem>
-                  <SelectItem value="rapid">Rapid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            </div>
-
-            <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-muted-foreground" />
-                Your board
-              </Label>
-              <Select value={yourBoardSource} onValueChange={setYourBoardSource}>
-                <SelectTrigger className="bg-secondary/50 border-border/50 min-h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {yourBoardOptions(boardSourceOptions).map((src) => (
-                    <SelectItem key={src} value={src}>
-                      {boardSourceLabel(src)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Order of the available list on your screen. Drafted players leave this list the same as everyone else.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-muted-foreground" />
-                Draft against
-              </Label>
-              <Select value={cpuBoardSource} onValueChange={setCpuBoardSource}>
-                <SelectTrigger className="bg-secondary/50 border-border/50 min-h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {draftAgainstOptions(boardSourceOptions).map((src) => (
-                    <SelectItem key={src} value={src}>
-                      {boardSourceLabel(src)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {draftMode === 'multiplayer'
-                  ? 'Room board for CPU seats and the frozen pick order. Your available list uses Your board.'
-                  : 'CPUs pick from this board. Your board can stay on Your rankings.'}
-              </p>
-            </div>
-            </div>
           </div>
 
           <div className="pt-4">

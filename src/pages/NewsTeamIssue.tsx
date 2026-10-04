@@ -14,7 +14,7 @@ export default function NewsTeamIssue() {
   const staticTeam = getTeamBySlug(teamSlug);
 
   const issueQuery = useQuery({
-    queryKey: ["newsletter-team-issue", teamSlug, issueSlug, "from-2026-08-03"],
+    queryKey: ["newsletter-team-issue", teamSlug, issueSlug, "from-2026-06-08"],
     queryFn: () => fetchTeamWeeklyIssue(teamSlug, issueSlug),
     enabled: Boolean(teamSlug && issueSlug),
   });
@@ -81,7 +81,7 @@ export default function NewsTeamIssue() {
   const playerEntries = playersQuery.data ?? [];
 
   return (
-    <NewsPageFrame>
+    <NewsPageFrame width="reading">
       <article className="news-issue">
         <NewsBreadcrumb
           items={[
@@ -92,8 +92,7 @@ export default function NewsTeamIssue() {
         />
 
         <header className="issue-header mb-6">
-          <span className="edition-badge edition-weekly">Weekly Edition</span>
-          <p className="mt-3 font-sans text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <p className="font-sans text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             {team.conference} {team.division}
           </p>
           <h1 className="mt-1 font-display text-4xl tracking-wide">{teamName}</h1>

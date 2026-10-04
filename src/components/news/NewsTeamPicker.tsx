@@ -57,14 +57,15 @@ export function NewsTeamPicker() {
         </Link>
       </HoverCardTrigger>
       <HoverCardContent
-        align="start"
+        align="end"
         sideOffset={8}
-        className="z-[60] w-[min(44rem,calc(100vw-2rem))] border-border bg-card p-4 shadow-lg"
+        collisionPadding={12}
+        className="z-[60] max-h-[min(34rem,calc(100vh-5rem))] w-[min(76rem,calc(100vw-1.5rem))] overflow-y-auto border-border bg-card p-5 shadow-lg"
       >
-        <p className="mb-3 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="mb-4 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Weekly by team
         </p>
-        <NewsTeamGrid compact onSelect={() => setOpen(false)} />
+        <NewsTeamGrid layout="board" onSelect={() => setOpen(false)} />
         <div className="mt-3 border-t border-border pt-2 text-center">
           <Link to="/news" className="text-sm font-semibold text-primary hover:underline">
             View all teams
