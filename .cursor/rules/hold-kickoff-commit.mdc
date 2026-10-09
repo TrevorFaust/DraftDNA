@@ -1,0 +1,25 @@
+---
+description: Keep the unfinished first-load title card out of commits until Trevor says to ship it
+alwaysApply: true
+---
+
+# Hold the entrance card
+
+The field-goal kickoff and the photo turf spin were removed. Do not restore them.
+
+The first-load title card, the sketch ball-spin intro, and the sideline-board wipe are still unfinished. Do not stage, commit, or push these until Trevor explicitly says to ship the entrance:
+
+- `src/components/SiteEntrance.tsx`
+- `src/components/BallSpinSequence.tsx`
+- `src/components/SketchBall.tsx`
+- `src/components/PanePushEntrance.tsx`
+- `src/components/PanePusher.tsx`
+- `src/components/BallRunner.tsx`
+- `src/components/footballKit.tsx`
+- `src/components/entranceMode.ts`
+- `src/App.tsx`
+- `src/components/SiteLogo.tsx`
+- `src/index.css`
+- `.cursor/rules/hold-kickoff-commit.mdc`
+
+A daily commit may include other files. It must not include this entrance work.

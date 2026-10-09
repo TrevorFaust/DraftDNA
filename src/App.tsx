@@ -24,6 +24,9 @@ import Settings from "./pages/Settings";
 import LeagueSettings from "./pages/LeagueSettings";
 import NotFound from "./pages/NotFound";
 import { Footer } from "./components/Footer";
+import { ENTRANCE_MODE } from "./components/entranceMode";
+import { PanePushEntrance } from "./components/PanePushEntrance";
+import { SiteEntrance } from "./components/SiteEntrance";
 import { BrandedLoader } from "./components/BrandedLoader";
 import { Navbar } from "./components/Navbar";
 import { RequireTeamSeat } from "@/components/league/RequireTeamSeat";
@@ -51,6 +54,8 @@ function PageFallback() {
     </div>
   );
 }
+
+const Entrance = ENTRANCE_MODE === 'ball' ? SiteEntrance : PanePushEntrance;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,8 +85,9 @@ const App = () => (
               <NflTeamContextProvider>
               <Toaster />
               <Sonner />
+              <Entrance>
               <div className="min-h-screen flex flex-col">
-                <main className="flex-1">
+                <main id="site-main" tabIndex={-1} className="flex-1 outline-none">
                   <RequireTeamSeat>
                   <Routes>
                     <Route path="/" element={<Index />} />
@@ -113,6 +119,7 @@ const App = () => (
                 </main>
                 <Footer />
               </div>
+              </Entrance>
               </NflTeamContextProvider>
               </FantasyDepthProvider>
             </TooltipProvider>

@@ -345,6 +345,14 @@
     animation: hero-rise 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
+  .entrance-masthead.is-set .melt-draft {
+    color: hsl(var(--foreground));
+  }
+
+  .entrance-masthead.is-set .melt-dna {
+    color: hsl(var(--primary));
+  }
+
   @keyframes hero-rule {
     from {
       transform: scaleX(0);
@@ -360,6 +368,51 @@
     transform-origin: left center;
     background: hsl(var(--primary));
     animation: hero-rule 640ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .hero-rule-center {
+    transform-origin: center;
+    margin-inline: auto;
+  }
+
+  @keyframes entrance-leave {
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+
+  .entrance-leave {
+    animation: entrance-leave 220ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  .spin-ball-slot {
+    width: clamp(16rem, 50vmin, 26rem);
+    height: clamp(16rem, 50vmin, 26rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    transition: width 480ms cubic-bezier(0.16, 1, 0.3, 1), height 480ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .spin-ball-slot.is-parked {
+    width: clamp(8.75rem, 26dvh, 12rem);
+    height: clamp(5.5rem, 16.5dvh, 7.25rem);
+    align-items: center;
+  }
+
+  .sketch-ball-3d,
+  .spin-ball-svg {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .sketch-ball-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
 
   /* Text links inside copy pick up a color and underline. Cards and buttons opt out. */
