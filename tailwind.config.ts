@@ -17,6 +17,7 @@ export default {
         display: ['Fraunces', 'serif'],
         sans: ['"IBM Plex Sans"', 'sans-serif'],
         editorial: ['Fraunces', 'serif'],
+        masthead: ['Newsreader', 'Georgia', 'serif'],
         share: ['Oswald', 'Montserrat', 'sans-serif'],
       },
       colors: {

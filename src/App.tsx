@@ -26,6 +26,7 @@ import NotFound from "./pages/NotFound";
 import { Footer } from "./components/Footer";
 import { ENTRANCE_MODE } from "./components/entranceMode";
 import { PanePushEntrance } from "./components/PanePushEntrance";
+import { RunnerEntrance } from "./components/RunnerEntrance";
 import { SiteEntrance } from "./components/SiteEntrance";
 import { BrandedLoader } from "./components/BrandedLoader";
 import { Navbar } from "./components/Navbar";
@@ -55,7 +56,12 @@ function PageFallback() {
   );
 }
 
-const Entrance = ENTRANCE_MODE === 'ball' ? SiteEntrance : PanePushEntrance;
+const Entrance =
+  ENTRANCE_MODE === 'ball'
+    ? SiteEntrance
+    : ENTRANCE_MODE === 'pane'
+      ? PanePushEntrance
+      : RunnerEntrance;
 
 const queryClient = new QueryClient({
   defaultOptions: {

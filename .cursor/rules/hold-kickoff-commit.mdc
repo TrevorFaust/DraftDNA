@@ -16,6 +16,9 @@ The first-load title card, the sketch ball-spin intro, and the sideline-board wi
 - `src/components/PanePusher.tsx`
 - `src/components/BallRunner.tsx`
 - `src/components/footballKit.tsx`
+- `src/components/RunnerEntrance.tsx`
+- `src/components/RunnerFigure.tsx`
+- `public/running_and_jumping.riv`
 - `src/components/entranceMode.ts`
 - `src/App.tsx`
 - `src/components/SiteLogo.tsx`
