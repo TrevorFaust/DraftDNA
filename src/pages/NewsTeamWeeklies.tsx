@@ -31,14 +31,21 @@ function plainCopy(text: string | null | undefined): string {
 const ABBREVIATION = /(?:\b(?:Jr|Sr|St|Dr|Mr|Ms|No|vs|Inc|Jan|Feb|Aug|Sept?|Oct|Nov|Dec)|\s[A-Z])\.$/;
 
 /**
- * Whole sentences only. Anything after the last terminator is dropped, so a blurb
- * built from these can never trail off mid-thought.
+ * Whole sentences only. Decimals (36.8) and initials (J.K.) are shielded so they
+ * are not read as a period. Anything after the last terminator is dropped.
  */
+/** Box score, not a final score (34-22) or a record (3-2). Keep in sync with the newsletter opener check. */
+const STAT_LINE =
+  /\bPPR\b|\d+\s+carr(?:y|ies)\b|\b(?:caught|catches)\b|\bcompleted\s+\d+|\d+\s+of\s+\d+\s+(?:passes|targets|attempts)\b|\d+\s+yards\b|\btarget share\b|\bsnap share\b/i;
+
 function wholeSentences(text: string): string[] {
-  const parts = text.match(/[^.!?]+[.!?]+(?:\s|$)/g) ?? [];
+  const shielded = text
+    .replace(/(\d)\.(\d)/g, "$1\u0000$2")
+    .replace(/([A-Z])\.(?=[A-Z])/g, "$1\u0001");
+  const parts = shielded.match(/[^.!?]+[.!?]+(?:\s|$)/g) ?? [];
   const out: string[] = [];
   for (const part of parts) {
-    const piece = part.trim();
+    const piece = part.replace(/\u0000/g, ".").replace(/\u0001/g, ".").trim();
     if (!piece) continue;
     const previous = out[out.length - 1];
     if (previous && ABBREVIATION.test(previous)) out[out.length - 1] = `${previous} ${piece}`;
@@ -49,7 +56,27 @@ function wholeSentences(text: string): string[] {
 
 const BLURB_MAX = 210;
 
-/** The opening sentences that fit the ticket, or the first short one if the lead runs long. */
+/**
+ * A long lead is usually the game, with the box score after a comma.
+ * Keep the front of that sentence instead of jumping to a later stat line.
+ */
+function clipLead(sentence: string): string | null {
+  const parts = sentence.split(/,\s+/);
+  let blurb = "";
+  for (const part of parts) {
+    if (STAT_LINE.test(part)) break;
+    const next = blurb ? `${blurb}, ${part}` : part;
+    if (next.length > BLURB_MAX) break;
+    blurb = next;
+  }
+  if (blurb.length < 40) return null;
+  return /[.!?]$/.test(blurb) ? blurb : `${blurb}.`;
+}
+
+/**
+ * The ticket line is the game or the week. Counting stats stay in the article,
+ * so the hook stops at the first box-score sentence.
+ */
 function sectionBlurb(section: TeamSectionContent): string | null {
   const source =
     plainCopy(section.intro_paragraphs) ||
@@ -59,15 +86,18 @@ function sectionBlurb(section: TeamSectionContent): string | null {
   const all = wholeSentences(source);
   if (all.length === 0) return null;
 
-  if (all[0].length <= BLURB_MAX) {
-    let blurb = all[0];
-    for (const next of all.slice(1)) {
-      if (blurb.length + next.length + 1 > BLURB_MAX) break;
-      blurb = `${blurb} ${next}`;
+  const kept: string[] = [];
+  for (const sentence of all) {
+    if (STAT_LINE.test(sentence)) break;
+    const next = kept.length ? `${kept.join(" ")} ${sentence}` : sentence;
+    if (next.length > BLURB_MAX) {
+      if (!kept.length) return clipLead(sentence);
+      break;
     }
-    return blurb;
+    kept.push(sentence);
   }
-  return all.find((sentence) => sentence.length <= BLURB_MAX) ?? null;
+  if (kept.length) return kept.join(" ");
+  return clipLead(all[0]);
 }
 
 const NOTES_MAX = 4;

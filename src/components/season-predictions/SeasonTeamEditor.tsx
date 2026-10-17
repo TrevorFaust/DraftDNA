@@ -9,6 +9,7 @@ import type { SeasonPredictionPicks } from '@/utils/seasonPredictionsStorage';
 import { scheduleGameKey } from '@/constants/nfl2026ScheduleGrid';
 import { PickemMatchupRow } from '@/components/pickem/PickemMatchupRow';
 import { officialKickoff, type WeekMatchup } from '@/utils/nfl2026Schedule';
+import { officialPickemGame, officialResult } from '@/utils/nfl2026Results';
 import {
   Select,
   SelectContent,
@@ -24,7 +25,7 @@ type Props = {
   selectedAbbr: string | null;
   onSelectTeam: (abbr: string) => void;
   onPick: (key: string, abbr: string) => void;
-  locked?: boolean;
+  isRowLocked?: (matchup: WeekMatchup) => boolean;
 };
 
 function teamMatchups(teamAbbr: string): WeekMatchup[] {
@@ -33,7 +34,7 @@ function teamMatchups(teamAbbr: string): WeekMatchup[] {
     week: slot.week,
     home: slot.home,
     away: slot.away,
-    game: null,
+    game: officialPickemGame(slot.week, slot.away, slot.home),
     kickoffAt: officialKickoff(slot.week, slot.away, slot.home),
   }));
 }
@@ -43,7 +44,7 @@ export function SeasonTeamEditor({
   selectedAbbr,
   onSelectTeam,
   onPick,
-  locked = false,
+  isRowLocked,
 }: Props) {
   const boards = buildSeasonStandings(picks);
   const selected = selectedAbbr
@@ -120,20 +121,23 @@ export function SeasonTeamEditor({
             <p className="text-sm text-muted-foreground">{matchups.length} games</p>
           </div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {matchups.map((matchup) => (
-              <div key={matchup.key} className="space-y-1">
-                <p className="px-1 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Week {matchup.week}
-                </p>
-                <PickemMatchupRow
-                  matchup={matchup}
-                  picked={picks[matchup.key] ?? null}
-                  onPick={(abbr) => onPick(matchup.key, abbr)}
-                  alwaysUnlocked={!locked}
-                  forceLocked={locked}
-                />
-              </div>
-            ))}
+            {matchups.map((matchup) => {
+              const result = officialResult(matchup.week, matchup.away, matchup.home);
+              return (
+                <div key={matchup.key} className="space-y-1">
+                  <p className="px-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Week {matchup.week}
+                  </p>
+                  <PickemMatchupRow
+                    matchup={matchup}
+                    picked={result ? result.winner : (picks[matchup.key] ?? null)}
+                    onPick={(abbr) => onPick(matchup.key, abbr)}
+                    forceLocked={isRowLocked?.(matchup) ?? false}
+                    showOutcome={!result}
+                  />
+                </div>
+              );
+            })}
           </div>
         </>
       )}

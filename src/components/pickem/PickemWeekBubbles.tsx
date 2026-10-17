@@ -1,6 +1,7 @@
-import { Trophy } from 'lucide-react';
+import { Lock, Trophy } from 'lucide-react';
 import { PICKEM_WEEKS } from '@/constants/pickem';
 import { cn } from '@/lib/utils';
+import { weekIsFinal } from '@/utils/nfl2026Results';
 
 type Props = {
   selectedWeek: number | null;
@@ -30,17 +31,23 @@ export function PickemWeekBubbles({
     <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Pick'em views">
       {weeks.map((week) => {
         const selected = !standingsSelected && selectedWeek === week;
+        const locked = weekIsFinal(week);
         return (
           <button
             key={week}
             type="button"
             role="tab"
             aria-selected={selected}
-            aria-label={`Week ${week}`}
+            aria-label={locked ? `Week ${week}, locked` : `Week ${week}`}
             onClick={() => onSelectWeek(week)}
-            className={cn(bubbleClass(selected), 'w-11 tabular-nums')}
+            className={cn(bubbleClass(selected), 'relative w-11 tabular-nums')}
           >
             {week}
+            {locked && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-foreground text-background">
+                <Lock className="h-2.5 w-2.5" aria-hidden />
+              </span>
+            )}
           </button>
         );
       })}

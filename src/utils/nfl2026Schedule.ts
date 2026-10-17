@@ -7,6 +7,7 @@ import {
   type ScheduleGame,
 } from '@/constants/nfl2026ScheduleGrid';
 import type { PickemGame } from '@/types/leagueSocial';
+import { applyOfficialScore } from '@/utils/nfl2026Results';
 
 export function teamNickname(abbr: string, fallbackName?: string | null): string {
   const full = fallbackName || getFullTeamName(abbr) || abbr;
@@ -55,7 +56,12 @@ export function matchupsForWeek(week: number, boardGames: PickemGame[]): WeekMat
 
   return gamesForWeek(week)
     .map((slot) => {
-      const game = byPair.get(`${slot.away}@${slot.home}`) ?? null;
+      const game = applyOfficialScore(
+        byPair.get(`${slot.away}@${slot.home}`) ?? null,
+        week,
+        slot.away,
+        slot.home
+      );
       const kickoffAt = isEspnLiveRow(game)
         ? game?.kickoff_at ?? officialKickoff(week, slot.away, slot.home)
         : officialKickoff(week, slot.away, slot.home) ?? game?.kickoff_at ?? null;

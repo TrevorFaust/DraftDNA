@@ -9,6 +9,7 @@ import {
   canonScheduleAbbr,
   scheduleGameKey,
 } from '@/constants/nfl2026ScheduleGrid';
+import { officialResult } from '@/utils/nfl2026Results';
 import {
   emptyConferenceBracketPicks,
   emptyPlayoffBracketPicks,
@@ -19,10 +20,27 @@ const STORAGE_PREFIX = 'season-predictions:v2';
 
 export type SeasonPredictionPicks = Record<string, string>;
 
+/** When a signed-in slate was saved. Guests keep this in memory for the visit only. */
+export type SeasonPredictionMeta = {
+  /** NFL week of the first game pick. 0 means before Week 1. */
+  startedWeek: number | null;
+  /** NFL week of the latest game-pick change. */
+  lastAdjustedWeek: number | null;
+  /** Schedule weeks whose picks are frozen on the account. */
+  committedWeeks: number[];
+  /** Signed-in lock after the season has started. */
+  slateLocked: boolean;
+  awardsCommitted: boolean;
+  awardsWeek: number | null;
+  playoffsCommitted: boolean;
+  playoffsWeek: number | null;
+};
+
 export type SeasonPredictionBoardState = {
   picks: SeasonPredictionPicks;
   bracket: PlayoffBracketPicks;
   awards: SeasonAwardsPicks;
+  meta: SeasonPredictionMeta;
 };
 
 type StoredPayload = {
@@ -30,7 +48,80 @@ type StoredPayload = {
   picks: SeasonPredictionPicks;
   bracket?: PlayoffBracketPicks;
   awards?: SeasonAwardsPicks;
+  meta?: SeasonPredictionMeta;
 };
+
+export function emptySeasonPredictionMeta(): SeasonPredictionMeta {
+  return {
+    startedWeek: null,
+    lastAdjustedWeek: null,
+    committedWeeks: [],
+    slateLocked: false,
+    awardsCommitted: false,
+    awardsWeek: null,
+    playoffsCommitted: false,
+    playoffsWeek: null,
+  };
+}
+
+function clampStoredWeek(week: number): number | null {
+  if (!Number.isInteger(week)) return null;
+  if (week < 0 || week > 18) return null;
+  return week;
+}
+
+export function normalizeSeasonPredictionMeta(raw: unknown): SeasonPredictionMeta {
+  const empty = emptySeasonPredictionMeta();
+  if (!raw || typeof raw !== 'object') return empty;
+  const meta = raw as Record<string, unknown>;
+  const committed = Array.isArray(meta.committedWeeks)
+    ? [
+        ...new Set(
+          meta.committedWeeks.filter(
+            (week): week is number => typeof week === 'number' && Number.isInteger(week) && week >= 1 && week <= 18
+          )
+        ),
+      ].sort((a, b) => a - b)
+    : [];
+  return {
+    startedWeek: typeof meta.startedWeek === 'number' ? clampStoredWeek(meta.startedWeek) : null,
+    lastAdjustedWeek:
+      typeof meta.lastAdjustedWeek === 'number' ? clampStoredWeek(meta.lastAdjustedWeek) : null,
+    committedWeeks: committed,
+    slateLocked: meta.slateLocked === true,
+    awardsCommitted: meta.awardsCommitted === true,
+    awardsWeek: typeof meta.awardsWeek === 'number' ? clampStoredWeek(meta.awardsWeek) : null,
+    playoffsCommitted: meta.playoffsCommitted === true,
+    playoffsWeek: typeof meta.playoffsWeek === 'number' ? clampStoredWeek(meta.playoffsWeek) : null,
+  };
+}
+
+export function stampAdjustment(meta: SeasonPredictionMeta, nflWeek: number): SeasonPredictionMeta {
+  const week = clampStoredWeek(nflWeek);
+  if (week == null) return meta;
+  if (meta.startedWeek != null && meta.lastAdjustedWeek === week) return meta;
+  return {
+    ...meta,
+    startedWeek: meta.startedWeek ?? week,
+    lastAdjustedWeek: week,
+  };
+}
+
+export function withCommittedWeeks(
+  meta: SeasonPredictionMeta,
+  weeks: readonly number[],
+  nflWeek: number
+): SeasonPredictionMeta {
+  const add = weeks.filter((week) => !meta.committedWeeks.includes(week));
+  if (add.length === 0) return meta;
+  const week = clampStoredWeek(nflWeek);
+  return {
+    ...meta,
+    committedWeeks: [...meta.committedWeeks, ...add].sort((a, b) => a - b),
+    startedWeek: meta.startedWeek ?? week,
+    lastAdjustedWeek: week ?? meta.lastAdjustedWeek,
+  };
+}
 
 function storageKey(season: number): string {
   return `${STORAGE_PREFIX}:${season}`;
@@ -87,6 +178,7 @@ function emptyBoard(): SeasonPredictionBoardState {
     picks: {},
     bracket: emptyPlayoffBracketPicks(),
     awards: emptySeasonAwardsPicks(),
+    meta: emptySeasonPredictionMeta(),
   };
 }
 
@@ -111,6 +203,7 @@ export function normalizeSeasonPredictionBoard(
     picks,
     bracket: normalizeBracket(parsed.bracket),
     awards: normalizeSeasonAwardsPicks(parsed.awards),
+    meta: normalizeSeasonPredictionMeta(parsed.meta),
   };
 }
 
@@ -136,6 +229,7 @@ export function loadSeasonPredictionState(season: number = PICKEM_SEASON): Seaso
         picks: legacyPicks,
         bracket: emptyPlayoffBracketPicks(),
         awards: emptySeasonAwardsPicks(),
+        meta: emptySeasonPredictionMeta(),
       };
     }
 
@@ -148,6 +242,7 @@ export function loadSeasonPredictionState(season: number = PICKEM_SEASON): Seaso
           picks: legacyPicks,
           bracket: emptyPlayoffBracketPicks(),
           awards: emptySeasonAwardsPicks(),
+          meta: emptySeasonPredictionMeta(),
         };
       }
     }
@@ -165,9 +260,10 @@ export function saveSeasonPredictionState(
   picks: SeasonPredictionPicks,
   bracket: PlayoffBracketPicks,
   awards: SeasonAwardsPicks = emptySeasonAwardsPicks(),
-  season: number = PICKEM_SEASON
+  season: number = PICKEM_SEASON,
+  meta: SeasonPredictionMeta = emptySeasonPredictionMeta()
 ): void {
-  const payload: StoredPayload = { season, picks, bracket, awards };
+  const payload: StoredPayload = { season, picks, bracket, awards, meta };
   localStorage.setItem(storageKey(season), JSON.stringify(payload));
 }
 
@@ -175,8 +271,8 @@ export function saveSeasonPredictionPicks(
   picks: SeasonPredictionPicks,
   season: number = PICKEM_SEASON
 ): void {
-  const { bracket, awards } = loadSeasonPredictionState(season);
-  saveSeasonPredictionState(picks, bracket, awards, season);
+  const { bracket, awards, meta } = loadSeasonPredictionState(season);
+  saveSeasonPredictionState(picks, bracket, awards, season, meta);
 }
 
 export function clearSeasonPredictionPicks(season: number = PICKEM_SEASON): void {
@@ -184,15 +280,18 @@ export function clearSeasonPredictionPicks(season: number = PICKEM_SEASON): void
   localStorage.removeItem(`season-predictions:v1:${season}`);
 }
 
-/** Random-fill only games that are still unpicked. Returns how many were filled. */
+/** Random-fill only games that are still unpicked and allowed by `canFill`. */
 export function fillRemainingRandomPicks(
-  existing: SeasonPredictionPicks
+  existing: SeasonPredictionPicks,
+  canFill: (game: { week: number; away: string; home: string }) => boolean = () => true
 ): { picks: SeasonPredictionPicks; filled: number } {
   const picks = { ...existing };
   let filled = 0;
   for (const game of allScheduleGames()) {
     const key = scheduleGameKey(game.week, game.away, game.home);
+    if (officialResult(game.week, game.away, game.home)) continue;
     if (picks[key]) continue;
+    if (!canFill(game)) continue;
     picks[key] = Math.random() < 0.5 ? game.home : game.away;
     filled += 1;
   }

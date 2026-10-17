@@ -16,6 +16,7 @@ type Props = {
   picks: SeasonPredictionPicks;
   awards: SeasonAwardsPicks;
   awardsLocked?: boolean;
+  awardsNote?: string;
   onAwardChange: (awardId: SeasonAwardId, pick: SeasonAwardPick | null) => void;
   onSelectTeam?: (abbr: string) => void;
 };
@@ -163,6 +164,7 @@ export function SeasonStandingsBoard({
   picks,
   awards,
   awardsLocked = false,
+  awardsNote,
   onAwardChange,
   onSelectTeam,
 }: Props) {
@@ -227,7 +229,7 @@ export function SeasonStandingsBoard({
       <div className="flex flex-col items-center">
         <h3 className="font-display mb-1 text-center text-xl tracking-wide">Awards</h3>
         <p className="mb-4 max-w-md text-center text-sm text-muted-foreground">
-          Pick your winners below, or open the Awards tab for the same list.
+          {awardsNote ?? 'Pick your winners below, or open the Awards tab for the same list.'}
         </p>
         <SeasonAwardsPanel
           awards={awards}

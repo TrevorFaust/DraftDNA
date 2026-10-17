@@ -1,4 +1,4 @@
-import { Award, Check, Shield, Table2, Trophy } from 'lucide-react';
+import { Award, Check, Lock, Shield, Table2, Trophy } from 'lucide-react';
 import { PICKEM_WEEKS } from '@/constants/pickem';
 import { cn } from '@/lib/utils';
 
@@ -8,6 +8,8 @@ type Props = {
   selectedWeek: number | null;
   activeView: SeasonPredictionView;
   completedWeeks: ReadonlySet<number>;
+  passedWeeks: ReadonlySet<number>;
+  slateLocked?: boolean;
   recordsReady: boolean;
   onSelectWeek: (week: number) => void;
   onSelectByTeam: () => void;
@@ -29,6 +31,8 @@ export function SeasonPredictionWeekBubbles({
   selectedWeek,
   activeView,
   completedWeeks,
+  passedWeeks,
+  slateLocked = false,
   recordsReady,
   onSelectWeek,
   onSelectByTeam,
@@ -42,18 +46,27 @@ export function SeasonPredictionWeekBubbles({
     <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Season prediction views">
       {weeks.map((week) => {
         const selected = activeView === 'picks' && selectedWeek === week;
-        const done = completedWeeks.has(week);
+        const passed = passedWeeks.has(week);
+        const frozen = !passed && slateLocked;
+        const done = !passed && !frozen && completedWeeks.has(week);
         return (
           <button
             key={week}
             type="button"
             role="tab"
             aria-selected={selected}
-            aria-label={done ? `Week ${week}, complete` : `Week ${week}`}
+            aria-label={
+              passed ? `Week ${week}, final` : frozen ? `Week ${week}, locked` : done ? `Week ${week}, complete` : `Week ${week}`
+            }
             onClick={() => onSelectWeek(week)}
             className={cn(bubbleClass(selected), 'w-11 tabular-nums')}
           >
             {week}
+            {(passed || frozen) && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-foreground text-background">
+                <Lock className="h-2.5 w-2.5" aria-hidden />
+              </span>
+            )}
             {done && !selected && (
               <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-white">
                 <Check className="h-2.5 w-2.5" aria-hidden />

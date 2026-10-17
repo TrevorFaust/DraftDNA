@@ -1,6 +1,7 @@
 import { allScheduleGames, scheduleGameKey, type ScheduleGame } from '@/constants/nfl2026ScheduleGrid';
 import { getTeams, type TeamRow } from '@/lib/newsletter/teams';
 import { teamNickname } from '@/utils/nfl2026Schedule';
+import { officialResult } from '@/utils/nfl2026Results';
 import { canonicalTeamAbbr } from '@/utils/teamMapping';
 import type { SeasonPredictionPicks } from '@/utils/seasonPredictionsStorage';
 
@@ -99,12 +100,18 @@ function buildContext(picks: SeasonPredictionPicks): SeasonContext {
 
   for (const game of allScheduleGames()) {
     const key = scheduleGameKey(game.week, game.away, game.home);
-    const picked = picks[key];
-    if (!picked) continue;
-
-    const winner = toCanonAbbr(picked);
     const home = toCanonAbbr(game.home);
     const away = toCanonAbbr(game.away);
+    const official = officialResult(game.week, game.away, game.home);
+    let winner: string | null = null;
+    if (official) {
+      if (!official.winner) continue;
+      winner = toCanonAbbr(official.winner);
+    } else {
+      const picked = picks[key];
+      if (!picked) continue;
+      winner = toCanonAbbr(picked);
+    }
     if (winner !== home && winner !== away) continue;
 
     const loser = winner === home ? away : home;

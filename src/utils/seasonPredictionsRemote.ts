@@ -4,10 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import type { PlayoffBracketPicks } from '@/utils/seasonPlayoffBracket';
 import {
+  emptySeasonPredictionMeta,
   loadSeasonPredictionState,
   normalizeSeasonPredictionBoard,
   seasonBoardHasContent,
   type SeasonPredictionBoardState,
+  type SeasonPredictionMeta,
   type SeasonPredictionPicks,
 } from '@/utils/seasonPredictionsStorage';
 
@@ -75,9 +77,10 @@ export async function saveSeasonPredictionBoard(
   bracket: PlayoffBracketPicks,
   awards: SeasonAwardsPicks,
   season: number = PICKEM_SEASON,
-  opts?: { allowEmpty?: boolean }
+  opts?: { allowEmpty?: boolean; meta?: SeasonPredictionMeta }
 ): Promise<boolean> {
-  const board: SeasonPredictionBoardState = { picks, bracket, awards };
+  const meta = opts?.meta ?? emptySeasonPredictionMeta();
+  const board: SeasonPredictionBoardState = { picks, bracket, awards, meta };
   if (!opts?.allowEmpty && !seasonBoardHasContent(board)) {
     // Never clobber a cloud slate with an empty autosave (phone/incognito wipe).
     return true;
@@ -88,6 +91,7 @@ export async function saveSeasonPredictionBoard(
     picks,
     bracket,
     awards,
+    meta,
   };
   const { error } = await supabase.from(TABLE as never).upsert(
     {
@@ -137,13 +141,9 @@ export async function migrateLocalSeasonPredictions(userId: string): Promise<boo
       return false;
     }
 
-    return saveSeasonPredictionBoard(
-      userId,
-      local.picks,
-      local.bracket,
-      local.awards,
-      season
-    );
+    return saveSeasonPredictionBoard(userId, local.picks, local.bracket, local.awards, season, {
+      meta: local.meta,
+    });
   } catch (error) {
     console.error('Error migrating season predictions:', error);
     return false;

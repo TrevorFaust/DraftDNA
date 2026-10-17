@@ -14,6 +14,8 @@ type Props = {
   alwaysUnlocked?: boolean;
   /** Force-lock picks (e.g. season predictions deadline). */
   forceLocked?: boolean;
+  /** Hide Correct / Missed when the row is showing an official result. */
+  showOutcome?: boolean;
 };
 
 function pickOutcomeLabel(picked: string | null, game: WeekMatchup['game']): string {
@@ -93,6 +95,7 @@ export function PickemMatchupRow({
   onPick,
   alwaysUnlocked = false,
   forceLocked = false,
+  showOutcome = true,
 }: Props) {
   const locked = forceLocked ? true : alwaysUnlocked ? false : isMatchupLocked(matchup);
   const game = matchup.game;
@@ -135,7 +138,7 @@ export function PickemMatchupRow({
       {matchup.kickoffAt ? (
         <p className="pt-1 text-center text-[10px] leading-tight text-muted-foreground">
           {formatKickoff(matchup.kickoffAt)}
-          {pickOutcomeLabel(picked, game)}
+          {showOutcome ? pickOutcomeLabel(picked, game) : ''}
         </p>
       ) : (
         <p className="pt-1 text-center text-[10px] leading-tight text-muted-foreground">Time TBD</p>

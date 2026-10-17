@@ -15,6 +15,7 @@ import { PICKEM_SEASON, formatPickemRecord, pickemRecordFromGames } from '@/cons
 import { gamesForWeek } from '@/constants/nfl2026ScheduleGrid';
 import { pickemGetWeek, pickemSetWeekPicks, syncNflScoreboard } from '@/utils/pickemApi';
 import { isMatchupLocked, isWeekComplete, matchupsForWeek, savedPickFor, seedPickFor } from '@/utils/nfl2026Schedule';
+import { weekIsFinal } from '@/utils/nfl2026Results';
 import { userFacingErrorMessage } from '@/utils/userFacingError';
 import type { PickemGame, PickemStanding, PickemWeekBoard } from '@/types/leagueSocial';
 import { cn } from '@/lib/utils';
@@ -164,7 +165,10 @@ export default function Pickem() {
 
   const boardGames = board?.week === week ? board.games : EMPTY_GAMES;
   const matchups = useMemo(() => matchupsForWeek(week, boardGames), [week, boardGames]);
-  const weekRecord = useMemo(() => pickemRecordFromGames(boardGames), [boardGames]);
+  const weekRecord = useMemo(
+    () => pickemRecordFromGames(matchups.flatMap((matchup) => (matchup.game ? [matchup.game] : []))),
+    [matchups]
+  );
   const weekComplete = isWeekComplete(matchups);
   const needsLiveUpdates = matchups.some((matchup) => {
     if (!isMatchupLocked(matchup)) return false;
@@ -253,6 +257,8 @@ export default function Pickem() {
   };
 
   const handlePick = (key: string, abbr: string) => {
+    const matchup = matchups.find((row) => row.key === key);
+    if (matchup && isMatchupLocked(matchup)) return;
     setDraftByKey((prev) => ({
       ...prev,
       [draftKey]: { ...(prev[draftKey] ?? {}), [key]: abbr },
@@ -305,6 +311,7 @@ export default function Pickem() {
   }
 
   const gameCount = gamesForWeek(week).length;
+  const weekLocked = weekIsFinal(week);
   const saveLabel = !user
     ? remaining > 0
       ? `Pick ${remaining} more`
@@ -328,7 +335,7 @@ export default function Pickem() {
   );
 
   return (
-    <div className={cn('min-h-screen bg-background', view === 'picks' && !weekComplete && openMatchups.length > 0 && 'pb-28')}>
+    <div className={cn('min-h-screen bg-background', view === 'picks' && (weekLocked || (!weekComplete && openMatchups.length > 0)) && 'pb-28')}>
       <Navbar />
       <main className="mx-auto max-w-6xl px-4 py-5">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -404,10 +411,12 @@ export default function Pickem() {
             <div className="mb-2 flex items-baseline justify-between gap-3">
               <h2 className="font-display text-xl tracking-wide">Week {week}</h2>
               <p className="text-sm text-muted-foreground">
-                {`${gameCount} ${gameCount === 1 ? 'game' : 'games'}`}
-                {weekRecord.wins + weekRecord.losses + weekRecord.pushes > 0
+                {weekLocked
+                  ? 'Locked'
+                  : `${gameCount} ${gameCount === 1 ? 'game' : 'games'}`}
+                {!weekLocked && weekRecord.wins + weekRecord.losses + weekRecord.pushes > 0
                   ? ` · ${formatPickemRecord(weekRecord.wins, weekRecord.losses, weekRecord.pushes)}`
-                  : openMatchups.length < matchups.length
+                  : !weekLocked && openMatchups.length < matchups.length
                     ? ` · ${matchups.length - openMatchups.length} locked`
                     : ''}
               </p>
@@ -433,7 +442,18 @@ export default function Pickem() {
         )}
       </main>
 
-      {view === 'picks' && !weekComplete && openMatchups.length > 0 && (
+      {view === 'picks' && weekLocked && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur-md">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">Week {week} is locked.</p>
+            <Button disabled className="min-h-11 min-w-[10.5rem]">
+              This week is locked
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {view === 'picks' && !weekLocked && !weekComplete && openMatchups.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur-md">
           <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 space-y-2">
