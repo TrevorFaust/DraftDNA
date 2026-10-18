@@ -190,6 +190,81 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out
 }
 
+type DbError = {
+  message?: string
+  code?: string
+  details?: string | null
+  hint?: string | null
+}
+
+function asDbError(err: unknown): DbError {
+  if (err && typeof err === 'object') return err as DbError
+  return { message: err instanceof Error ? err.message : String(err) }
+}
+
+function describeDbError(error: DbError): string {
+  const parts = [error.code, error.message, error.details, error.hint]
+    .map((part) => (part == null ? '' : String(part).trim()))
+    .filter(Boolean)
+  return parts.join(' — ') || 'empty response (gateway or statement timeout)'
+}
+
+function isMissingRelation(error: DbError): boolean {
+  const code = error.code ?? ''
+  const message = (error.message ?? '').toLowerCase()
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    message.includes('does not exist') ||
+    message.includes('schema cache')
+  )
+}
+
+function isTransientDbError(error: DbError): boolean {
+  if (isMissingRelation(error)) return false
+  const blob = `${error.code ?? ''} ${error.message ?? ''} ${error.details ?? ''}`.toLowerCase()
+  if (!blob.trim()) return true
+  return (
+    blob.includes('timeout') ||
+    blob.includes('57014') ||
+    blob.includes('55p03') ||
+    blob.includes('fetch failed') ||
+    blob.includes('econnreset') ||
+    blob.includes('socket') ||
+    blob.includes('network') ||
+    blob.includes('gateway') ||
+    blob.includes('unavailable')
+  )
+}
+
+const RETRY_DELAYS_MS = [2_000, 8_000, 20_000, 45_000]
+
+async function withDbRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  let attempt = 0
+  for (;;) {
+    try {
+      return await fn()
+    } catch (err) {
+      const dbErr = asDbError(err)
+      if (!isTransientDbError(dbErr) || attempt >= RETRY_DELAYS_MS.length) throw err
+      const wait = RETRY_DELAYS_MS[attempt]
+      attempt += 1
+      console.log(
+        `[sync-weekly-stats-2026] ${label} hit a transient error (${describeDbError(dbErr)}). Retry ${attempt} in ${wait / 1000}s.`
+      )
+      await new Promise((resolve) => setTimeout(resolve, wait))
+    }
+  }
+}
+
+function throwDbError(error: DbError, prefix: string): never {
+  const wrapped = new Error(`${prefix} (${describeDbError(error)})`) as Error & DbError
+  wrapped.code = error.code
+  wrapped.details = error.details
+  wrapped.hint = error.hint
+  throw wrapped
+}
+
 async function main() {
   loadDotEnv()
   const url = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL
@@ -210,21 +285,10 @@ async function main() {
 
   const supabase = createClient(url, key)
 
-  // Ensure table exists / is readable
-  const { count, error: countErr } = await supabase
-    .from('weekly_stats_2026')
-    .select('player_id', { count: 'exact', head: true })
-  if (countErr) {
-    throw new Error(
-      `weekly_stats_2026 not readable (${countErr.message}). Apply migration 20260909170000_create_weekly_stats_2026.sql first.`
-    )
-  }
-  console.log(`[sync-weekly-stats-2026] current rows=${count ?? 0}`)
-
   const csv = await fetchCsvOrNull(statsUrl)
   if (!csv) {
     console.log(
-      '[sync-weekly-stats-2026] nflverse file not published yet (404). Table is ready; re-run after week 1.'
+      '[sync-weekly-stats-2026] nflverse file not published yet (404). Re-run after week 1.'
     )
     console.log(
       '[sync-weekly-stats-2026] Expected URL once available:\n  ' + DEFAULT_STATS_URL
@@ -232,7 +296,21 @@ async function main() {
     return
   }
 
-  const cols = await detectTableColumns(supabase)
+  // A limit-1 GET confirms the table exists and keeps the error body.
+  // The old exact-count HEAD returned 500 with an empty body when the API
+  // was busy, and the script treated that as a missing table.
+  await withDbRetry('read weekly_stats_2026', async () => {
+    const { error } = await supabase.from('weekly_stats_2026').select('player_id').limit(1)
+    if (!error) return
+    if (isMissingRelation(error)) {
+      throw new Error(
+        `weekly_stats_2026 not readable (${describeDbError(error)}). Apply migration 20260909170000_create_weekly_stats_2026.sql first.`
+      )
+    }
+    throwDbError(error, 'weekly_stats_2026 read failed')
+  })
+
+  const cols = await withDbRetry('detect columns', () => detectTableColumns(supabase))
   console.log(`[sync-weekly-stats-2026] table columns=${cols.size} csv rows=${csv.length}`)
 
   const payloads: Record<string, string | number | null>[] = []
@@ -285,10 +363,12 @@ async function main() {
 
   let written = 0
   for (const batch of chunk(payloads, UPSERT_CHUNK)) {
-    const { error } = await supabase.from('weekly_stats_2026').upsert(batch, {
-      onConflict: 'player_id,season,week,season_type',
+    await withDbRetry(`upsert ${written + batch.length}/${payloads.length}`, async () => {
+      const { error } = await supabase.from('weekly_stats_2026').upsert(batch, {
+        onConflict: 'player_id,season,week,season_type',
+      })
+      if (error) throwDbError(error, 'weekly_stats_2026 upsert failed')
     })
-    if (error) throw error
     written += batch.length
     console.log(`[sync-weekly-stats-2026] upserted ${written}/${payloads.length}`)
   }

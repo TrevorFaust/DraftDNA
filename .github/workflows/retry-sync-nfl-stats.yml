@@ -23,7 +23,7 @@ concurrency:
 jobs:
   retry:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'startup_failure'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Re-run a recent startup failure
