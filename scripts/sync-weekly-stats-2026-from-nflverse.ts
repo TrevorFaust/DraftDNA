@@ -226,6 +226,7 @@ function isTransientDbError(error: DbError): boolean {
   if (!blob.trim()) return true
   return (
     blob.includes('timeout') ||
+    blob.includes('aborted') ||
     blob.includes('57014') ||
     blob.includes('55p03') ||
     blob.includes('fetch failed') ||
@@ -237,7 +238,13 @@ function isTransientDbError(error: DbError): boolean {
   )
 }
 
-const RETRY_DELAYS_MS = [2_000, 8_000, 20_000, 45_000]
+const RETRY_DELAYS_MS = [5_000, 15_000]
+
+function fetchWithDeadline(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const deadline = AbortSignal.timeout(20_000)
+  const signal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline
+  return fetch(input, { ...init, signal })
+}
 
 async function withDbRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
   let attempt = 0
@@ -283,7 +290,9 @@ async function main() {
     console.log(`[sync-weekly-stats-2026] week filter=${weekFilter}`)
   }
 
-  const supabase = createClient(url, key)
+  const supabase = createClient(url, key, {
+    global: { fetch: fetchWithDeadline },
+  })
 
   const csv = await fetchCsvOrNull(statsUrl)
   if (!csv) {
